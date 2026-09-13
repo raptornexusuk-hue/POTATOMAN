@@ -20,6 +20,7 @@ final class BrowserModel: ObservableObject {
     init() {
         refreshInstallations()
         restoreAccess()
+        restoreClearPreferences()
         refresh()
     }
 
@@ -128,6 +129,100 @@ final class BrowserModel: ObservableObject {
                 let count = result.profiles.filter { $0.historyURL != nil }.count
                 self.statusMessage = "\(currentInstallations.count) browsers detected · \(count) local profiles. History counts refresh when you return to \(Brand.name)."
             }
+        }
+    }
+
+    // MARK: - One-click clearing
+
+    /// Everything the Clear panel needs. Cleared data is not recoverable from the
+    /// browser, so the confirmation sheet is the consent step for this operation.
+    @Published var clearSelection = BrowserClearSelection() {
+        didSet { persistClearPreferences() }
+    }
+    @Published var clearRange: BrowserTimeRange = .last24Hours {
+        didSet { persistClearPreferences() }
+    }
+    @Published private(set) var isClearing = false
+    @Published private(set) var clearReport: BrowserClearReport?
+    @Published var showClearConfirmation = false
+
+    /// Profiles that have something this selection could actually clear.
+    var clearTargets: [BrowserClearTarget] {
+        profiles.compactMap { profile in
+            let caches = cacheURLs(for: profile)
+            let hasHistory = profile.historyURL != nil
+            guard hasHistory || !caches.isEmpty else { return nil }
+            let name = installations.first { $0.id == profile.installationID }?.displayName ?? profile.browser.rawValue
+            return BrowserClearTarget(id: profile.id,
+                                      browser: profile.browser,
+                                      browserName: name,
+                                      profileName: profile.displayName,
+                                      profileDirectory: profile.directoryURL,
+                                      historyURL: profile.historyURL,
+                                      cookiesURL: profile.cookiesURL,
+                                      cachePaths: caches)
+        }
+    }
+
+    /// Browsers that are open right now. Clearing skips these, so the UI warns
+    /// before the sheet rather than reporting a pile of skips afterwards.
+    var runningBrowserNames: [String] {
+        let running = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
+        let names = clearTargets
+            .filter { target in target.browser.bundleIdentifiers.contains { running.contains($0) } }
+            .map(\.browserName)
+        return Array(Set(names)).sorted()
+    }
+
+    var canClear: Bool {
+        hasAccess && !isClearing && !isRefreshing && !clearSelection.isEmpty && !clearTargets.isEmpty
+    }
+
+    func requestClear() {
+        guard canClear else { return }
+        clearReport = nil
+        showClearConfirmation = true
+    }
+
+    func confirmClear() {
+        guard canClear else { return }
+        let targets = clearTargets
+        let selection = clearSelection
+        let range = clearRange
+        let running = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
+        showClearConfirmation = false
+        isClearing = true
+        statusMessage = "Clearing \(selection.summary) · \(range.title.lowercased())…"
+        Task { [self] in
+            let report = await Task.detached(priority: .userInitiated) {
+                BrowserDataCleaner.clear(targets: targets, selection: selection, range: range, runningBrowserIDs: running)
+            }.value
+            self.clearReport = report
+            self.isClearing = false
+            self.statusMessage = report.headline
+            self.refresh()
+        }
+    }
+
+    func dismissClearReport() { clearReport = nil }
+
+    private func persistClearPreferences() {
+        let defaults = UserDefaults.standard
+        defaults.set(clearRange.rawValue, forKey: "clearRange")
+        defaults.set(clearSelection.history, forKey: "clearHistory")
+        defaults.set(clearSelection.cookies, forKey: "clearCookies")
+        defaults.set(clearSelection.cache, forKey: "clearCache")
+    }
+
+    private func restoreClearPreferences() {
+        let defaults = UserDefaults.standard
+        if let raw = defaults.string(forKey: "clearRange"), let range = BrowserTimeRange(rawValue: raw) {
+            clearRange = range
+        }
+        if defaults.object(forKey: "clearHistory") != nil {
+            clearSelection = BrowserClearSelection(history: defaults.bool(forKey: "clearHistory"),
+                                                   cookies: defaults.bool(forKey: "clearCookies"),
+                                                   cache: defaults.bool(forKey: "clearCache"))
         }
     }
 

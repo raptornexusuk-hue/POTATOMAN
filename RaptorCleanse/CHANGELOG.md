@@ -1,5 +1,53 @@
 # Changelog
 
+## 0.4.0 Alpha — Build 5
+
+Acts on two things the previous build only reported on.
+
+### Added
+
+- **One-click browser clearing.** A single Clear panel at the top of Browser
+  cleaner: pick a time range (last hour, 24 hours, 7 days, 4 weeks, all time),
+  tick history, cookies and/or cache, press once. It applies to every detected
+  browser and profile at the same time. Previously the app only *opened* each
+  browser's own privacy controls and left the work to you.
+- **Virus scan works in one click.** Downloads is pre-selected on arrival, with
+  Desktop and Documents one tap away, and a single Scan now button. The page
+  opens ready to scan rather than ready to be configured.
+- **Actionable setup when ClamAV is missing.** The old message named a
+  documentation page. The new panel gives the exact command
+  (`brew install clamav && freshclam`) with a Copy button and a "detect again"
+  step. "ClamAV is not installed" is by far the most likely reason a scan does
+  nothing, and the app now says so plainly.
+- **Scan at login.** Registers the app itself as a login item via
+  `SMAppService`; on launch it scans the selected folder. No helper tool, no
+  background agent — closing the app stops everything.
+- 22 new tests in `BrowserCleanupTests.swift`.
+
+### Safety of the clearing feature
+
+Clearing writes to a browser's own databases, which is the only irreversible
+thing this app does. Three rules bound it:
+
+1. **The browser must be quit.** Running browsers are skipped, named in the UI
+   before you press the button, and re-checked at the moment of clearing.
+2. **Every database is copied before it is touched.** On success the copy goes to
+   Trash, so a mistake is recoverable; on failure the original is put back and
+   the copy removed.
+3. **Time bounds are tested.** Chromium counts microseconds from 1601, Firefox
+   microseconds from 1970, Safari seconds from 2001. A wrong conversion would
+   silently delete far more than asked, so each is a pure function with exact
+   assertions, and the delete statements run against synthetic databases in the
+   test suite.
+
+Firefox bookmarks are protected explicitly: pages are only removed when they have
+no remaining visits **and** `foreign_count = 0`, so clearing history never takes a
+bookmark with it. Safari's history and cookies are protected by macOS from other
+apps; the app says so and leaves Safari's own controls as the route, while still
+clearing Safari's cache.
+
+Cache files always go to Trash rather than being deleted.
+
 ## 0.3.0 Alpha — Build 4
 
 Branding, interface and behaviour revision. No safety rule was relaxed: folder boundaries,

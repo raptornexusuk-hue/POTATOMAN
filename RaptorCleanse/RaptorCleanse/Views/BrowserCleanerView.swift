@@ -11,6 +11,8 @@ struct BrowserCleanerView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: BrandSpace.lg) {
                 if !browsers.hasAccess { accessCard }
+                if browsers.hasAccess { clearCard }
+                if let report = browsers.clearReport { resultCard(report) }
                 statusRow
                 if browsers.installations.isEmpty {
                     CleanseEmptyState(symbol: "globe",
@@ -37,6 +39,118 @@ struct BrowserCleanerView: View {
         }
         .sheet(item: $historyProfile) { profile in
             BrowserHistoryConfirmation(profile: profile)
+        }
+        .sheet(isPresented: $browsers.showClearConfirmation) {
+            BrowserClearConfirmation()
+        }
+    }
+
+    /// One control for the whole job: pick how far back, pick what to remove,
+    /// press once. Everything below it stays available for per-profile work.
+    private var clearCard: some View {
+        CleansePanel {
+            VStack(alignment: .leading, spacing: BrandSpace.md) {
+                HStack(alignment: .top, spacing: BrandSpace.md) {
+                    CleanseIconTile(symbol: "sparkles", size: 48)
+                    VStack(alignment: .leading, spacing: BrandSpace.xxs) {
+                        Text("Clear browsing data").font(BrandFont.heading)
+                        Text("Applies to every detected browser and profile at once.")
+                            .font(BrandFont.body)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 0)
+                }
+
+                Picker("Time range", selection: $browsers.clearRange) {
+                    ForEach(BrowserTimeRange.allCases) { range in
+                        Text(range.title).tag(range)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .disabled(browsers.isClearing)
+                .accessibilityLabel("Time range to clear")
+
+                HStack(alignment: .top, spacing: BrandSpace.lg) {
+                    Toggle("Browsing history", isOn: $browsers.clearSelection.history)
+                    Toggle("Cookies and sign-ins", isOn: $browsers.clearSelection.cookies)
+                    Toggle("Cached files", isOn: $browsers.clearSelection.cache)
+                    Spacer(minLength: 0)
+                }
+                .toggleStyle(.checkbox)
+                .font(BrandFont.body)
+                .disabled(browsers.isClearing)
+
+                if browsers.clearSelection.cookies {
+                    CleanseCallout(text: "Clearing cookies signs you out of websites.",
+                                   symbol: "person.badge.key", tone: .caution)
+                }
+                if !browsers.runningBrowserNames.isEmpty {
+                    CleanseCallout(text: "Quit \(browsers.runningBrowserNames.joined(separator: ", ")) with ⌘Q first. Open browsers are skipped, and would rewrite the data anyway.",
+                                   symbol: "exclamationmark.triangle", tone: .caution)
+                }
+
+                HStack(spacing: BrandSpace.sm) {
+                    if browsers.isClearing {
+                        ProgressView().controlSize(.small)
+                        Text(browsers.statusMessage).font(BrandFont.body.weight(.medium))
+                    } else {
+                        Text("\(browsers.clearTargets.count) \(browsers.clearTargets.count == 1 ? "profile" : "profiles") ready")
+                            .font(BrandFont.detail)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 0)
+                    Button(action: browsers.requestClear) {
+                        Label("Clear now", systemImage: "trash")
+                    }
+                    .buttonStyle(CleansePrimaryButtonStyle())
+                    .disabled(!browsers.canClear)
+                    .keyboardShortcut(.defaultAction)
+                }
+            }
+        }
+    }
+
+    private func resultCard(_ report: BrowserClearReport) -> some View {
+        CleansePanel {
+            VStack(alignment: .leading, spacing: BrandSpace.sm) {
+                HStack(alignment: .top, spacing: BrandSpace.sm) {
+                    CleanseIconTile(symbol: report.failures.isEmpty ? "checkmark.circle" : "exclamationmark.triangle",
+                                    size: 40,
+                                    tone: report.failures.isEmpty ? .positive : .caution)
+                    VStack(alignment: .leading, spacing: BrandSpace.xxs) {
+                        Text(report.headline).font(BrandFont.subheading)
+                        Text("\(report.selection.summary.capitalized) · \(report.range.title.lowercased())")
+                            .font(BrandFont.detail)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 0)
+                    Button("Dismiss", action: browsers.dismissClearReport)
+                        .buttonStyle(CleanseQuietButtonStyle())
+                }
+                ForEach(report.outcomes.filter(\.didSomething)) { outcome in
+                    HStack(spacing: BrandSpace.xs) {
+                        Text("\(outcome.browserName) · \(outcome.profileName)")
+                            .font(BrandFont.detail.weight(.medium))
+                        Spacer(minLength: 0)
+                        Text(outcome.summary)
+                            .font(BrandFont.detail)
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
+                }
+                ForEach(Array(report.skipped.prefix(8).enumerated()), id: \.offset) { _, note in
+                    CleanseCallout(text: note, tone: .neutral)
+                }
+                ForEach(Array(report.failures.prefix(8).enumerated()), id: \.offset) { _, note in
+                    CleanseCallout(text: note, symbol: "exclamationmark.triangle", tone: .critical)
+                }
+                Text("Database copies were moved to Trash before anything was changed. Recover them from Trash if this removed more than you meant.")
+                    .font(BrandFont.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
@@ -321,6 +435,86 @@ private struct BrowserHistoryConfirmation: View {
                     dismiss()
                 }
                 .buttonStyle(CleansePrimaryButtonStyle())
+            }
+        }
+        .padding(BrandSpace.lg)
+        .frame(width: 620)
+    }
+}
+
+/// The consent step for the only irreversible thing this app does. It names the
+/// exact browsers, profiles, data and time range before anything is removed.
+private struct BrowserClearConfirmation: View {
+    @EnvironmentObject private var browsers: BrowserModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        let targets = browsers.clearTargets
+        let running = browsers.runningBrowserNames
+        let safari = targets.filter { $0.browser == .safari }
+
+        return VStack(alignment: .leading, spacing: BrandSpace.md) {
+            Label("Clear browsing data?", systemImage: "trash")
+                .font(BrandFont.title)
+
+            CleanseWell {
+                VStack(alignment: .leading, spacing: BrandSpace.xxs) {
+                    Text(browsers.clearSelection.summary.capitalized)
+                        .font(BrandFont.subheading)
+                    Text("Time range: \(browsers.clearRange.title.lowercased())")
+                        .font(BrandFont.body)
+                        .foregroundStyle(.secondary)
+                    Text("\(targets.count) \(targets.count == 1 ? "profile" : "profiles") across \(Set(targets.map(\.browserName)).count) \(Set(targets.map(\.browserName)).count == 1 ? "browser" : "browsers")")
+                        .font(BrandFont.body)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(targets) { target in
+                        HStack(spacing: BrandSpace.xs) {
+                            Text(target.browserName).font(BrandFont.detail.weight(.medium))
+                            Text(target.profileName).font(BrandFont.detail).foregroundStyle(.secondary)
+                            Spacer(minLength: 0)
+                            if target.browser == .safari {
+                                Text("cache only").font(BrandFont.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(.vertical, BrandSpace.xxs)
+                        Divider()
+                    }
+                }
+            }
+            .frame(maxHeight: 150)
+
+            if !running.isEmpty {
+                CleanseCallout(text: "\(running.joined(separator: ", ")) \(running.count == 1 ? "is" : "are") still open and will be skipped. Quit with ⌘Q and clear again.",
+                               symbol: "exclamationmark.triangle", tone: .caution)
+            }
+            if !safari.isEmpty && (browsers.clearSelection.history || browsers.clearSelection.cookies) {
+                CleanseCallout(text: "macOS protects Safari's history and cookies from other apps. Safari's cache can be cleared here; for the rest, use Safari → History → Clear History.",
+                               symbol: "lock", tone: .caution)
+            }
+            if browsers.clearSelection.cookies {
+                CleanseCallout(text: "Clearing cookies signs you out of websites on this Mac.",
+                               symbol: "person.badge.key", tone: .caution)
+            }
+
+            Text("History and cookies are removed from the browser's own databases and cannot be restored from the browser. A copy of each database is moved to Trash first, so you can recover it from there. Cache files go to Trash.")
+                .font(BrandFont.detail)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Divider()
+            HStack(spacing: BrandSpace.sm) {
+                Spacer()
+                Button("Cancel") { dismiss() }
+                    .buttonStyle(CleanseSecondaryButtonStyle())
+                    .keyboardShortcut(.cancelAction)
+                Button("Clear now", action: browsers.confirmClear)
+                    .buttonStyle(CleansePrimaryButtonStyle())
+                    .disabled(targets.isEmpty)
             }
         }
         .padding(BrandSpace.lg)

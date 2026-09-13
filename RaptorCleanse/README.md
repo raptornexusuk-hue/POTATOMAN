@@ -1,6 +1,6 @@
 # Raptor Cleanse — macOS
 
-**Dev Build v0.3.0 Alpha · Build 4**
+**Dev Build v0.4.0 Alpha · Build 5**
 More space. Less clutter.
 
 A native SwiftUI app for macOS 14 Sonoma or later, on Apple Silicon or Intel. It does
@@ -8,9 +8,9 @@ three things, and only when you ask it to:
 
 | | |
 |---|---|
-| **Browser cleaner** | Finds installed browsers and their profiles, reports recorded history visits, and reviews their cache files before you move any to Trash. |
+| **Browser cleaner** | Clears history, cookies and cache across every detected browser in one click, for a time range you choose. |
 | **Folder review** | Scans exactly one folder you choose, lists large files and content-matched duplicates, and moves only what you select to Trash. |
-| **Virus scan** | Checks a chosen folder with a **separately installed ClamAV** engine. Nothing is removed or quarantined for you. |
+| **Virus scan** | One button. Downloads is pre-selected; optionally scans at login. Uses a **separately installed ClamAV** engine, and never removes or quarantines anything for you. |
 
 This package contains the complete source, the Xcode project, the artwork, isolated test
 fixtures and a CCleaner Mac scope comparison. It is source code, not a compiled or
@@ -125,6 +125,35 @@ space, so its apparent size is not a promise of recoverable space.
 
 ## Browser cleaner
 
+### Clearing in one click
+
+Pick a time range, tick what to remove, press **Clear now**. It covers every
+detected browser and profile at once.
+
+**Quit the browsers first (⌘Q).** A running browser holds its databases open and
+would rewrite whatever was removed, so running browsers are skipped — they are
+named in the panel before you press anything.
+
+This writes to the browser's own databases and is the only irreversible thing the
+app does, so it is bounded three ways: every database is **copied to Trash before
+it is touched** (recover it from there if the result was not what you wanted); a
+failure puts the original back; and the time bounds are covered by tests, because
+Chromium, Firefox and Safari each count time from a different epoch and a wrong
+conversion would delete far more than you asked for.
+
+Two things it deliberately will not do:
+
+- **Firefox bookmarks are never removed.** A page is only deleted when it has no
+  remaining visits *and* no bookmark referring to it.
+- **Safari history and cookies are protected by macOS** from other applications.
+  The app says so rather than failing obscurely, clears Safari's cache, and leaves
+  Safari → History → Clear History as the route for the rest.
+
+Clearing cookies signs you out of websites. It is off by default for that reason.
+Cache files go to Trash, never straight to deletion.
+
+### Reviewing in detail
+
 Supported families are Safari, Chrome, Edge, Brave and Firefox. Installed applications are
 detected without a whole-disk search. Grant access to your home **Library** folder, or to a
 recognised browser subtree, to discover standard local profiles and history counts. This
@@ -159,10 +188,29 @@ Modern browser versions may store data elsewhere. Unsupported locations are neve
 added. **Settings → Forget access** discards browser permissions and the current cache
 review. The scope comparison is in **CCLEANER-COMPARISON.md**.
 
-## Virus scan: ClamAV setup
+## Virus scan
+
+Open the page and press **Scan now**. Downloads is already selected, because that
+is where files arrive; Desktop and Documents are one tap away, and **Choose…**
+takes any other folder. **Scan at login** makes the app open at login and scan
+that folder — it registers the app itself as a login item, with no helper tool and
+no background agent, so quitting the app stops everything.
+
+### First-time setup
 
 The scanner uses a real, separately installed **ClamAV** engine with local official
 signatures. ClamAV is **not bundled**. Browser cleaner and Folder review work without it.
+
+If the page says ClamAV is not installed, that is almost certainly why a scan does
+nothing. The panel gives you the command to paste, with a Copy button:
+
+```
+brew install clamav && freshclam
+```
+
+`freshclam` matters as much as the install: the engine on its own has no malware
+signatures, and this app refuses definitions more than seven days old rather than
+reporting a clean result it cannot stand behind.
 
 1. Install ClamAV using the [official macOS instructions](https://docs.clamav.net/manual/Installing.html#macos).
 2. Configure and update its signature database — see [signature management](https://docs.clamav.net/manual/Usage/SignatureManagement.html). Installing the engine alone may not install usable definitions.

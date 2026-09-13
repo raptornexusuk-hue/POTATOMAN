@@ -113,6 +113,18 @@
 			"path" = "Views/VirusScanView.swift";
 			"sourceTree" = "<group>";
 		};
+		"FAC4D6F5F25BB5A3156E926C" = {
+			"isa" = "PBXFileReference";
+			"lastKnownFileType" = "sourcecode.swift";
+			"path" = "Models/BrowserCleanupModels.swift";
+			"sourceTree" = "<group>";
+		};
+		"C1EE64DEFFB48935E2FA00AA" = {
+			"isa" = "PBXFileReference";
+			"lastKnownFileType" = "sourcecode.swift";
+			"path" = "Services/BrowserDataCleaner.swift";
+			"sourceTree" = "<group>";
+		};
 		"8BF729FFE074CAEE622C0292" = {
 			"isa" = "PBXFileReference";
 			"lastKnownFileType" = "folder.assetcatalog";
@@ -155,6 +167,12 @@
 			"path" = "SortingTests.swift";
 			"sourceTree" = "<group>";
 		};
+		"798B836106C77B49E6A6CF9C" = {
+			"isa" = "PBXFileReference";
+			"lastKnownFileType" = "sourcecode.swift";
+			"path" = "BrowserCleanupTests.swift";
+			"sourceTree" = "<group>";
+		};
 		"681C948D238C526E9E3424E0" = {
 			"isa" = "PBXFileReference";
 			"explicitFileType" = "wrapper.application";
@@ -190,6 +208,8 @@
 				"B902136321E88A2270EE6752",
 				"2B2AEC8E108285B99C54B866",
 				"5944483E0CF77D6751B5EBE3",
+				"FAC4D6F5F25BB5A3156E926C",
+				"C1EE64DEFFB48935E2FA00AA",
 				"8BF729FFE074CAEE622C0292",
 				"A4CC6BC01A927E2A78FD3BEC",
 				"CCB32DA757F8CB91EA8A9F9D",
@@ -204,6 +224,7 @@
 				"4BA4BDE34BACAD4BAE45F310",
 				"9D51DA4B647926A07D798294",
 				"AA60711929D2DC0DBBD90EFB",
+				"798B836106C77B49E6A6CF9C",
 			);
 			"path" = "RaptorCleanseTests";
 			"sourceTree" = "<group>";
@@ -298,6 +319,14 @@
 			"isa" = "PBXBuildFile";
 			"fileRef" = "5944483E0CF77D6751B5EBE3";
 		};
+		"08B4F830B3CA2AC3B0797F3C" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "FAC4D6F5F25BB5A3156E926C";
+		};
+		"D54901A9DB6B8695A00A6946" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "C1EE64DEFFB48935E2FA00AA";
+		};
 		"F70B8C6279FC8B0E7847895C" = {
 			"isa" = "PBXBuildFile";
 			"fileRef" = "F249C432BA331EA59C78F6C1";
@@ -338,6 +367,14 @@
 			"isa" = "PBXBuildFile";
 			"fileRef" = "2B2AEC8E108285B99C54B866";
 		};
+		"95FA2E2BD536A398E9B2DE2A" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "FAC4D6F5F25BB5A3156E926C";
+		};
+		"C0AE2F5C51F2D83A04CD51C3" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "C1EE64DEFFB48935E2FA00AA";
+		};
 		"15AD87D655D029E81DB90F89" = {
 			"isa" = "PBXBuildFile";
 			"fileRef" = "B558902D89AD8BB780282E84";
@@ -353,6 +390,10 @@
 		"E71C51ABD47DB7AE21698401" = {
 			"isa" = "PBXBuildFile";
 			"fileRef" = "AA60711929D2DC0DBBD90EFB";
+		};
+		"4077E43DFF281B1234565156" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "798B836106C77B49E6A6CF9C";
 		};
 		"CB937D56FA89F170C3DE6EA1" = {
 			"isa" = "PBXBuildFile";
@@ -384,6 +425,8 @@
 				"012040F606E98D6A71C2AF79",
 				"CF8F2E4581EC84592358CDCF",
 				"6136FE0FA50DF956B9D69680",
+				"08B4F830B3CA2AC3B0797F3C",
+				"D54901A9DB6B8695A00A6946",
 			);
 			"runOnlyForDeploymentPostprocessing" = 0;
 		};
@@ -417,10 +460,13 @@
 				"111BA69C860CEFE316FA85CB",
 				"71EE6471697CE680035C4B1A",
 				"747D12710D4EEEB4E1BC5DC2",
+				"95FA2E2BD536A398E9B2DE2A",
+				"C0AE2F5C51F2D83A04CD51C3",
 				"15AD87D655D029E81DB90F89",
 				"0725CF67618D3FA03B84371B",
 				"702CA8F88E24C6E6AE4064E3",
 				"E71C51ABD47DB7AE21698401",
+				"4077E43DFF281B1234565156",
 			);
 			"runOnlyForDeploymentPostprocessing" = 0;
 		};
@@ -513,8 +559,8 @@
 				"INFOPLIST_KEY_LSApplicationCategoryType" = "public.app-category.utilities";
 				"INFOPLIST_KEY_NSHumanReadableCopyright" = "Raptor Nexus";
 				"INFOPLIST_KEY_CFBundleName" = "Raptor Cleanse";
-				"MARKETING_VERSION" = "0.3.0";
-				"CURRENT_PROJECT_VERSION" = "4";
+				"MARKETING_VERSION" = "0.4.0";
+				"CURRENT_PROJECT_VERSION" = "5";
 				"ASSETCATALOG_COMPILER_APPICON_NAME" = "AppIcon";
 				"CODE_SIGN_STYLE" = "Manual";
 				"CODE_SIGN_IDENTITY" = "-";
@@ -546,8 +592,8 @@
 				"INFOPLIST_KEY_LSApplicationCategoryType" = "public.app-category.utilities";
 				"INFOPLIST_KEY_NSHumanReadableCopyright" = "Raptor Nexus";
 				"INFOPLIST_KEY_CFBundleName" = "Raptor Cleanse";
-				"MARKETING_VERSION" = "0.3.0";
-				"CURRENT_PROJECT_VERSION" = "4";
+				"MARKETING_VERSION" = "0.4.0";
+				"CURRENT_PROJECT_VERSION" = "5";
 				"ASSETCATALOG_COMPILER_APPICON_NAME" = "AppIcon";
 				"CODE_SIGN_STYLE" = "Manual";
 				"CODE_SIGN_IDENTITY" = "-";

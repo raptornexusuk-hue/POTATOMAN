@@ -28,19 +28,22 @@ struct VirusScanView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: BrandSpace.lg) {
                 introPanel
-                enginePanel
-                scopePanel
+                if model.engine == nil { setupPanel } else { quickScanPanel }
                 if let message = model.message {
                     CleanseCallout(text: message, tone: .caution)
                 }
                 if model.isScanning { progressPanel }
                 if let report = model.report { resultPanel(report) }
+                enginePanel
                 coveragePanel
             }
             .padding(.horizontal, BrandSpace.xl)
             .padding(.bottom, BrandSpace.xl)
         }
-        .task { model.discoverIfNeeded() }
+        .task {
+            model.prepareIfNeeded()
+            model.startScanIfLaunchedAtLogin()
+        }
     }
 
     private var introPanel: some View {
@@ -68,11 +71,10 @@ struct VirusScanView: View {
         CleansePanel {
             VStack(alignment: .leading, spacing: BrandSpace.md) {
                 HStack(alignment: .top) {
-                    CleanseStepHeading(number: 1,
-                                       title: "ClamAV engine",
-                                       detail: model.engine == nil
-                                           ? "An installed engine and signature database are needed."
-                                           : "Using your installed engine and local signature database.")
+                    CleanseSectionHeading(title: "Scanning engine",
+                                          detail: model.engine == nil
+                                              ? "An installed engine and signature database are needed."
+                                              : "Using your installed engine and local signature database.")
                     Spacer(minLength: BrandSpace.sm)
                     if model.isCheckingEngine {
                         ProgressView().controlSize(.small)
@@ -124,49 +126,136 @@ struct VirusScanView: View {
             .disabled(model.isScanning || model.isCheckingEngine)
     }
 
-    private var scopePanel: some View {
+    /// The whole scan in one panel: a folder that is already chosen, and a
+    /// button. Picking a different folder stays available but is not required.
+    private var quickScanPanel: some View {
         CleansePanel {
             VStack(alignment: .leading, spacing: BrandSpace.md) {
-                CleanseStepHeading(number: 2,
-                                   title: "Choose exactly where to scan",
-                                   detail: "This selection is independent of your cleaning folders.")
-                if let folder = model.selectedFolder {
-                    CleanseWell {
-                        VStack(alignment: .leading, spacing: BrandSpace.xxs) {
-                            Label(folder.lastPathComponent, systemImage: "folder")
-                                .font(BrandFont.subheading)
-                            Text(folder.path)
-                                .font(BrandFont.mono)
-                                .foregroundStyle(.secondary)
-                                .textSelection(.enabled)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
+                CleanseSectionHeading(title: "Scan a folder",
+                                      detail: "Downloads is pre-selected because that is where files usually arrive.")
+
+                HStack(spacing: BrandSpace.xs) {
+                    ForEach(VirusScanModel.presets) { preset in
+                        presetButton(preset)
                     }
+                    Button("Choose…", action: model.chooseFolder)
+                        .buttonStyle(CleanseSecondaryButtonStyle())
+                        .disabled(model.isScanning)
+                    Spacer(minLength: 0)
+                }
+
+                if let folder = model.selectedFolder {
+                    Text(folder.path)
+                        .font(BrandFont.mono)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .lineLimit(2)
+                        .truncationMode(.middle)
+                        .help(folder.path)
                 } else {
                     Text("No folder selected")
                         .font(BrandFont.rowTitle)
                         .foregroundStyle(.secondary)
                 }
+
                 Toggle("Include subfolders", isOn: $model.includeSubfolders)
+                    .font(BrandFont.body)
+                    .toggleStyle(.checkbox)
+                    .disabled(model.isScanning)
+
+                HStack(spacing: BrandSpace.sm) {
+                    Toggle("Scan at login", isOn: Binding(
+                        get: { model.scanAtLogin },
+                        set: { model.setScanAtLogin($0) }
+                    ))
                     .font(BrandFont.body)
                     .toggleStyle(.switch)
                     .tint(BrandColor.accent)
                     .disabled(model.isScanning)
-                    .frame(maxWidth: 330, alignment: .leading)
-                Text(model.includeSubfolders
-                     ? "Includes eligible files in child folders. Links and mounted disks remain excluded."
-                     : "Only eligible files directly inside the selected folder will be checked.")
-                    .font(BrandFont.detail)
+                    Spacer(minLength: 0)
+                    Button(action: model.startScan) {
+                        Label("Scan now", systemImage: "shield.lefthalf.filled")
+                    }
+                    .buttonStyle(CleansePrimaryButtonStyle())
+                    .disabled(!model.canScan)
+                    .keyboardShortcut(.defaultAction)
+                }
+
+                if let note = model.loginItemMessage {
+                    CleanseCallout(text: note, tone: .caution)
+                }
+            }
+        }
+    }
+
+    private func presetButton(_ preset: VirusScanModel.ScanPreset) -> some View {
+        let selected = model.isPresetSelected(preset)
+        return Button { model.selectPreset(preset) } label: {
+            Label(preset.title, systemImage: preset.symbol)
+                .font(BrandFont.body.weight(selected ? .semibold : .medium))
+                .foregroundStyle(selected ? BrandColor.accent : Color.primary)
+                .padding(.horizontal, BrandSpace.sm)
+                .padding(.vertical, BrandSpace.xs)
+                .background(selected ? BrandColor.accentWash : BrandColor.panel)
+                .clipShape(RoundedRectangle(cornerRadius: BrandRadius.md))
+                .overlay {
+                    RoundedRectangle(cornerRadius: BrandRadius.md)
+                        .stroke(selected ? BrandColor.accent.opacity(0.55) : BrandColor.line, lineWidth: 1)
+                }
+                .contentShape(RoundedRectangle(cornerRadius: BrandRadius.md))
+        }
+        .buttonStyle(.plain)
+        .disabled(model.isScanning)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    /// Shown instead of the scan controls when there is no engine. The previous
+    /// message pointed at a documentation page; this gives the actual command.
+    private var setupPanel: some View {
+        CleansePanel {
+            VStack(alignment: .leading, spacing: BrandSpace.md) {
+                HStack(alignment: .top, spacing: BrandSpace.md) {
+                    CleanseIconTile(symbol: "wrench.and.screwdriver", size: 48, tone: .caution)
+                    VStack(alignment: .leading, spacing: BrandSpace.xxs) {
+                        Text("ClamAV is not installed yet").font(BrandFont.heading)
+                        Text("The scanner uses the free ClamAV engine, which is a separate install and is not bundled with \(Brand.name). This is a one-time setup.")
+                            .font(BrandFont.body)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
+                CleanseWell {
+                    VStack(alignment: .leading, spacing: BrandSpace.xs) {
+                        Text("1. Paste this into Terminal").font(BrandFont.detail.weight(.medium))
+                        Text(VirusScanModel.installCommand)
+                            .font(BrandFont.mono)
+                            .textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text("Installs the engine, then downloads the official malware signatures. Needs Homebrew, and takes a few minutes.")
+                            .font(BrandFont.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
+                HStack(spacing: BrandSpace.sm) {
+                    Button(action: model.copyInstallCommand) {
+                        Label("Copy command", systemImage: "doc.on.doc")
+                    }
+                    .buttonStyle(CleanseSecondaryButtonStyle())
+                    Button(action: model.discoverEngine) {
+                        Label(model.isCheckingEngine ? "Checking…" : "2. I've installed it — detect", systemImage: "arrow.clockwise")
+                    }
+                    .buttonStyle(CleansePrimaryButtonStyle())
+                    .disabled(model.isCheckingEngine)
+                    Spacer(minLength: 0)
+                }
+
+                Text("No Homebrew? Use the official package from the installation guide below, then choose the installed engine by hand.")
+                    .font(BrandFont.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                HStack(spacing: BrandSpace.sm) {
-                    Button(model.selectedFolder == nil ? "Choose folder…" : "Change folder…", action: model.chooseFolder)
-                        .buttonStyle(CleanseSecondaryButtonStyle())
-                        .disabled(model.isScanning)
-                    Button(action: model.startScan) { Label("Scan for threats", systemImage: "shield") }
-                        .buttonStyle(CleansePrimaryButtonStyle())
-                        .disabled(!model.canScan)
-                }
             }
         }
     }

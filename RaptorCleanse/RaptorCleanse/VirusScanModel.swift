@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import AppKit
+import ServiceManagement
 import UniformTypeIdentifiers
 
 @MainActor
@@ -16,8 +17,106 @@ final class VirusScanModel: ObservableObject {
     @Published var message: String?
     private var cancellation: VirusScanCancellation?
     private var hasDiscovered = false
+    private var hasPreparedLaunch = false
 
     var canScan: Bool { engine != nil && selectedFolder != nil && !isScanning && !isCheckingEngine }
+
+    // MARK: - One-click scanning
+
+    /// Where most people actually acquire files. The home folder itself is not
+    /// offered: the safety policy rejects it as a scan root, and scanning it
+    /// whole would take long enough that nobody would wait for it.
+    struct ScanPreset: Identifiable, Sendable {
+        let id: String
+        let title: String
+        let symbol: String
+        var url: URL { SafetyPolicy.userHomeDirectory.appendingPathComponent(id, isDirectory: true) }
+    }
+
+    static let presets: [ScanPreset] = [
+        ScanPreset(id: "Downloads", title: "Downloads", symbol: "arrow.down.circle"),
+        ScanPreset(id: "Desktop", title: "Desktop", symbol: "menubar.dock.rectangle"),
+        ScanPreset(id: "Documents", title: "Documents", symbol: "doc")
+    ]
+
+    /// The command that installs the engine. Shown with a copy button, because
+    /// "install ClamAV using the official guide" is not an instruction anyone
+    /// can act on without leaving the app and reading a page first.
+    static let installCommand = "brew install clamav && freshclam"
+
+    @Published private(set) var scanAtLogin = false
+    @Published private(set) var loginItemMessage: String?
+
+    /// Called once when the Virus scan page first appears: find the engine and
+    /// pre-select a folder, so the page opens ready to scan rather than ready to
+    /// be configured.
+    func prepareIfNeeded() {
+        discoverIfNeeded()
+        guard !hasPreparedLaunch else { return }
+        hasPreparedLaunch = true
+        readLoginItemState()
+        if selectedFolder == nil, let downloads = Self.presets.first {
+            selectPreset(downloads)
+        }
+    }
+
+    func selectPreset(_ preset: ScanPreset) {
+        guard !isScanning else { return }
+        do {
+            try SafetyPolicy.validateRoot(preset.url)
+            selectedFolder = preset.url.standardizedFileURL
+            report = nil
+            message = nil
+            progress = VirusScanProgress(completed: 0, total: 0, message: "Ready to check \(preset.title).")
+        } catch {
+            message = "\(preset.title) could not be used: \(error.localizedDescription)"
+        }
+    }
+
+    func isPresetSelected(_ preset: ScanPreset) -> Bool {
+        selectedFolder?.standardizedFileURL == preset.url.standardizedFileURL
+    }
+
+    func copyInstallCommand() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(Self.installCommand, forType: .string)
+        message = "Install command copied. Paste it into Terminal, then choose Detect engine."
+    }
+
+    // MARK: - Start at login
+
+    private func readLoginItemState() {
+        scanAtLogin = SMAppService.mainApp.status == .enabled
+    }
+
+    /// Registers the app itself as a login item. There is no helper tool and no
+    /// background agent: the app opens at login and scans, and closing it stops
+    /// everything.
+    func setScanAtLogin(_ enabled: Bool) {
+        do {
+            if enabled {
+                if SMAppService.mainApp.status != .enabled { try SMAppService.mainApp.register() }
+            } else {
+                if SMAppService.mainApp.status == .enabled { try SMAppService.mainApp.unregister() }
+            }
+            readLoginItemState()
+            loginItemMessage = scanAtLogin
+                ? "\(Brand.name) will open at login and scan the selected folder."
+                : nil
+        } catch {
+            readLoginItemState()
+            // A locally-signed build moved outside /Applications is the usual
+            // reason this fails, and the error alone does not say so.
+            loginItemMessage = "macOS refused the login item: \(error.localizedDescription) Move \(Brand.name) to your Applications folder and try again."
+        }
+    }
+
+    /// Runs a scan immediately if the app was opened at login and everything
+    /// needed is already in place.
+    func startScanIfLaunchedAtLogin() {
+        guard scanAtLogin, canScan, report == nil else { return }
+        startScan()
+    }
 
     func discoverEngine() {
         guard !isCheckingEngine, !isScanning else { return }

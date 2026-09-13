@@ -31,13 +31,15 @@ sources = ["RaptorCleanseApp.swift", "Brand.swift", "CleanseModel.swift", "Model
            "Views/ContentView.swift", "Views/Components.swift", "Views/BrowserCleanerView.swift",
            "BrowserModel.swift", "Models/BrowserModels.swift", "Services/BrowserDiscovery.swift",
            "Services/BrowserHistoryReader.swift", "VirusScanModel.swift", "Models/VirusScanModels.swift",
-           "Services/VirusScanner.swift", "Views/VirusScanView.swift"]
+           "Services/VirusScanner.swift", "Views/VirusScanView.swift",
+           "Models/BrowserCleanupModels.swift", "Services/BrowserDataCleaner.swift"]
 # Files the standalone test bundle compiles for itself, with no app host.
 # Brand.swift is included because the virus report header is built from it.
 core_sources = ["Brand.swift", "Models/CleanseModels.swift", "Services/SafetyPolicy.swift",
                 "Services/ScanEngine.swift", "Services/TrashService.swift",
                 "Models/BrowserModels.swift", "Services/BrowserDiscovery.swift", "Services/BrowserHistoryReader.swift",
-                "Models/VirusScanModels.swift", "Services/VirusScanner.swift"]
+                "Models/VirusScanModels.swift", "Services/VirusScanner.swift",
+                "Models/BrowserCleanupModels.swift", "Services/BrowserDataCleaner.swift"]
 # A source listed twice would be compiled twice and fail to link. A source in
 # core_sources that is not in sources would be referenced but never declared.
 assert len(sources) == len(set(sources)), "duplicate entry in sources"
@@ -56,10 +58,11 @@ test_source = obj("test-source", "PBXFileReference", lastKnownFileType="sourceco
 browser_tests = obj("browser-tests", "PBXFileReference", lastKnownFileType="sourcecode.swift", path="BrowserTests.swift", sourceTree="<group>")
 virus_tests = obj("virus-tests", "PBXFileReference", lastKnownFileType="sourcecode.swift", path="VirusScannerTests.swift", sourceTree="<group>")
 sorting_tests = obj("sorting-tests", "PBXFileReference", lastKnownFileType="sourcecode.swift", path="SortingTests.swift", sourceTree="<group>")
+cleanup_tests = obj("cleanup-tests", "PBXFileReference", lastKnownFileType="sourcecode.swift", path="BrowserCleanupTests.swift", sourceTree="<group>")
 app_product = obj("app-product", "PBXFileReference", explicitFileType="wrapper.application", includeInIndex=0, path="Raptor Cleanse.app", sourceTree="BUILT_PRODUCTS_DIR")
 test_product = obj("test-product", "PBXFileReference", explicitFileType="wrapper.cfbundle", includeInIndex=0, path="RaptorCleanseTests.xctest", sourceTree="BUILT_PRODUCTS_DIR")
 app_group = obj("app-group", "PBXGroup", children=list(refs.values()) + [assets, privacy, entitlements], path="RaptorCleanse", sourceTree="<group>")
-test_group = obj("test-group", "PBXGroup", children=[test_source, browser_tests, virus_tests, sorting_tests], path="RaptorCleanseTests", sourceTree="<group>")
+test_group = obj("test-group", "PBXGroup", children=[test_source, browser_tests, virus_tests, sorting_tests, cleanup_tests], path="RaptorCleanseTests", sourceTree="<group>")
 products = obj("products", "PBXGroup", children=[app_product, test_product], name="Products", sourceTree="<group>")
 main = obj("main-group", "PBXGroup", children=[app_group, test_group, products], sourceTree="<group>")
 
@@ -69,6 +72,7 @@ test_builds.append(obj("test-build:tests", "PBXBuildFile", fileRef=test_source))
 test_builds.append(obj("test-build:browser-tests", "PBXBuildFile", fileRef=browser_tests))
 test_builds.append(obj("test-build:virus-tests", "PBXBuildFile", fileRef=virus_tests))
 test_builds.append(obj("test-build:sorting-tests", "PBXBuildFile", fileRef=sorting_tests))
+test_builds.append(obj("test-build:cleanup-tests", "PBXBuildFile", fileRef=cleanup_tests))
 resource_builds = [obj("resource-build:" + name, "PBXBuildFile", fileRef=ref) for name, ref in [("assets", assets), ("privacy", privacy)]]
 
 def phase(name, isa, files):
@@ -93,7 +97,7 @@ app_settings = {
     "INFOPLIST_KEY_LSApplicationCategoryType": "public.app-category.utilities",
     "INFOPLIST_KEY_NSHumanReadableCopyright": "Raptor Nexus",
     "INFOPLIST_KEY_CFBundleName": "Raptor Cleanse",
-    "MARKETING_VERSION": "0.3.0", "CURRENT_PROJECT_VERSION": "4",
+    "MARKETING_VERSION": "0.4.0", "CURRENT_PROJECT_VERSION": "5",
     "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
     "CODE_SIGN_STYLE": "Manual", "CODE_SIGN_IDENTITY": "-",
     "CODE_SIGN_ENTITLEMENTS": "RaptorCleanse/RaptorCleanse.entitlements",
