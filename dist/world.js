@@ -9,7 +9,7 @@ import {WEAPONS} from './weapons.js';
 import * as T from './assets/three.module.js';
 import {PlayerLabel} from './player-label.js';
 import {CELL,rng,POWERUPS,isTrial,boxContact3D} from './core.js';
-import {roundedBox,potatoGeometry,applyWorldUV,makeSky,curveTube,clogGeometry} from './visuals.js';
+import {roundedBox,potatoGeometry,applyWorldUV,makeSky,curveTube,clogGeometry,ambientDust} from './visuals.js';
 const colors=[0xf1bc40,0x4ccbd3,0xef6b72,0x9b92ed];
 export {colors};
 export class World{
@@ -60,6 +60,9 @@ export class World{
   this.environment(night);this.scene.background.set(night?0x182d45:0x87b8c9);this.scene.fog.color.copy(this.scene.background);this.renderer.toneMappingExposure=night?1.2:1.03;
   root.add(makeSky(night,level.theme==='fort'));root.add(new T.HemisphereLight(night?0xadc3fa:0xc1e2fa,0x71614c,night?.7:.75));
   const sun=this.sun=new T.DirectionalLight(night?0xbed6ff:0xffdfab,night?2.1:3.2);sun.position.set(-25,50,20);sun.castShadow=true;sun.shadow.mapSize.set(this.qualityMode==='cinematic'?2048:this.qualityMode==='high'?1536:768,this.qualityMode==='cinematic'?2048:this.qualityMode==='high'?1536:768);const d=map.n*CELL*.55;Object.assign(sun.shadow.camera,{left:-d,right:d,top:d,bottom:-d,near:1,far:120});sun.shadow.bias=-.0004;sun.shadow.normalBias=.04;root.add(sun);
+  // Soft opposite-side fill keeps the shadowed side of characters/buildings readable without a second shadow pass.
+  const fill=new T.DirectionalLight(night?0x3d5a86:0xcfe3ec,night?.26:.34);fill.position.set(22,16,-18);root.add(fill);
+  const dust=ambientDust(150,map.n*CELL*.42,night?3.6:5.5);root.add(dust);this.ambientParticles=dust;
   const ground=this.mesh(new T.PlaneGeometry(map.n*CELL,map.n*CELL),this.groundMaterial(map.n*CELL,night),root,0,-.005,0);ground.rotation.x=-Math.PI/2;ground.castShadow=false;ground.userData.ownGeometry=true;
   // Paved perimeter and non-playable surroundings.
   this.mesh('box',this.mat(night?0x344352:0x7e9b84),root,0,-.52,0,map.n*CELL+60,.5,map.n*CELL+60);
@@ -226,12 +229,22 @@ export class World{
   m.brows.forEach((b,j)=>{b.position.y=1.602+m.joy*.028-m.hurt*.012-effort*.022;b.rotation.z=(j?1:-1)*(m.hurt*.08+effort*.11+walk*.006);});m.cheeks.forEach(c=>{c.position.y=1.08+effort*.022+m.joy*.012;c.scale.y=.115*(1+effort*.12);});
   m.mouth.visible=exhale>.025;m.mouth.scale.set(1-effort*.12,.05+exhale*.66,1);m.lip.scale.y=1+effort*.3;m.smile.scale.set(1+m.joy*.10-effort*.06,1-m.hurt*.35,1);
   if(m.cape.visible){const pos=m.cape.geometry.attributes.position;for(let k=0;k<pos.count;k++){const x=m.capeBase[k*3],y=m.capeBase[k*3+1],a=(.65-y)/1.3;pos.setZ(k,m.capeBase[k*3+2]-a*(.09+Math.min(speed,10)*.034)+Math.sin(time*7-x*5+a*5)*a*(.022+walk*.065));}pos.needsUpdate=true;const normalTick=Math.floor(time*24+i/4);if(normalTick!==m.normalTick){m.cape.geometry.computeVertexNormals();m.normalTick=normalTick;}}
- });for(const water of this.waterSurfaces??[])water.material.uniforms.clock.value=time;for(const flow of this.waterFlows??[])flow.update(time);if(this.leafClock)this.leafClock.value=time;if(this.ambientParticles)this.ambientParticles.rotation.y=time*.007;}
+ });for(const water of this.waterSurfaces??[])water.material.uniforms.clock.value=time;for(const flow of this.waterFlows??[])flow.update(time);if(this.leafClock)this.leafClock.value=time;if(this.ambientParticles){this.ambientParticles.rotation.y=time*.007;const dustTime=this.ambientParticles.material.userData?.dustTime;if(dustTime)dustTime.value=time;}}
  syncProjectiles(shots){const live=new Set();for(const s of shots){live.add(s.id);let m=this.projectileMeshes.get(s.id);if(!m){m=this.mesh(s.gun&&s.weapon!=='rpg'?'box':'sphere',s.weapon==='rpg'?this.mat(0xf4ad4e,'skin',{emissive:0x8b2e05,emissiveIntensity:.6}):s.gun?this.mat(0xffe3a3,null,{emissive:0xffc137,emissiveIntensity:3}):this.mat(0xbb8e50,'skin'),this.root);this.projectileMeshes.set(s.id,m);}m.position.set(s.x,s.y,s.z);m.scale.set(s.weapon==='rpg'?.23:s.gun?.045:.23,s.weapon==='rpg'?.23:s.gun?.045:.18,s.weapon==='rpg'?.55:s.gun?.6:.30);m.rotation.set(s.age*14,Math.atan2(s.vx,s.vz),s.age*8);}
   for(const[id,m]of this.projectileMeshes)if(!live.has(id)){this.root.remove(m);this.projectileMeshes.delete(id);}
  }
- burst(x,z,color=0xdeb872,n=9){for(let i=0;i<n;i++){if(this.effects.length>100){const old=this.effects.shift();this.root.remove(old.m);}const m=this.mesh('sphere',this.mat(color),this.root,x,1,z,.075,.055,.08);this.effects.push({m,vx:(Math.random()-.5)*6,vy:2+Math.random()*4,vz:(Math.random()-.5)*6,life:.65});}}
- effectsUpdate(dt){for(let i=this.effects.length-1;i>=0;i--){const e=this.effects[i];e.life-=dt;e.vy-=12*dt;e.m.position.x+=e.vx*dt;e.m.position.y+=e.vy*dt;e.m.position.z+=e.vz*dt;e.m.rotation.x+=dt*8;if(e.life<=0){this.root.remove(e.m);this.effects.splice(i,1);}}}
+ // Shared teardown for every transient effect mesh/sprite, whether cached or one-off.
+ releaseEffect(e){this.root.remove(e.m);if(e.m.userData.ownGeometry)e.m.geometry.dispose();if(e.m.userData.ownMaterial)e.m.material.dispose();}
+ burst(x,z,color=0xdeb872,n=9){for(let i=0;i<n;i++){if(this.effects.length>100)this.releaseEffect(this.effects.shift());const m=this.mesh('sphere',this.mat(color),this.root,x,1,z,.075,.055,.08);this.effects.push({m,vx:(Math.random()-.5)*6,vy:2+Math.random()*4,vz:(Math.random()-.5)*6,life:.65});}}
+ // A quick emissive billboard at the muzzle; purely cosmetic, cleared within a couple of frames.
+ flash(x,y,z,color=0xfff3c0){if(this.effects.length>100)this.releaseEffect(this.effects.shift());const material=new T.SpriteMaterial({color,transparent:true,opacity:.9,depthWrite:false,toneMapped:false});const sprite=new T.Sprite(material);sprite.position.set(x,y,z);sprite.scale.setScalar(.5);sprite.userData.ownMaterial=true;this.root.add(sprite);this.effects.push({m:sprite,life:.07,maxLife:.07,flash:true});}
+ // An expanding, fading ring for explosions and destroyed targets.
+ shockwave(x,z,color=0xffcf6b,maxRadius=4.5){if(this.effects.length>100)this.releaseEffect(this.effects.shift());const geometry=new T.TorusGeometry(1,.085,8,32),material=new T.MeshBasicMaterial({color,transparent:true,opacity:.85,depthWrite:false});const ring=new T.Mesh(geometry,material);ring.position.set(x,.14,z);ring.rotation.x=Math.PI/2;ring.scale.setScalar(.3);ring.userData.ownGeometry=true;ring.userData.ownMaterial=true;this.root.add(ring);this.effects.push({m:ring,life:.5,maxLife:.5,shockwave:true,maxRadius});}
+ effectsUpdate(dt){for(let i=this.effects.length-1;i>=0;i--){const e=this.effects[i];e.life-=dt;
+  if(e.flash){const t=Math.max(0,e.life)/e.maxLife;e.m.material.opacity=t*.9;e.m.scale.setScalar(.3+(1-t)*.45);if(e.life<=0){this.releaseEffect(e);this.effects.splice(i,1);}continue;}
+  if(e.shockwave){const t=1-Math.max(0,e.life)/e.maxLife;e.m.scale.setScalar(.3+t*e.maxRadius);e.m.material.opacity=.85*(1-t);if(e.life<=0){this.releaseEffect(e);this.effects.splice(i,1);}continue;}
+  e.vy-=12*dt;e.m.position.x+=e.vx*dt;e.m.position.y+=e.vy*dt;e.m.position.z+=e.vz*dt;e.m.rotation.x+=dt*8;if(e.life<=0){this.root.remove(e.m);this.effects.splice(i,1);}
+ }}
  render(players,duo,dt){
   for(const mesh of this.root.children)if(mesh.userData.treeCards){const center=mesh.boundingSphere.center;let d=Infinity;for(let i=0;i<(duo?2:1);i++)d=Math.min(d,Math.hypot(players[i].x-center.x,players[i].z-center.z));mesh.count=d>50?36:d>30?72:mesh.userData.fullCount;}
   for(const mesh of this.root.children)if(mesh.userData.foliage){const center=mesh.boundingSphere?.center;mesh.geometry=center&&players.slice(0,duo?2:1).every(p=>Math.hypot(p.x-center.x,p.z-center.z)>24)?this.geo.foliageLow:this.geo.foliage;}
