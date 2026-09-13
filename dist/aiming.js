@@ -1,4 +1,4 @@
-import {boxContact3D} from './core.js';
+import {boxContact3D,THROW_DROP} from './core.js';
 import {bodyHeight,bodyScale,muzzleHeight} from './stance.js';
 import {weaponConfig} from './weapons.js';
 const GUN_TUNING={lightRight:.60,lightLift:.10,heavyRight:.42,heavyForward:.90,heavyLift:0};
@@ -35,7 +35,7 @@ export function aimPoint(p,view,players,solids,targets=[],range=28){const camera
  if(dir.y<0){const ground=(.05-a.y)/(b.y-a.y);if(ground>=0)at=Math.min(at,ground);}
  return{x:mix(a.x,b.x,at),y:mix(a.y,b.y,at),z:mix(a.z,b.z,at)};
 }
-export function shotVelocity(p,target,speed,gun=false,muzzle=muzzlePosition(p)){const d=Math.max(.05,Math.hypot(target.x-muzzle.x,target.z-muzzle.z)),t=d/speed;return{...muzzle,vx:(target.x-muzzle.x)/d*speed,vz:(target.z-muzzle.z)/d*speed,vy:(target.y-muzzle.y)/t+(gun?0:1.9*t)};}
+export function shotVelocity(p,target,speed,gun=false,muzzle=muzzlePosition(p)){const d=Math.max(.05,Math.hypot(target.x-muzzle.x,target.z-muzzle.z)),t=d/speed;return{...muzzle,vx:(target.x-muzzle.x)/d*speed,vz:(target.z-muzzle.z)/d*speed,vy:(target.y-muzzle.y)/t+(gun?0:THROW_DROP*t)};}
 
 export function weaponAim(p,players,solids,targets=[],speed=weaponConfig(p).speed){const w=weaponConfig(p),view=cameraPose(p,{zoom:p.cameraDistance},solids),target=aimPoint(p,view,players,solids,targets,w.gun?60:28),scale=bodyScale(p),origin={x:p.x,y:(p.y??0)+muzzleHeight(p),z:p.z};let muzzle=muzzlePosition(p),velocity,nearTarget=false;
  if(p.weapon!=='throw'){

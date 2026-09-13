@@ -33,7 +33,15 @@ Object.assign(p,player(0));assert.ok(weaponAim(p,players,[rear]).velocity.vz<0,'
 const sideWall={x:.95,z:0,w:1,d:5,h:4},muzzle=muzzlePosition(p,[sideWall]);assert.ok(muzzle.x<.27);assert.equal(boxContact3D(muzzle.x,muzzle.y,muzzle.z,muzzle.x,muzzle.y,muzzle.z-.4,sideWall,.18),Infinity,'large potatoes must clear parallel side cover');
 const ahead={x:0,z:-1,w:4,d:.1,h:4},v=weaponAim(p,players,[ahead]).velocity;assert.ok(Number.isFinite(boxContact3D(v.x,v.y,v.z,v.x+v.vx*.1,v.y+v.vy*.1,v.z+v.vz*.1,ahead,.18)),'near cover must still block outgoing shots');
 console.log('PASS zoom/wall compression preserve sight direction; rear cover cannot reverse shots; large spuds clear side walls and hit frontal cover');
-const m=w.characters[0];Object.assign(p,player(0));w.updatePlayers(players,5,1/60);const stride=m.stride;let lift=0;for(let f=0;f<60;f++){p.x+=.1;w.updatePlayers(players,5+f/60,1/60);lift=Math.max(lift,...m.legs.map(l=>l.userData.foot.position.y-.09));}assert.ok((m.stride-stride)/(Math.PI*2)>2.5&&(m.stride-stride)/(Math.PI*2)<2.9,'running gait stays between 2.5 and 2.9 cycles/second');assert.ok(lift<.12,'foot lift stays restrained');
+// Gliding is a measurable defect, not a matter of taste: whichever foot is planted has to hold
+// the ground while the body travels over it. Sampling both feet each frame and taking the
+// stiller one tracks the stance foot through the cycle without needing to know the phase.
+const m=w.characters[0];Object.assign(p,player(0));w.updatePlayers(players,5,1/60);const stride=m.stride;let lift=0,slip=0,steps=0,previous=null;
+for(let f=0;f<120;f++){p.x+=.1;w.updatePlayers(players,5+f/60,1/60);w.root.updateMatrixWorld(true);lift=Math.max(lift,...m.legs.map(l=>l.userData.foot.position.y-.09));
+ const feet=m.legs.map(l=>l.userData.foot.getWorldPosition(new T.Vector3()).x);if(previous){slip+=Math.min(...feet.map((v,i)=>Math.abs(v-previous[i])));steps++;}previous=feet;}
+assert.ok((m.stride-stride)/(Math.PI*4)>4.5&&(m.stride-stride)/(Math.PI*4)<5.2,'running gait stays between 4.5 and 5.2 cycles/second');
+assert.ok(slip/steps<.025,`planted foot must grip the ground rather than skate: ${(slip/steps/.1*100).toFixed(0)}% of body travel`);
+assert.ok(lift<.18,'foot lift stays restrained');
 const shoe=m.legs[0].userData.foot.children[0];assert.equal(shoe.material.color.getHex(),0xffc522);assert.equal(shoe.material.map,null);const pos=shoe.geometry.attributes.position;let midWidth=0,tipWidth=0,tipTop=0;for(let i=0;i<pos.count;i++){const x=Math.abs(pos.getX(i)),z=pos.getZ(i);if(z>.3&&z<.45)midWidth=Math.max(midWidth,x);if(z>.75){tipWidth=Math.max(tipWidth,x);tipTop=Math.max(tipTop,pos.getY(i));}}assert.ok(tipWidth<midWidth*.65);assert.ok(tipTop>.3);
 console.log('PASS lively gait, restrained foot lift and bright yellow upturned pointed clogs');
 
@@ -51,9 +59,9 @@ w.solids=[];Object.assign(players[1],{x:0,z:-1.3});w.updatePlayers(players,8,1/6
 assert.equal(rendered.at(-1)[0].visible,true,'nearby rivals must not hide the own character');assert.equal(rendered.at(-1)[1].visible,true,'point-blank rival stays visible');
 Object.assign(players[1],{x:8,z:-8});w.updatePlayers(players,9,1/60);rendered=[];w.render(players,true,1/60);assert.equal(rendered.length,2);assert.equal(rendered[0][1].visible,true);assert.equal(rendered[1][0].visible,true);
 console.log('PASS clear shoulder view, opaque bodies, close-cover clearance and independent split-screen visibility');
-Object.assign(p,{weapon:'throw',shotAnim:0,runner:false,winStreak:2});w.updatePlayers(players,10,1/60);const ready=m.arms[0].userData.hand.position.clone();assert.equal(m.heldSpud.visible,true);assert.equal(m.gun.visible,false);assert.equal(m.cape.visible,false);assert.equal(m.crown.visible,false);
+Object.assign(p,{weapon:'throw',shotAnim:0,runner:false,roundWins:2});w.updatePlayers(players,10,1/60);const ready=m.arms[0].userData.hand.position.clone();assert.equal(m.heldSpud.visible,true);assert.equal(m.gun.visible,false);assert.equal(m.cape.visible,false);assert.equal(m.crown.visible,false);
 p.shotAnim=.2;w.updatePlayers(players,10.14,1/60);assert.ok(m.arms[0].userData.hand.position.distanceTo(ready)>.1);assert.equal(m.heldSpud.visible,false);
-Object.assign(p,{runner:true,winStreak:3});w.updatePlayers(players,11,1/60);assert.equal(m.cape.visible,true);assert.equal(m.crown.visible,true);assert.ok(m.legs.every(l=>l.userData.foot.rotation.y*l.position.x>0),'both clog toes point outward');
+Object.assign(p,{runner:true,roundWins:3});w.updatePlayers(players,11,1/60);assert.equal(m.cape.visible,true);assert.equal(m.crown.visible,true);assert.ok(m.legs.every(l=>l.userData.foot.rotation.y*l.position.x>0),'both clog toes point outward');
 console.log('PASS hand throwing motion, weapon visibility, Potatoman cape, three-win crown and outward clog toes');
 
 // Regression: the sight must remain clear of the actual hands, arms, weapons and torso.

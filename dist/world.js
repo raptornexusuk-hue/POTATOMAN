@@ -12,10 +12,21 @@ import {CELL,rng,POWERUPS,isTrial,boxContact3D} from './core.js';
 import {roundedBox,potatoGeometry,applyWorldUV,makeSky,curveTube,clogGeometry,ambientDust} from './visuals.js';
 const colors=[0xf1bc40,0x4ccbd3,0xef6b72,0x9b92ed];
 export {colors};
+// Feet have to keep up with the ground, which a sine wave alone never does: it only matches
+// ground speed at mid-stance and skates at either end. So the stance half drives the foot back
+// linearly and STRIDE_RATE is derived to make that return exactly cancel the body's travel,
+// leaving the planted foot pinned to the ground; the swing half keeps its cosine arc.
+const STEP_REACH=.30,STRIDE_RATE=Math.PI/(2*STEP_REACH),TAU=Math.PI*2;
+// The eyelid is a shell cap sharing the eyeball's centre, so closing it sweeps the cap around the
+// eye at a constant size the way a lid actually moves. Open, it is tipped back out of sight behind
+// the brow; the sweep below carries it down across the front.
+const LID_OPEN=-1.18;
+const footReach=(phase,walk)=>{const cycle=((phase%TAU)+TAU)%TAU;return walk*STEP_REACH*(cycle<Math.PI?-Math.cos(cycle):1-2*(cycle-Math.PI)/Math.PI);};
+
 export class World{
  constructor(canvas,renderer=null){
   if(renderer)this.renderer=renderer;else{try{this.renderer=new T.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});}catch{this.renderer=new T.WebGLRenderer({canvas,antialias:false,powerPreference:'default'});}}this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.autoUpdate=false;this.renderer.shadowMap.type=T.PCFSoftShadowMap;this.renderer.outputColorSpace=T.SRGBColorSpace;this.renderer.toneMapping=T.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.25;
-  this.scene=new T.Scene();this.scene.background=new T.Color(0x8db4c3);this.scene.fog=new T.Fog(0x8db4c3,45,125);this.cameras=[0,1].map(()=>new T.PerspectiveCamera(65,1,.08,180));this.cameraReady=[false,false];this.ray=new T.Raycaster();this.wallMeshes=[];this.materials=new Map();this.geo={box:new T.BoxGeometry(1,1,1),sphere:new T.SphereGeometry(1,24,16),foliage:new T.SphereGeometry(1,16,10),foliageLow:new T.SphereGeometry(1,8,6),smallSphere:new T.SphereGeometry(1,10,8),potato:potatoGeometry(),rounded:roundedBox(),clog:clogGeometry(),cylinder:new T.CylinderGeometry(1,1,1,20),cone:new T.ConeGeometry(1,1,4),leaf:new T.PlaneGeometry(1,1),leafPlain:new T.CircleGeometry(.5,12)};
+  this.scene=new T.Scene();this.scene.background=new T.Color(0x8db4c3);this.scene.fog=new T.Fog(0x8db4c3,45,125);this.cameras=[0,1].map(()=>new T.PerspectiveCamera(65,1,.08,180));this.cameraReady=[false,false];this.ray=new T.Raycaster();this.wallMeshes=[];this.materials=new Map();this.geo={box:new T.BoxGeometry(1,1,1),sphere:new T.SphereGeometry(1,24,16),foliage:new T.SphereGeometry(1,16,10),foliageLow:new T.SphereGeometry(1,8,6),eyelid:new T.SphereGeometry(1,24,10,0,Math.PI*2,0,Math.PI*.55),smallSphere:new T.SphereGeometry(1,10,8),potato:potatoGeometry(),rounded:roundedBox(),clog:clogGeometry(),cylinder:new T.CylinderGeometry(1,1,1,20),cone:new T.ConeGeometry(1,1,4),leaf:new T.PlaneGeometry(1,1),leafPlain:new T.CircleGeometry(.5,12)};
   this.scratch={hip:new T.Vector3(),ankle:new T.Vector3(),knee:new T.Vector3(),direction:new T.Vector3(),inverse:new T.Quaternion(),up:new T.Vector3(0,1,0),forward:new T.Vector3(0,0,1)};
   this.textures={skin:this.texture('skin'),brick:this.texture('brick'),stone:this.texture('stone'),wood:this.texture('wood'),hedge:this.texture('hedge')};this.effects=[];this.projectileMeshes=new Map();this.characters=[];this.qualityMode='high';this.ready=this.loadMaterials();this.resize();
  }
@@ -170,25 +181,48 @@ export class World{
   if(!this.contactTexture){const pixels=new Uint8Array(64*64*4);for(let z=0;z<64;z++)for(let x=0;x<64;x++){const i=(z*64+x)*4,d=Math.hypot((x-31.5)/31.5,(z-31.5)/31.5);pixels[i+3]=Math.max(0,1-d)**2*150;}this.contactTexture=new T.DataTexture(pixels,64,64);this.contactTexture.needsUpdate=true;}
   const shadow=new T.Mesh(new T.PlaneGeometry(2.7,2.7),new T.MeshBasicMaterial({map:this.contactTexture,transparent:true,depthWrite:false,opacity:.65}));shadow.rotation.x=-Math.PI/2;shadow.userData.ownGeometry=shadow.userData.ownMaterial=true;this.root.add(shadow);
   // Alternate light baked and golden russet skins consistently on every client.
-  const skin=this.mat(id%2?0xe7c38e:0xc68b49,'skin',{roughness:.88,bumpScale:.037,envMapIntensity:.28}),dark=this.mat(0x352719,null,{roughness:.65}),white=this.mat(0xfff6df,null,{roughness:.25}),wood=this.clogMaterial(),iris=this.mat([0x778146,0x50787e,0x987343,0x6b7190][id],null,{roughness:.32});const bob=new T.Group();g.add(bob);
+  // Limbs wear the same russet skin a few shades lighter than the torso, so arms and legs
+  // match each other and still read as potato rather than pale plastic.
+  const skinColor=id%2?0xe7c38e:0xc68b49,lift=t=>Math.round(t+(255-t)*.22),limbColor=lift(skinColor>>16&255)<<16|lift(skinColor>>8&255)<<8|lift(skinColor&255);
+  const skin=this.mat(skinColor,'skin',{roughness:.88,bumpScale:.037,envMapIntensity:.28}),limb=this.mat(limbColor,'skin',{roughness:.86,bumpScale:.032,envMapIntensity:.30}),dark=this.mat(0x352719,null,{roughness:.65}),white=this.mat(0xfff6df,null,{roughness:.25}),wood=this.clogMaterial(),iris=this.mat([0x778146,0x50787e,0x987343,0x6b7190][id],null,{roughness:.32});const bob=new T.Group();g.add(bob);
   const body=this.mesh('potato',skin,bob,0,1.09,0,.635,.86,.48);body.rotation.z=-.045;
-  const brows=[],eyes=[],cheeks=[],pupils=[],lids=[];
-  for(const sign of[-1,1]){const x=sign*.225,eye=new T.Group();eye.position.set(x,1.40,.392);bob.add(eye);this.mesh(this.geo.sphere,white,eye,0,0,0,.172,.155,.087);const gaze=new T.Group();eye.add(gaze);this.mesh(this.geo.sphere,iris,gaze,0,-.01,.082,.101,.105,.022);this.mesh(this.geo.sphere,dark,gaze,0,-.008,.101,.054,.065,.011);this.mesh(this.geo.sphere,white,gaze,-.023,.029,.115,.018,.019,.006);eyes.push(eye);pupils.push(gaze);
-   // A real skin eyelid swinging down over the eyeball, instead of squashing the whole eye flat.
-   const lidPivot=new T.Group();eye.add(lidPivot);this.mesh(this.geo.sphere,skin,lidPivot,0,.10,-.01,.188,.175,.10);lids.push(lidPivot);
-   const brow=this.mesh(curveTube([[-.145,0,-.012],[0,.031,.008],[.145,.014,-.012]],.023),this.mat(0x78502c,null,{roughness:.9}),bob,x,1.602,.432);brow.userData.ownGeometry=true;brows.push(brow);
-   // Soft skin ridge above each eye gives the brow something to sit on.
-   this.mesh(this.geo.sphere,skin,bob,x,1.556,.408,.20,.075,.10);
-   cheeks.push(this.mesh(this.geo.sphere,skin,bob,sign*.32,1.08,.345,.17,.115,.13));
+  const brows=[],eyes=[],cheeks=[],pupils=[],lids=[],browSkin=this.mat(0x6a4523,null,{roughness:.92});
+  for(const sign of[-1,1]){const x=sign*.225,eye=new T.Group();eye.position.set(x,1.40,.392);bob.add(eye);
+   // A socket rim sunk into the skin gives the eyeball somewhere to sit, so it reads as set into
+   // the potato rather than stuck onto the front of it.
+   const socket=this.mesh(this.geo.sphere,skin,bob,x,1.395,.368,.206,.196,.068);socket.rotation.x=-.10;
+   this.mesh(this.geo.sphere,white,eye,0,0,0,.172,.155,.087);const gaze=new T.Group();eye.add(gaze);
+   this.mesh(this.geo.sphere,iris,gaze,0,-.01,.082,.101,.105,.022);this.mesh(this.geo.sphere,dark,gaze,0,-.008,.101,.054,.065,.011);
+   // Two catchlights, a bright one and a faint bounce below it, are what make an eye look wet.
+   this.mesh(this.geo.sphere,white,gaze,-.030,.034,.112,.024,.025,.008);this.mesh(this.geo.sphere,white,gaze,.030,-.028,.110,.012,.012,.005);
+   eyes.push(eye);pupils.push(gaze);
+   // The upper lid hinges on the crease at the top of the eyeball and reads as a thin fold when
+   // open, rather than hooding half the eye with a permanent brown blob.
+   const lidPivot=new T.Group();lidPivot.rotation.x=LID_OPEN;eye.add(lidPivot);
+   this.mesh(this.geo.eyelid,skin,lidPivot,0,0,0,.181,.167,.097);lids.push(lidPivot);
+   this.mesh(this.geo.sphere,skin,eye,0,-.158,-.006,.150,.030,.050);
+   const brow=this.mesh(curveTube([[-.155,-.014,-.018],[-.06,.028,.008],[.05,.038,.014],[.155,.006,-.014]],.028),browSkin,bob,x,1.596,.410);brow.userData.ownGeometry=true;brow.rotation.y=sign*.10;brows.push(brow);
+   // A flat skin ridge under the brow, not a ball: it shades the eye without stacking a third lump
+   // above it.
+   this.mesh(this.geo.sphere,skin,bob,x,1.572,.352,.240,.034,.058);
+   cheeks.push(this.mesh(this.geo.sphere,skin,bob,sign*.315,1.070,.280,.200,.062,.062));
   }
-  this.mesh(this.geo.sphere,skin,bob,0,1.18,.432,.10,.11,.08);
-  const smile=new T.Group();smile.position.set(0,.96,.48);bob.add(smile);const lip=this.mesh(curveTube([[-.205,.025,-.015],[0,-.035,.011],[.205,.025,-.015]],.013),this.mat(0x755036,null,{roughness:.8}),smile);lip.userData.ownGeometry=true;
-  const mouth=new T.Group();mouth.position.set(0,-.027,.017);smile.add(mouth);const mouthInside=this.mesh(new T.CircleGeometry(.13,32),this.mat(0x42251b,null,{roughness:.95}),mouth);mouthInside.userData.ownGeometry=true;
-  this.mesh('rounded',white,mouth,0,.070,.008,.16,.040,.012);this.mesh(this.geo.sphere,this.mat(0xb67461,null,{roughness:.8}),mouth,0,-.075,.009,.073,.031,.010);mouth.scale.y=.02;mouth.visible=false;
+  // Nose: a broad bulb over a short bridge, the way a sprout swells out of a potato, with two
+  // small skin eyes for nostrils.
+  this.mesh(this.geo.sphere,skin,bob,0,1.255,.410,.062,.085,.055);
+  this.mesh(this.geo.sphere,skin,bob,0,1.175,.436,.108,.105,.086);
+  for(const sign of[-1,1])this.mesh(this.geo.sphere,dark,bob,sign*.045,1.136,.505,.023,.016,.020);
+  const smile=new T.Group();smile.position.set(0,.955,.475);bob.add(smile);
+  const lip=this.mesh(curveTube([[-.255,.052,-.030],[-.12,-.018,.014],[0,-.042,.022],[.12,-.018,.014],[.255,.052,-.030]],.017),this.mat(0x6d4730,null,{roughness:.82}),smile);lip.userData.ownGeometry=true;
+  // A lower lip catches the light under the mouth line, so the smile is a mouth rather than a
+  // line drawn on a potato.
+  this.mesh(this.geo.sphere,this.mat(0xa9705a,null,{roughness:.72}),smile,0,-.060,.010,.128,.030,.030);
+  const mouth=new T.Group();mouth.position.set(0,-.030,.020);smile.add(mouth);const mouthInside=this.mesh(new T.CircleGeometry(.132,32),this.mat(0x3a1f16,null,{roughness:.95}),mouth);mouthInside.userData.ownGeometry=true;
+  this.mesh('rounded',this.mat(0xf2e3c6,null,{roughness:.35}),mouth,0,.074,.010,.158,.034,.014);this.mesh(this.geo.sphere,this.mat(0xb67461,null,{roughness:.8}),mouth,0,-.074,.011,.082,.034,.012);mouth.scale.y=.02;mouth.visible=false;
 
   const arms=[],forearms=[],legs=[];
-  for(const sign of[-1,1]){const arm=makeArm(this,g,skin,sign);arms.push(arm);forearms.push(arm.userData.lower);
-   const leg=new T.Group();leg.position.x=sign*.38;g.add(leg);const thigh=this.mesh('sphere',skin,leg,0,.69,0,.115,.22,.12),shin=this.mesh('sphere',skin,leg,0,.40,0,.125,.21,.135),knee=this.mesh('sphere',skin,leg,0,.53,.08,.13,.13,.13),foot=new T.Group();leg.add(foot);foot.position.y=.09;foot.rotation.y=sign*.32;foot.scale.set(.56,.76,.56);
+  for(const sign of[-1,1]){const arm=makeArm(this,g,limb,sign);arms.push(arm);forearms.push(arm.userData.lower);
+   const leg=new T.Group();leg.position.x=sign*.38;g.add(leg);const thigh=this.mesh('sphere',limb,leg,0,.69,0,.115,.22,.12),shin=this.mesh('sphere',limb,leg,0,.40,0,.125,.21,.135),knee=this.mesh('sphere',limb,leg,0,.53,.08,.13,.13,.13),foot=new T.Group();leg.add(foot);foot.position.y=.09;foot.rotation.y=sign*.32;foot.scale.set(.56,.76,.56);
    this.mesh('clog',wood,foot,0,0,.04,1.13,1,1.13);
    // The reshaped klomp sits a little taller, so opening and carving ride on one lifted trim group.
    const trim=new T.Group();trim.position.y=.028;foot.add(trim);
@@ -232,7 +266,7 @@ export class World{
   return{g,shadow,label,fadeMaterials,crouchBlend:0,bob,arms,forearms,legs,cape,capeBase,clasp,crown,heldSpud,gun,eyes,brows,cheeks,pupils,lids,smile,mouth,lip,hurt:0,joy:0,gaze:0,lastHP:null,stride:0,walk:0,lastX:null,lastZ:null,blinkAt:2.5+id*.7};
  }
  updatePlayers(players,time,dt){const {hip,ankle,knee,direction,inverse,up:upAxis,forward}=this.scratch,aimPlayers=this.isBonus?players.filter(q=>q.runner):players;players.forEach((p,i)=>{const m=this.characters[i];m.g.visible=p.respawn<=0;const dx=m.lastX===null?0:p.x-m.lastX,dz=m.lastZ===null?0:p.z-m.lastZ,travelled=Math.hypot(dx,dz);m.lastX=p.x;m.lastZ=p.z;
-  const speed=travelled<2?travelled/Math.max(dt,.001):0;const smoothing=1-Math.exp(-10*dt);m.walk+=(Math.min(speed/6,1.35)-m.walk)*smoothing;if(travelled<2)m.stride+=travelled*2.8;else{m.walk=0;m.stride=0;}
+  const speed=travelled<2?travelled/Math.max(dt,.001):0;const smoothing=1-Math.exp(-10*dt);m.walk+=(Math.min(speed/6,1.35)-m.walk)*smoothing;if(travelled<2)m.stride+=travelled*STRIDE_RATE;else{m.walk=0;m.stride=0;}
   const stride=m.stride,walk=m.walk,dash=p.dashTime>0?Math.sin(Math.min(1,p.dashTime/.16)*Math.PI):0,throwProgress=p.shotAnim>0?1-p.shotAnim/(p.shotDuration??(p.weapon==='throw'?.46:.18)):0,throwSwing=p.shotAnim>0?Math.sin(throwProgress*Math.PI):0;
   m.shadow.position.set(p.x,.02,p.z);m.shadow.visible=p.respawn<=0;m.shadow.material.opacity=.65/(1+(p.y??0));m.shadow.scale.setScalar(1+(p.y??0)*.15);m.g.position.set(p.x,p.y??0,p.z);m.g.rotation.y=Math.PI-p.yaw+BODY_YAW_OFFSET;m.g.scale.setScalar(p.runner?1.18:1);
   // Ground-relative travel, rotated into the quarter-turned torso's frame.
@@ -244,22 +278,25 @@ export class World{
   // Lean around the torso, rather than sweeping its shoulders forward from the feet.
   direction.set(0,1.09*m.bob.scale.y,0).applyEuler(m.bob.rotation);m.bob.position.x=-direction.x;m.bob.position.z=-direction.z;m.bob.position.y+=1.09*m.bob.scale.y-direction.y;
 
-  m.legs.forEach((leg,j)=>{const phase=stride+j*Math.PI,air=p.grounded===false,up=air?.16+(.06*j):Math.max(0,Math.sin(phase))*.085*walk,step=-Math.cos(phase)*.15*walk,x=step*(m.gaitX??0),z=step*(m.gaitZ??1);hip.set(0,.72-crouch*.19,0);ankle.set(x,.315+up,z);knee.set(x*.5,(hip.y+ankle.y)*.5,(hip.z+ankle.z)*.5+.11+crouch*.21);const {thigh,shin,foot}=leg.userData;leg.userData.knee.position.copy(knee);for(let segment=0;segment<2;segment++){const mesh=segment?shin:thigh,a=segment?knee:hip,b=segment?ankle:knee,width=segment?.125:.135;mesh.position.copy(a).add(b).multiplyScalar(.5);direction.copy(b).sub(a);const length=direction.length();mesh.quaternion.setFromUnitVectors(upAxis,direction.normalize());mesh.scale.set(width,length*.58,width*1.06);}foot.position.set(x,.09+up,z);foot.rotation.x=air?-.20:Math.max(0,Math.sin(phase))*.05*walk;});
+  m.legs.forEach((leg,j)=>{const phase=stride+j*Math.PI,air=p.grounded===false,up=air?.16+(.06*j):Math.max(0,Math.sin(phase))*.135*walk,step=footReach(phase,walk),x=step*(m.gaitX??0),z=step*(m.gaitZ??1);hip.set(0,.78-crouch*.19,0);ankle.set(x,.315+up,z);knee.set(x*.5,(hip.y+ankle.y)*.5,(hip.z+ankle.z)*.5+.11+crouch*.21);const {thigh,shin,foot}=leg.userData;leg.userData.knee.position.copy(knee);for(let segment=0;segment<2;segment++){const mesh=segment?shin:thigh,a=segment?knee:hip,b=segment?ankle:knee,width=segment?.125:.135;mesh.position.copy(a).add(b).multiplyScalar(.5);direction.copy(b).sub(a);const length=direction.length();mesh.quaternion.setFromUnitVectors(upAxis,direction.normalize());mesh.scale.set(width,length*.58,width*1.06);}foot.position.set(x,.09+up,z);foot.rotation.x=air?-.20:Math.max(0,Math.sin(phase))*.05*walk;});
   m.gun.visible=p.weapon!=='throw'&&!p.runner&&(!isTrial(this.level)||this.isBonus);m.gun.scale.set(p.weapon==='rpg'?1.2:1,p.weapon==='rpg'?1.2:1,p.weapon==='rpg'?.91:p.weapon==='scatter'?.82:.72);
   if(m.gun.visible){const {velocity}=weaponAim(p,aimPlayers,this.solids,this.level.mode==='smash'&&!this.isBonus?(this.aimTargets??[]):[],p.shotAnim>0?p.visualShotSpeed:undefined),scale=p.runner?1.18:1;inverse.copy(m.g.quaternion).invert();direction.set(velocity.vx,velocity.vy,velocity.vz).normalize().applyQuaternion(inverse);m.gun.position.set(velocity.x-p.x,velocity.y-(p.y??0),velocity.z-p.z).applyQuaternion(inverse).divideScalar(scale);m.gun.quaternion.setFromUnitVectors(forward,direction);m.gun.scale.z*=1-throwSwing*.025;}
 
   poseArms(m,p,stride,walk,crouch,!isTrial(this.level)||this.isBonus);
-  m.cape.visible=m.clasp.visible=!!p.runner;m.crown.visible=(p.winStreak??0)>=3;
+  m.cape.visible=m.clasp.visible=!!p.runner;m.crown.visible=(p.roundWins??0)>=3;
   const blink=Math.max(0,1-Math.abs((time+i*.73)%4.1-3.9)/.095);if(m.lastHP!==null&&p.hp<m.lastHP&&p.respawn<=0)m.hurt=1;m.lastHP=p.hp;m.hurt=Math.max(0,m.hurt-dt*3.5);m.joy+=((p.catchTime>0?1:p.runner?.35:0)-m.joy)*(1-Math.exp(-8*dt));
   const throwing=p.weapon==='throw'&&!p.runner&&p.shotAnim>0,throwClock=throwing?Math.max(0,(p.shotDuration??.46)-p.shotAnim):0,effort=throwing?Math.sin(Math.PI*Math.min(1,throwClock/.27)):0,exhale=throwing?Math.exp(-Math.pow((throwClock-.145)/.055,2)):0;
   // Lids do the closing; the eyeball keeps its shape and only squashes a little under a wince.
   const shut=Math.min(1,blink+m.hurt*.45+effort*.30);
-  m.lids.forEach(l=>l.rotation.x=shut*1.62);m.eyes.forEach(e=>e.scale.y=1-m.hurt*.10+m.joy*.03);
+m.lids.forEach(l=>l.rotation.x=LID_OPEN+shut*1.52);m.eyes.forEach(e=>e.scale.y=1-m.hurt*.10+m.joy*.03);
   // Eyes lead the turn and follow the aim, so the head reads as looking where the player looks.
   m.gaze+=((travelled>.004?Math.max(-1,Math.min(1,(m.gaitX??0)*1.6)):0)-m.gaze)*(1-Math.exp(-6*dt));
-  m.pupils.forEach(g=>{g.position.y=Math.sin(p.pitch??0)*.016-effort*.004;g.position.x=m.gaze*.022+effort*.006;});
-  m.brows.forEach((b,j)=>{b.position.y=1.602+m.joy*.028-m.hurt*.012-effort*.022;b.rotation.z=(j?1:-1)*(m.hurt*.08+effort*.11+walk*.006);});m.cheeks.forEach(c=>{c.position.y=1.08+effort*.022+m.joy*.012;c.scale.y=.115*(1+effort*.12);});
-  m.mouth.visible=exhale>.025;m.mouth.scale.set(1-effort*.12,.05+exhale*.66,1);m.lip.scale.y=1+effort*.3;m.smile.scale.set(1+m.joy*.10-effort*.06,1-m.hurt*.35,1);
+  // Pupils widen with delight and pinch under a wince; a fixed iris is what makes a face look dead.
+  m.pupils.forEach(g=>{g.position.y=Math.sin(p.pitch??0)*.016-effort*.004;g.position.x=m.gaze*.022+effort*.006;g.scale.setScalar(1+m.joy*.07-m.hurt*.05);});
+  m.brows.forEach((b,j)=>{b.position.y=1.596+m.joy*.030-m.hurt*.014-effort*.024;b.rotation.z=(j?1:-1)*(m.hurt*.10+effort*.13+walk*.006);});m.cheeks.forEach(c=>{c.position.y=1.070+effort*.022+m.joy*.014;c.scale.y=.062*(1+effort*.18+m.joy*.14);});
+  // Taking a hit gapes the mouth too, so damage registers on the face and not only on the bar.
+  const gape=Math.max(exhale,m.hurt*.80);
+  m.mouth.visible=gape>.025;m.mouth.scale.set(1-effort*.12+m.hurt*.10,.05+gape*.66,1);m.lip.scale.y=1+effort*.3;m.smile.scale.set(1+m.joy*.12-effort*.06,1-m.hurt*.35,1);
   if(m.cape.visible){const pos=m.cape.geometry.attributes.position;for(let k=0;k<pos.count;k++){const x=m.capeBase[k*3],y=m.capeBase[k*3+1],a=(.65-y)/1.3;pos.setZ(k,m.capeBase[k*3+2]-a*(.09+Math.min(speed,10)*.034)+Math.sin(time*7-x*5+a*5)*a*(.022+walk*.065));}pos.needsUpdate=true;const normalTick=Math.floor(time*24+i/4);if(normalTick!==m.normalTick){m.cape.geometry.computeVertexNormals();m.normalTick=normalTick;}}
  });for(const water of this.waterSurfaces??[])water.material.uniforms.clock.value=time;for(const flow of this.waterFlows??[])flow.update(time);if(this.leafClock)this.leafClock.value=time;if(this.ambientParticles){this.ambientParticles.rotation.y=time*.007;const dustTime=this.ambientParticles.material.userData?.dustTime;if(dustTime)dustTime.value=time;}}
  syncProjectiles(shots){const live=new Set();for(const s of shots){live.add(s.id);let m=this.projectileMeshes.get(s.id);if(!m){m=this.mesh(s.gun&&s.weapon!=='rpg'?'box':'sphere',s.weapon==='rpg'?this.mat(0xf4ad4e,'skin',{emissive:0x8b2e05,emissiveIntensity:.6}):s.gun?this.mat(0xffe3a3,null,{emissive:0xffc137,emissiveIntensity:3}):this.mat(0xbb8e50,'skin'),this.root);this.projectileMeshes.set(s.id,m);}m.position.set(s.x,s.y,s.z);m.scale.set(s.weapon==='rpg'?.23:s.gun?.045:.23,s.weapon==='rpg'?.23:s.gun?.045:.18,s.weapon==='rpg'?.55:s.gun?.6:.30);m.rotation.set(s.age*14,Math.atan2(s.vx,s.vz),s.age*8);}

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {MAPS,mapId,nextCircuitSeed} from '../dist/map-catalogue.js';
 import {LEVELS,roundLevel,circuitLevels,makeMap,route} from '../dist/core.js';
-import {lastPlaceLine,awardStreaks} from '../dist/progression.js';
+import {lastPlaceLine,awardRoundWins} from '../dist/progression.js';
 import {preferredVoice,GameAudio} from '../dist/game-audio.js';
 
 assert.equal(MAPS.length,6);assert.equal(new Set(LEVELS.map(mapId)).size,6);
@@ -22,7 +22,11 @@ console.log('PASS six world families, all fourteen rounds, 600 non-repeating ope
 const players=[{id:0,name:'MACCA',score:0,best:Infinity},{id:1,name:'JAMIE',score:8,best:40},{id:2,name:'SAM',score:4,best:70}];
 for(let i=0;i<10;i++){assert.ok(lastPlaceLine(players,false,i).includes('MACCA'));assert.ok(lastPlaceLine(players,true,i).includes('MACCA'));}
 assert.equal(lastPlaceLine(players.map(p=>({...p,score:0})),false,0),'');
-for(let i=0;i<3;i++)awardStreaks(players,[players[1]]);assert.equal(players[1].winStreak,3);awardStreaks(players,[players[2]]);assert.equal(players[1].winStreak,0);assert.equal(players[2].winStreak,1);awardStreaks(players,[players[1],players[2]]);assert.ok(players.every(p=>p.winStreak===0));
+// The crown counts any three wins, so an interrupted run keeps everything already earned and
+// a shared victory credits every winner.
+for(let i=0;i<2;i++)awardRoundWins(players,[players[1]]);assert.equal(players[1].roundWins,2);
+awardRoundWins(players,[players[2]]);assert.equal(players[1].roundWins,2,'losing a round cannot take back earlier wins');assert.equal(players[2].roundWins,1);
+awardRoundWins(players,[players[1],players[2]]);assert.equal(players[1].roundWins,3);assert.equal(players[2].roundWins,2);assert.equal(players[0].roundWins,undefined);
 console.log('PASS last-place-only named commentary, silent all-tied rounds and consecutive-win crown resets');
 
 const voices=[{name:'Generic English',lang:'en-GB',voiceURI:'generic'},{name:'Moira (Enhanced)',lang:'en-IE',voiceURI:'moira'},{name:'Rishi',lang:'en-IN',voiceURI:'rishi'}];

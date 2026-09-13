@@ -3,11 +3,11 @@ import {muzzlePosition} from './aiming.js';
 import {THROW_DURATION,THROW_WINDUP} from './weapons.js';
 // A quarter-turned torso exposes the throwing hand and receiver in the shoulder view.
 export const BODY_YAW_OFFSET=-.55;
-export const ARM_LENGTHS=Object.freeze({upper:.53,forearm:.55});
+export const ARM_LENGTHS=Object.freeze({upper:.46,forearm:.48});
 // Shoulder sockets, rest pose and elbow pole targets, expressed in the aim-aligned frame:
 // "across" is the player's right, "fwd" is the sight direction, so arms hang at the sides
 // of the quarter-turned torso rather than off its front.
-export const ARM_TUNING={shoulderWidth:.645,shoulderHeight:1.30,shoulderDepth:.02,restAcross:.90,pole:[.60,.95,.70],lightPole:[1.06,.80,.35],heavyOffPole:[-.45,.72,1.15],aimDownSpread:.55,aimDownDrop:.30};
+export const ARM_TUNING={shoulderWidth:.645,shoulderHeight:1.30,shoulderDepth:.02,restAcross:.82,restHeight:.80,pole:[.60,.95,.70],lightPole:[1.06,.80,.35],heavyOffPole:[-.75,.72,1.15],aimDownSpread:.55,aimDownDrop:.30};
 const xAxis=new T.Vector3(1,0,0),up=new T.Vector3(0,1,0),direction=new T.Vector3(),bend=new T.Vector3(),elbow=new T.Vector3(),wrist=new T.Vector3(),target=new T.Vector3(),inverse=new T.Quaternion(),handTurn=new T.Quaternion(),spud=new T.Vector3();
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const smooth=t=>t*t*(3-2*t);
@@ -31,11 +31,11 @@ function shapeSleeve(upper,lower,start,hinge,end){
   }position.needsUpdate=normal.needsUpdate=true;
  }
 }
-export function makeArm(world,parent,skin,sign){
- // Arms share the body's textured potato skin exactly, so limbs never read as pale plastic
- // next to the russet torso and legs.
+export function makeArm(world,parent,limbSkin,sign){
+ // Arms wear the same textured potato skin as the legs, a few shades lighter than the torso,
+ // so limbs read as potato and stand out against the body rather than vanishing into it.
  world.geo.finger??=new T.CapsuleGeometry(.037,.043,5,10);
- const limbSkin=skin,arm=new T.Group();parent.add(arm);const shoulder=world.mesh('sphere',limbSkin,arm,0,0,0,.145,.152,.145),upper=world.mesh(sleeveGeometry(),limbSkin,arm),lower=world.mesh(sleeveGeometry(),limbSkin,arm),joint=new T.Object3D();upper.userData.ownGeometry=lower.userData.ownGeometry=true;arm.add(joint);
+ const arm=new T.Group();parent.add(arm);const shoulder=world.mesh('sphere',limbSkin,arm,0,0,0,.145,.152,.145),upper=world.mesh(sleeveGeometry(),limbSkin,arm),lower=world.mesh(sleeveGeometry(),limbSkin,arm),joint=new T.Object3D();upper.userData.ownGeometry=lower.userData.ownGeometry=true;arm.add(joint);
  const hand=new T.Group();arm.add(hand);world.mesh('sphere',limbSkin,hand,0,-.09,0,.137,.117,.076);world.mesh('cylinder',limbSkin,hand,0,.012,0,.078,.065,.073);world.mesh('sphere',limbSkin,hand,0,.025,0,.092,.032,.083);
  const fingers=[];
  for(let j=0;j<3;j++){const finger=new T.Group();finger.position.set((j-1)*.079,-.176,.008);hand.add(finger);const length=[.88,1,.91][j];world.mesh('finger',limbSkin,finger,0,-.035,0,1,length,1);const tip=new T.Group();tip.position.y=-.071*length;finger.add(tip);world.mesh('finger',limbSkin,tip,0,-.030,0,.97,.76,.97);fingers.push({finger,tip});}
@@ -45,10 +45,14 @@ export function makeArm(world,parent,skin,sign){
 function grip(arm,curl){for(const {finger,tip}of arm.userData.fingers){finger.rotation.x=-curl;tip.rotation.x=-curl*.75;}arm.userData.thumb.rotation.x=-curl*.65;}
 // Tuck wide reaches forward around the potato with a smooth, bounded lateral reach.
 function tuckReach(point,threshold,width){const over=point.dot(aimRight)-threshold;if(over>0){const correction=over*over/(over+width);point.addScaledVector(aimRight,-correction).addScaledVector(aimForward,correction);}}
+const REACH=(ARM_LENGTHS.upper+ARM_LENGTHS.forearm)*.985;
 function solveArm(arm,shoulder,point,pole,throwing=false){const {upper,lower,joint,hand}=arm.userData;arm.userData.shoulder.position.copy(shoulder);wrist.copy(point);
  // Keep both bones at their intended length. Animated bend guides and the
  // outboard hand recovery avoid singularities without moving a solved elbow.
- direction.copy(wrist).sub(shoulder);const distance=Math.max(.001,direction.length());direction.divideScalar(distance);
+ // A target past the arm's reach is pulled back onto it, so a distant fore-end grip
+ // bends the elbow open instead of silently stretching the sleeve into a rubber tube.
+ direction.copy(wrist).sub(shoulder);let distance=Math.max(.001,direction.length());direction.divideScalar(distance);
+ if(distance>REACH){distance=REACH;wrist.copy(shoulder).addScaledVector(direction,REACH);}
   const a=ARM_LENGTHS.upper,b=ARM_LENGTHS.forearm,along=(a*a-b*b+distance*distance)/(2*distance),height=Math.sqrt(Math.max(0,a*a-along*along));bend.copy(pole).sub(shoulder);bend.addScaledVector(direction,-bend.dot(direction)).normalize();elbow.copy(shoulder).addScaledVector(direction,along).addScaledVector(bend,height);
  if(throwing){
   // Bound the elbow on its IK circle, so clearing the sight cannot shorten a bone.
@@ -103,7 +107,10 @@ export function poseArms(m,p,stride,walk,crouch,canThrow=true){
   // Only the weapon arm grips. A potato torso is wider than the arms are long, so a support
   // hand can never actually reach across to the fore-end; forcing it drove a straight upper
   // arm clean through the chest. The free arm braces at the side instead.
-  if(m.gun.visible&&j===0){target.set(0,-.10,-.77).applyMatrix4(m.gun.matrix);hand.quaternion.copy(m.gun.quaternion);curl=1.35;}
+  if(m.gun.visible&&j===0){
+   // Grip where the shorter arm can actually hold: the wide-bodied weapons are gripped at the
+   // receiver rather than out along the fore-end, so the upper arm never gets dragged into the ribs.
+   target.set(0,-.10,p.weapon==='rpg'||p.weapon==='scatter'?-.50:-.72).applyMatrix4(m.gun.matrix);hand.quaternion.copy(m.gun.quaternion);curl=1.35;}
   else if(tossing&&j===0){
    // Palm faces the throw, fingers cradle the rear skin; a small wrist cock
    // replaces the old upward/backward-facing palm and under-potato grip.
@@ -113,7 +120,7 @@ export function poseArms(m,p,stride,walk,crouch,canThrow=true){
   else{const swing=Math.cos(stride+j*Math.PI)*walk,gaitAcross=(m.gaitX??0)*aimRight.x+(m.gaitZ??1)*aimRight.z,gaitFwd=(m.gaitX??0)*aimForward.x+(m.gaitZ??1)*aimForward.z;
    // Gait comes in body coordinates; rotate it into the aim frame the arms now live in so the
    // swing still opposes the same-side foot in real travel directions.
-   aimLocal(target,side*ARM_TUNING.restAcross+swing*.055*gaitAcross,.65+Math.abs(swing)*.025,-.04+swing*.21*gaitFwd);hand.rotation.x=-swing*.12;if(tossing&&p.shotAnim>0){target.y+=Math.sin(elapsed/THROW_DURATION*Math.PI)*.10;target.z-=Math.sin(elapsed/THROW_DURATION*Math.PI)*.08;}}
+   aimLocal(target,side*ARM_TUNING.restAcross+swing*.055*gaitAcross,ARM_TUNING.restHeight+Math.abs(swing)*.025,-.04+swing*.21*gaitFwd);hand.rotation.x=-swing*.12;if(tossing&&p.shotAnim>0){target.y+=Math.sin(elapsed/THROW_DURATION*Math.PI)*.10;target.z-=Math.sin(elapsed/THROW_DURATION*Math.PI)*.08;}}
   solveArm(arm,shoulder,target,pole,tossing&&j===0);if(!(tossing&&j===0))limitWrist(arm);grip(arm,curl);
  }
 }

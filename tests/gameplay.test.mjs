@@ -90,24 +90,27 @@ console.log('PASS strict shared-item snapshots and guest spatial audio dedupe, i
 a.init(0);const progression=a.snapshot();progression.players.forEach(p=>p.botDelay=999);const thrower=progression.players[0],rival=progression.players[1];rival.invuln=0;
 assert.equal(thrower.weapon,'throw');
 for(let i=0;i<3;i++)a.hit(rival,{owner:0,vx:0,vz:-23,gun:false,weapon:'throw',damage:10});
-assert.equal(thrower.weapon,'spud');assert.equal(thrower.weaponLevel,1);
+assert.equal(thrower.weapon,'throw','landing hits is no longer enough; the gun is earned by a knockout');
+a.hit(rival,{owner:0,vx:0,vz:-23,gun:false,weapon:'throw',damage:200});
+assert.equal(thrower.weapon,'spud');assert.equal(thrower.weaponLevel,1);assert.equal(thrower.kills,1,'objective rounds still count knockouts');
 thrower.invuln=0;a.hit(thrower,{owner:1,vx:0,vz:23,gun:false,damage:200});
-for(let i=0;i<365;i++)a.tick(dt);assert.equal(thrower.weapon,'throw','every death returns to hand throwing');assert.equal(thrower.weaponLevel,0);assert.equal(thrower.weaponHits,0);
+for(let i=0;i<365;i++)a.tick(dt);assert.equal(thrower.weapon,'throw','every death returns to hand throwing');assert.equal(thrower.weaponLevel,0);
 const shared=progression.pickups.find(p=>p.kind==='weapon');Object.assign(thrower,{x:shared.x,z:shared.z});a.tick(dt);assert.equal(thrower.weaponLevel,2);const held=thrower.weapon,ammo=thrower.mag;
 thrower.invuln=0;a.hit(thrower,{owner:1,vx:0,vz:23,gun:false,damage:200});assert.equal(shared.phase,'available');assert.equal(shared.weapon,held);assert.equal(shared.ammo,ammo);
-for(let i=0;i<365;i++)a.tick(dt);assert.equal(thrower.weapon,'throw');assert.equal(thrower.weaponHits,0);
-console.log('PASS three landed throws earn the base gun; ordinary death resets it; special-weapon death drops remaining ammo and returns to hands');
-// A kill resets progression even if old projectiles are still travelling.
+for(let i=0;i<365;i++)a.tick(dt);assert.equal(thrower.weapon,'throw');
+console.log('PASS a knockout earns the base gun; ordinary death resets it; special-weapon death drops remaining ammo and returns to hands');
+// Being dead beats earning: a knockout landed by a still-travelling projectile after its owner
+// has been mashed must not hand that corpse a gun to respawn with.
 a.init(0);const resetMatch=a.snapshot(),resetPlayer=resetMatch.players[0],resetRival=resetMatch.players[1];resetMatch.players.forEach(p=>p.botDelay=999);resetMatch.pickups.forEach(p=>{p.x=p.z=1000;});
-Object.assign(resetPlayer,{weaponHits:2,invuln:0});a.hit(resetPlayer,{owner:1,vx:0,vz:23,gun:false,damage:200});resetRival.invuln=0;
-for(let i=0;i<3;i++)a.hit(resetRival,{owner:0,vx:0,vz:-23,gun:false,weapon:'throw',damage:1});
-assert.equal(resetPlayer.weaponHits,0);assert.equal(resetPlayer.weaponLevel,0);
+Object.assign(resetPlayer,{invuln:0});a.hit(resetPlayer,{owner:1,vx:0,vz:23,gun:false,damage:200});resetRival.invuln=0;
+a.hit(resetRival,{owner:0,vx:0,vz:-23,gun:false,weapon:'throw',damage:200});
+assert.equal(resetPlayer.weaponLevel,0);
 for(let i=0;i<365;i++)a.tick(dt);assert.equal(resetPlayer.weapon,'throw');
-resetRival.invuln=0;for(let i=0;i<3;i++)a.hit(resetRival,{owner:0,vx:0,vz:-23,gun:false,weapon:'throw',damage:1});assert.equal(resetPlayer.weapon,'spud');
+resetRival.invuln=0;a.hit(resetRival,{owner:0,vx:0,vz:-23,gun:false,weapon:'throw',damage:200});assert.equal(resetPlayer.weapon,'spud');
 // Water deaths follow the same rule, including host-to-guest state.
-let waterMatch;for(let i=0;i<10;i++){a.init(i);waterMatch=a.snapshot();if(waterMatch.map.waterCells.length)break;}const waterPlayer=waterMatch.players[0];waterMatch.players.forEach(p=>p.botDelay=999);const water=waterMatch.map.waterCells[0];assert.ok(water);equipWeapon(waterPlayer,'spud');waterPlayer.weaponLevel=1;Object.assign(waterPlayer,{x:water.x,z:water.z,y:0,invuln:0});a.tick(dt);assert.ok(waterPlayer.respawn>0);for(let i=0;i<185;i++)a.tick(dt);assert.equal(waterPlayer.weapon,'throw');assert.equal(waterPlayer.weaponHits,0);assert.equal(waterPlayer.weaponLevel,0);
-const resetPacket=a.makeSnapshot();a.becomeGuest(guest);a.receiveRemoteSnapshot(resetPacket);await new Promise(setImmediate);const guestPlayer=a.snapshot().players[0];assert.equal(guestPlayer.weapon,'throw');assert.equal(guestPlayer.weaponLevel,0);assert.equal(guestPlayer.weaponHits,0);a.setOnline(null);
-console.log('PASS death resets progression, post-death hits cannot promote, three new hits re-earn the gun, and water/guest respawns use throwing');
+let waterMatch;for(let i=0;i<10;i++){a.init(i);waterMatch=a.snapshot();if(waterMatch.map.waterCells.length)break;}const waterPlayer=waterMatch.players[0];waterMatch.players.forEach(p=>p.botDelay=999);const water=waterMatch.map.waterCells[0];assert.ok(water);equipWeapon(waterPlayer,'spud');waterPlayer.weaponLevel=1;Object.assign(waterPlayer,{x:water.x,z:water.z,y:0,invuln:0});a.tick(dt);assert.ok(waterPlayer.respawn>0);for(let i=0;i<185;i++)a.tick(dt);assert.equal(waterPlayer.weapon,'throw');assert.equal(waterPlayer.weaponLevel,0);
+const resetPacket=a.makeSnapshot();a.becomeGuest(guest);a.receiveRemoteSnapshot(resetPacket);await new Promise(setImmediate);const guestPlayer=a.snapshot().players[0];assert.equal(guestPlayer.weapon,'throw');assert.equal(guestPlayer.weaponLevel,0);a.setOnline(null);
+console.log('PASS death resets progression, a post-death knockout cannot promote, a fresh kill re-earns the gun, and water/guest respawns use throwing');
 
 
 a.init(0);const waiting=a.snapshot(),humanOnly={slot:0,isHost:true,roster:[{slot:0},{slot:1},{slot:2}],remoteInputs:new Map()};a.setOnline(humanOnly);const beforeHumans=waiting.players.slice(1).map(p=>({x:p.x,z:p.z}));

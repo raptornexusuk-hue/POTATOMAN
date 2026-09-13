@@ -1,6 +1,10 @@
 import {mapId} from './map-catalogue.js';
 import {bodyHeight,updateStance,STANDING_HEIGHT} from './stance.js';
 export const STEP=1/120, CELL=3.2, ROUND_TIME=120, BONUS_TIME=40;
+// Half the gravity applied to a thrown potato. A hand-thrown spud is lobbed, not fired: this is
+// what gives it a visible arc to lead with, and every launch solver below derives from it, so the
+// crosshair keeps converging on the same point the potato actually reaches.
+export const THROW_DROP=5.4;
 export const LEVELS=[
  {name:'Market Mayhem',tag:'VILLAGE • DAY',mode:'battle',size:15,theme:'market',seed:11,detail:'Fight through the town streets. Flank around the buildings and contest weapon drops in the market.',skill:'Move · aim · dodge'},
  {name:'Hedge Your Bets',tag:'GARDENS • DAY',mode:'race',size:15,theme:'hedge',seed:32,detail:'Fastest complete escape wins. Follow the landmarks, then improve your route.',skill:'Find the fastest route'},
@@ -121,7 +125,7 @@ export function boxContact(ax,az,bx,bz,w,pad=0){let lo=0,hi=1;for(const[a,b,c,s]
 export function boxContact3D(ax,ay,az,bx,by,bz,w,pad=0){let lo=0,hi=1;for(let axis=0;axis<3;axis++){const a=axis===0?ax:axis===1?ay:az,b=axis===0?bx:axis===1?by:bz,c=axis===0?w.x:axis===1?(w.base??0)+w.h/2:w.z,size=axis===0?w.w:axis===1?w.h:w.d;const delta=b-a,min=c-size/2-pad,max=c+size/2+pad;if(Math.abs(delta)<1e-9){if(a<min||a>max)return Infinity;}else{let t1=(min-a)/delta,t2=(max-a)/delta;if(t1>t2){const swap=t1;t1=t2;t2=swap;}lo=Math.max(lo,t1);hi=Math.min(hi,t2);if(lo>hi)return Infinity;}}return lo;}
 
 // Both the camera and weapon converge on the same point eleven metres ahead.
-export function launchVerticalSpeed(speed,pitch,gun=false){const flight=10.42/speed;return(pitch*7-.02)/flight+(gun?0:1.9*flight);}
+export function launchVerticalSpeed(speed,pitch,gun=false){const flight=10.42/speed;return(pitch*7-.02)/flight+(gun?0:THROW_DROP*flight);}
 
 export const POWERUPS={run:{label:'BUTTER BOOTS',caption:'RUN FASTER',color:0x60edbd,field:'runBoost',seconds:12},fire:{label:'HOT SPUD',caption:'SHOOT FASTER',color:0xff9861,field:'fireBoost',seconds:12},jump:{label:'SPRING CLOGS',caption:'JUMP HIGHER',color:0xb89bff,field:'jumpBoost',seconds:14}};
 export function isTrial(level){return level.mode==='race'||level.mode==='assault';}

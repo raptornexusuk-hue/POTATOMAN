@@ -10,7 +10,7 @@ const renderer={shadowMap:{},capabilities:{getMaxAnisotropy:()=>4},setPixelRatio
 World.prototype.loadMaterials=async function(){};
 const w=new World({},renderer);await w.ready;w.root=new T.Group();w.scene.add(w.root);w.level=LEVELS[0];w.solids=[];w.isBonus=false;w.characters=[w.character(0)];
 const m=w.characters[0],p={id:0,name:'GAIT',hp:100,x:0,y:0,z:0,yaw:0,pitch:-.08,respawn:0,crouching:false,runner:false,dashTime:0,shotAnim:0,catchTime:0,reload:0,gun:false,weapon:'throw',panX:0,panY:0,cameraDistance:4.6,grounded:true};
-const sample=(phase,heading,side)=>{m.lastX=p.x-heading.x*.01;m.lastZ=p.z-heading.z*.01;m.stride=phase-.01*2.8;m.walk=1;w.updatePlayers([p],0,0);w.root.updateMatrixWorld(true);return m.legs[side].userData.foot.getWorldPosition(new T.Vector3()).sub(m.g.position);};
+const sample=(phase,heading,side)=>{m.lastX=p.x-heading.x*.01;m.lastZ=p.z-heading.z*.01;m.stride=phase-.01*5.1;m.walk=1;w.updatePlayers([p],0,0);w.root.updateMatrixWorld(true);return m.legs[side].userData.foot.getWorldPosition(new T.Vector3()).sub(m.g.position);};
 let checks=0;
 for(const yaw of[0,.4,1.3,-2.7,Math.PI])for(const [motion,inputX,inputZ]of[['forward',0,-1],['back',0,1],['right',1,0],['left',-1,0],['forward-right',Math.SQRT1_2,-Math.SQRT1_2],['back-left',-Math.SQRT1_2,Math.SQRT1_2]]){
  p.yaw=yaw;const heading=new T.Vector3(inputX*Math.cos(yaw)-inputZ*Math.sin(yaw),0,inputX*Math.sin(yaw)+inputZ*Math.cos(yaw));
