@@ -1,0 +1,606 @@
+{
+  "version": "0.16.0",
+  "commit": "72be169d60bd6e954ce1579e58aa2219b429e494",
+  "source_files": [
+    {
+      "path": ".gitignore",
+      "bytes": 61,
+      "sha256": "b6b9806fea86029f327ac0b83f91e0a42e7918c918be9567859d1d6d807620a3"
+    },
+    {
+      "path": ".openai/hosting.json",
+      "bytes": 77,
+      "sha256": "416fd20dbec2cde23d88bfcb82c52806ccb8deea233fd56ccfd47620a744eb3b"
+    },
+    {
+      "path": "README.md",
+      "bytes": 33574,
+      "sha256": "353bb0c2506eb9bd0674f091bd8966b2c2f9342f4c8291fd7aed27fc0bce2a28"
+    },
+    {
+      "path": "TESTING.md",
+      "bytes": 33045,
+      "sha256": "454d610583e86761400697e6aa2d6d24aaf3c212a7786ec69ab6a32c8687a778"
+    },
+    {
+      "path": "UPLOAD-GUIDE.md",
+      "bytes": 4264,
+      "sha256": "a5a78b1d14d51221402d5ae220b276db0c7a3de62f8ed8b1e4ec34fe6556db89"
+    },
+    {
+      "path": "db/schema.ts",
+      "bytes": 2502,
+      "sha256": "2f9fb64765667fc7648f0779faf72aaf84881b849f69c6e99c6c29070a54c92d"
+    },
+    {
+      "path": "design/concept-board-prompt.txt",
+      "bytes": 3104,
+      "sha256": "e0e3175f72f2087ae5defcd175718558497608d07ff5e233177332026c1489a3"
+    },
+    {
+      "path": "design/key-art-prompt.txt",
+      "bytes": 2736,
+      "sha256": "1aed88ec4a27963abc676c2b3e88f5b08f6dcdcf58f5e8aeaa519ec3260c9940"
+    },
+    {
+      "path": "design/material-prompts-v04.json",
+      "bytes": 3896,
+      "sha256": "cd84968faa18cc1c15b434467122f196adef425a35b2c991eb89e9bfba71f4ea"
+    },
+    {
+      "path": "dist/aiming.js",
+      "bytes": 6592,
+      "sha256": "35f522335aee68c8dbc668139966293996011cd4117687f88c4d1d7829ee9056"
+    },
+    {
+      "path": "dist/app.js",
+      "bytes": 75151,
+      "sha256": "61de74a0d58f12f81b1738abe9f83747e0233496c9f891072971defa5d7d12fd"
+    },
+    {
+      "path": "dist/assets/PBR-CREDITS.txt",
+      "bytes": 317,
+      "sha256": "bdc6ca0e0822cbb24f91f32307b245cf5f79f7f35befc7c41c621857d99108bf"
+    },
+    {
+      "path": "dist/assets/THREE-LICENSE.txt",
+      "bytes": 1081,
+      "sha256": "bfe119ea4fd413f5f7ca3fcd63adb0c4a073ed39daa2fe7d3e6b769e21272601"
+    },
+    {
+      "path": "dist/assets/audio/AUDIO-CREDITS.txt",
+      "bytes": 3103,
+      "sha256": "681e0f944d93b89a9a7ae0c93392642bac9a42437e219675ee1195df7669d504"
+    },
+    {
+      "path": "dist/assets/audio/arena-funk.mp3",
+      "bytes": 586545,
+      "sha256": "6499a2b074f59ababe30cea360b3f3780e814c67361b1fedc43d052eb82f10cb"
+    },
+    {
+      "path": "dist/assets/audio/asset-manifest.json",
+      "bytes": 13434,
+      "sha256": "732c8aac46f838d119b5813be4dee164bb4c28867718a27ffccfa95bec01400c"
+    },
+    {
+      "path": "dist/assets/audio/bell.mp3",
+      "bytes": 19053,
+      "sha256": "4b89e0453a465030ddafd9b0883d5787bae9ffb612e9cfc57f7c51e97572313f"
+    },
+    {
+      "path": "dist/assets/audio/cloth-a.mp3",
+      "bytes": 9117,
+      "sha256": "f507832ce2d22021b144d26c3d2aa36b4fcaa82d34d4270706ac7368f8fd54b9"
+    },
+    {
+      "path": "dist/assets/audio/cloth-b.mp3",
+      "bytes": 6093,
+      "sha256": "6acf702257c5cec5daad6da260a4afa47b7bb82307deb61fadbe7ae1ce2e9b1a"
+    },
+    {
+      "path": "dist/assets/audio/hunt-electro.mp3",
+      "bytes": 1337083,
+      "sha256": "c2c8859e707b011dab0c15e21604be08f44b27e2eef89a6be524d034cbabe329"
+    },
+    {
+      "path": "dist/assets/audio/kenney-impact-license.txt",
+      "bytes": 586,
+      "sha256": "48d20ed2f4fd9146e76b7f558d09a1c27e62554d9897beb93dee57d269006d02"
+    },
+    {
+      "path": "dist/assets/audio/kenney-rpg-license.txt",
+      "bytes": 458,
+      "sha256": "842c42cc1942963f6fcdc18fe57e9e0631e8a4936f9803688e8152e830088eb9"
+    },
+    {
+      "path": "dist/assets/audio/metal-click.mp3",
+      "bytes": 6525,
+      "sha256": "6a507852a228bea64c2585dbb0dbf1bb04b9663e2684b3ca1a7bfc45897ddd57"
+    },
+    {
+      "path": "dist/assets/audio/metal-heavy.mp3",
+      "bytes": 3069,
+      "sha256": "4fcc0cd7f0dda97b713b712bc32ebff7779f04a3daf81a90e2ad868b4fa347c1"
+    },
+    {
+      "path": "dist/assets/audio/metal-pot.mp3",
+      "bytes": 18621,
+      "sha256": "0f9381cd7bac4b4a17b51b43793fcf1ca6d9a7306e5407792a5f8bb88b104f95"
+    },
+    {
+      "path": "dist/assets/audio/punch-heavy-a.mp3",
+      "bytes": 9117,
+      "sha256": "c3feb6766333888ba19e6c97ab36d9c101d68e04c33236cd7adb32c8137a6b32"
+    },
+    {
+      "path": "dist/assets/audio/punch-heavy-b.mp3",
+      "bytes": 7389,
+      "sha256": "4c10f948b6509d38af9941f75f37967b63513a7bc015215c314729ea10182043"
+    },
+    {
+      "path": "dist/assets/audio/slime-a.mp3",
+      "bytes": 6957,
+      "sha256": "0ae8c86541ca66be5be8d2d3f3cb4d2f2ac27bd9e4a8f74435a56918b1f0841c"
+    },
+    {
+      "path": "dist/assets/audio/slime-b.mp3",
+      "bytes": 7821,
+      "sha256": "ef5f49f9e137f3a85427df021af5ca0d484d23de3bc832304142c607ba313049"
+    },
+    {
+      "path": "dist/assets/audio/splash-a.mp3",
+      "bytes": 17757,
+      "sha256": "bc119fbfdb057cd7f63021d95a9080f2dbc5b4b05117f4eff768bad629af8137"
+    },
+    {
+      "path": "dist/assets/audio/splash-b.mp3",
+      "bytes": 10413,
+      "sha256": "d4c591fa35993ebc85083eb327a3cf7d4adaa8d98220dd423eb3c46709ecda57"
+    },
+    {
+      "path": "dist/assets/audio/step-grass-a.mp3",
+      "bytes": 10413,
+      "sha256": "7d7334237fc68803fa1e06de2cfcb7e0702df904deb38194ad25bcf81fb03117"
+    },
+    {
+      "path": "dist/assets/audio/step-grass-b.mp3",
+      "bytes": 9117,
+      "sha256": "49d1e2255cf398a0a34e425d1ea749f9e8a0fcdc346b792e6eceb79a609bfb50"
+    },
+    {
+      "path": "dist/assets/audio/step-wood-a.mp3",
+      "bytes": 4365,
+      "sha256": "04d24465304cfc38f9fcff47ea761a2d7491b5d8b890944f657e774a2b98da55"
+    },
+    {
+      "path": "dist/assets/audio/step-wood-b.mp3",
+      "bytes": 3933,
+      "sha256": "3ef6e9f9c9d77a61bc4e7babaa0c132156cfe4dbe6cd6edd6b6b9e759918f0b6"
+    },
+    {
+      "path": "dist/assets/audio/water-loop.mp3",
+      "bytes": 85149,
+      "sha256": "77530b37e09a2e88d400bf4b05686843116eccc89cff1fb9314f0f8eea9a69e1"
+    },
+    {
+      "path": "dist/assets/audio/whoosh-a.mp3",
+      "bytes": 8253,
+      "sha256": "aeb63b52c33b3be6cca6faf57d0c83bb57576b27193ac3849f72bc0c284959fe"
+    },
+    {
+      "path": "dist/assets/audio/whoosh-b.mp3",
+      "bytes": 7821,
+      "sha256": "4529c809c87bcd47508ccd4aef7ba8caa72dcc53cb745bb3198d773e21f768d8"
+    },
+    {
+      "path": "dist/assets/audio/wood-heavy.mp3",
+      "bytes": 4797,
+      "sha256": "1d2b28e17a53bcc770ac47ac51ec89bacad3d3d3992cb46628bcde5829cb2614"
+    },
+    {
+      "path": "dist/assets/audio/wood-plank.mp3",
+      "bytes": 10413,
+      "sha256": "3181cceee50ebca865154fb262011f5125161ac951e38df6a4943f05485b45eb"
+    },
+    {
+      "path": "dist/assets/cobblestone_floor_08_diff_2k.jpg",
+      "bytes": 2289909,
+      "sha256": "9aaf7db7f660f03d0c5c129c11e83caa828fb8bca63f8cd5154d450ffc4c340f"
+    },
+    {
+      "path": "dist/assets/cobblestone_floor_08_nor_gl_2k.jpg",
+      "bytes": 3948187,
+      "sha256": "42dd5fc2da4a858f9c076c9ac5002857a1c064f8f4c4ffb12fafecffb84e96cc"
+    },
+    {
+      "path": "dist/assets/cobblestone_floor_08_rough_2k.jpg",
+      "bytes": 1657928,
+      "sha256": "3bc645ec45543c704fe1042f7b81f9bad4f88a8567760c4898c82bc2a134e093"
+    },
+    {
+      "path": "dist/assets/dutch-brick-color.png",
+      "bytes": 3193323,
+      "sha256": "f6373671894aad475a82553f27c8123b07da5d5283f20f1ba70463100e4a81f6"
+    },
+    {
+      "path": "dist/assets/dutch-cobblestone-color.png",
+      "bytes": 3370532,
+      "sha256": "ad029ec7493ad3c1883ed56fa25bf16d339967979e1d68ec55e9897efd0de171"
+    },
+    {
+      "path": "dist/assets/oak-foliage-v10.png",
+      "bytes": 1805672,
+      "sha256": "28089db98c34516b2051a8786184cb5b575056e7b578ccf85971a1d0bde5c911"
+    },
+    {
+      "path": "dist/assets/oak_veneer_02_diff_1k.jpg",
+      "bytes": 586151,
+      "sha256": "69410573a965898d455f389ede7c0de5709de33430ad489786e5ba70b3e7ba81"
+    },
+    {
+      "path": "dist/assets/oak_veneer_02_nor_gl_1k.jpg",
+      "bytes": 306086,
+      "sha256": "4e5444b3fa1f3456891ca06e9f8978f7f303cadaf36cd4041da8e207be7202ce"
+    },
+    {
+      "path": "dist/assets/oak_veneer_02_rough_1k.jpg",
+      "bytes": 767259,
+      "sha256": "e9d438b6d00db37cbf4745cc7ff3b59ee29fd7cc75ce6396356dd004a84d2e43"
+    },
+    {
+      "path": "dist/assets/potato-skin-albedo-realistic.png",
+      "bytes": 3264783,
+      "sha256": "4d90afc7a73370fa637cf1bd21d7ca24d385d173bed055a9c04a1e51bd439319"
+    },
+    {
+      "path": "dist/assets/potato-skin-color.png",
+      "bytes": 3153840,
+      "sha256": "dfb39694540ee3e88702e15df8951dea95c9a9d56840871fa191b7edd34e0d68"
+    },
+    {
+      "path": "dist/assets/potatoman-concept-board.png",
+      "bytes": 2882418,
+      "sha256": "15d6ae57b197b149a44f55cb6994647f02f8e46eaee5d5c38e807ad28e89403a"
+    },
+    {
+      "path": "dist/assets/potatoman-key-art-crowned-v13.png",
+      "bytes": 2477438,
+      "sha256": "d6e1a09ae8fd696ad1fc7e76eea8dfbfa1ecf7c8a099176e09405b126b73e5c7"
+    },
+    {
+      "path": "dist/assets/potatoman-key-art.png",
+      "bytes": 2527896,
+      "sha256": "664db5cf1a454e07e1ddb464c4e6855fae8702a21e5384f3cdf23ab6822dd444"
+    },
+    {
+      "path": "dist/assets/potatoman-wordmark-3d.png",
+      "bytes": 1567950,
+      "sha256": "d67b0d5772846a5be9c49e7c29d5716bc5c2e8f60df027561bd29ca1ca6ca457"
+    },
+    {
+      "path": "dist/assets/three.core.js",
+      "bytes": 1403455,
+      "sha256": "eb077d2417f61d3e6d9264c317cabc4ea35769ed6b0ab533067292a550784c20"
+    },
+    {
+      "path": "dist/assets/three.module.js",
+      "bytes": 603113,
+      "sha256": "c8211c69345d2e9949dc7a8ac969380497aa0600a5a8ac6a459c8cd02dd9cb8a"
+    },
+    {
+      "path": "dist/assets/voices/README.md",
+      "bytes": 479,
+      "sha256": "659211280f4d1496700e8f9230443bb0493bd96f2052b8e5878037207f6a727a"
+    },
+    {
+      "path": "dist/assets/voices/manifest.json",
+      "bytes": 25,
+      "sha256": "d6d2f71847f5fcccfea57703fc1cec3302e0e93de094928e4eb2f51e0d2ff750"
+    },
+    {
+      "path": "dist/camera-input.js",
+      "bytes": 3167,
+      "sha256": "7f5fe85542f5b15692e2c6f88620cd81ac0734f1b6852d9ddf535f340d65659e"
+    },
+    {
+      "path": "dist/character-rig.js",
+      "bytes": 13752,
+      "sha256": "f009e6411d80955e7e6e5610e760d8c57c800e1d784a1a5fd614836b60fd3a23"
+    },
+    {
+      "path": "dist/controls.js",
+      "bytes": 6947,
+      "sha256": "8e8e071889a83d496a7781bed23657daad4248ef4adf5867bb903788153093c6"
+    },
+    {
+      "path": "dist/core.js",
+      "bytes": 16836,
+      "sha256": "6bb66651c0967ec2134c78c89df369f89b7328a9d0c14f66bfee0523c78704d6"
+    },
+    {
+      "path": "dist/difficulty.js",
+      "bytes": 1223,
+      "sha256": "5f323827487507dfe53515698690f69af13727cb26565344000d89722be59c2e"
+    },
+    {
+      "path": "dist/environment-design.js",
+      "bytes": 9332,
+      "sha256": "7390ca5b519f6be123930d58326c32ed0c14641961e84e197c8eaf8362279ac7"
+    },
+    {
+      "path": "dist/game-audio.js",
+      "bytes": 6674,
+      "sha256": "a2ee1b632f192d865fe7ba20c0881d75b0ecb98a5b499fd91ac7a9d1dcafe81b"
+    },
+    {
+      "path": "dist/index.html",
+      "bytes": 17744,
+      "sha256": "ea399a22b8aff3ab10383528690beaa7bafd020c81b947110625a8b95c1bf202"
+    },
+    {
+      "path": "dist/map-catalogue.js",
+      "bytes": 1355,
+      "sha256": "263ad39a89397686dedf59a5018f2e2fda207408740d11e312e9948cc307e3c4"
+    },
+    {
+      "path": "dist/nature.js",
+      "bytes": 7105,
+      "sha256": "62d4fc128ee67880f820072d62abaef7e4ff0ab40edff758fc0a0af1887e5eed"
+    },
+    {
+      "path": "dist/net-state.js",
+      "bytes": 5073,
+      "sha256": "5d98de777540224a8660affbb57d7e44723e3338bf32ce2782b76b208ac64aca"
+    },
+    {
+      "path": "dist/network.js",
+      "bytes": 6912,
+      "sha256": "d2f62bf77a82d128ac080a817fb9db2ae1c34542cdd74171a48f4b44a527df23"
+    },
+    {
+      "path": "dist/player-label.js",
+      "bytes": 2753,
+      "sha256": "507b9b10135729937209724ceb6adeb622f0f17ec17b97eb0ecc5676a54d18e1"
+    },
+    {
+      "path": "dist/profiles.js",
+      "bytes": 6939,
+      "sha256": "8897f4fafbf1b77b2fee4caff1ec9d9a2616eb1abdd97324464c0dc122cb4b7b"
+    },
+    {
+      "path": "dist/progression.js",
+      "bytes": 1038,
+      "sha256": "44525bc6c946851fdffae9316ed2ba3c2f74ffe1830e360983aed3d35003fce5"
+    },
+    {
+      "path": "dist/score-queue.js",
+      "bytes": 1518,
+      "sha256": "3ae85587690044e50af58a06e6776e5353025092d9180066ab055616b156ffc9"
+    },
+    {
+      "path": "dist/sound-pack.js",
+      "bytes": 2534,
+      "sha256": "8e19143321152d21e49ea2cc65263f487058d4f22652acac04ecf3469b2723b1"
+    },
+    {
+      "path": "dist/spatial-audio.js",
+      "bytes": 9916,
+      "sha256": "3061c2715fe46eb7325960da15cae73c878139328b8f1957dab83363aebb2658"
+    },
+    {
+      "path": "dist/stance.js",
+      "bytes": 692,
+      "sha256": "c4f154a329ccec4bdec960e4ae1c3cfb2bca93c8d035c7e7289dd45ee12f7502"
+    },
+    {
+      "path": "dist/style.css",
+      "bytes": 28686,
+      "sha256": "ea623db31abdb42adbbc8264121fd8fe207f325a0a8928aa5c6338d39d03b34f"
+    },
+    {
+      "path": "dist/visuals.js",
+      "bytes": 4600,
+      "sha256": "7f8b4ca17a7da908c41614822e8edd675fb2bb33ba571a84600a64ee8b22f0c7"
+    },
+    {
+      "path": "dist/weapon-model.js",
+      "bytes": 5065,
+      "sha256": "2f895eab4017e0863eca0b55fcb4c687161e4b9b5a37583163fb274b0c8ecba1"
+    },
+    {
+      "path": "dist/weapon-pickup.js",
+      "bytes": 1976,
+      "sha256": "839041426b9359daab210e8b2793ef2a968823e83f43ffee430a555c8334e2d4"
+    },
+    {
+      "path": "dist/weapons.js",
+      "bytes": 1153,
+      "sha256": "3386ea13cbd3a77a4d6e519f4de190c3ff04b17df7f5599e0e3e3af119eadb6a"
+    },
+    {
+      "path": "dist/world.js",
+      "bytes": 45585,
+      "sha256": "9ed2a28283a53bedbb73e09d9565aa4d4cec3e05b02a18502916201b952f8832"
+    },
+    {
+      "path": "drizzle.config.ts",
+      "bytes": 131,
+      "sha256": "09e793081a6d4e69c9d59cdab4941a17293048c4b2db8963d7a0ca4fccc8ede0"
+    },
+    {
+      "path": "drizzle/0000_optimal_gravity.sql",
+      "bytes": 938,
+      "sha256": "1ed7ed5d18bb637202c46d02ec1ea9ae25862ce34515fd585e4558e60fdaeaea"
+    },
+    {
+      "path": "drizzle/0001_cynical_sunfire.sql",
+      "bytes": 64,
+      "sha256": "ca7d15d1c67fe84fce67286159bd9613403dd972d0303b11df1582805a2a06b9"
+    },
+    {
+      "path": "drizzle/0002_hot_santa_claus.sql",
+      "bytes": 1321,
+      "sha256": "f37e0d22e7042e08f5f87878a749f152d175aa99b5ba56726a1990ae18b999ff"
+    },
+    {
+      "path": "drizzle/0003_flimsy_ironclad.sql",
+      "bytes": 232,
+      "sha256": "1afce671c0ebbe41247feb20dcf5c28c52537a91c47ac65114cceb949891cc0a"
+    },
+    {
+      "path": "drizzle/meta/0000_snapshot.json",
+      "bytes": 5302,
+      "sha256": "9eb91bbd19858dbb8b711d57b7a05927837f463c06821a32669020328c6ead73"
+    },
+    {
+      "path": "drizzle/meta/0001_snapshot.json",
+      "bytes": 5513,
+      "sha256": "cbf27f4e4bd028265bf585a826a47d02865c0b177b77aaff42f590260d0dbd94"
+    },
+    {
+      "path": "drizzle/meta/0002_snapshot.json",
+      "bytes": 11516,
+      "sha256": "eae41077632ea3ee122f7b454cdd752f767148a7682cdd619dad8ed08fbd1175"
+    },
+    {
+      "path": "drizzle/meta/0003_snapshot.json",
+      "bytes": 12135,
+      "sha256": "b0bdfa30a1b40db6fe81293e072b06c343473bc2bbea4b6567539b2a52893552"
+    },
+    {
+      "path": "drizzle/meta/_journal.json",
+      "bytes": 634,
+      "sha256": "ffc2b521695fdbf14b4f63504e0e7295fb73b8c9ee0f50b45eabb9960d886392"
+    },
+    {
+      "path": "package-lock.json",
+      "bytes": 70297,
+      "sha256": "b8370daf334eae9ab8b5f3e20be7126544ec548f5a827537faccc6f1edffd86c"
+    },
+    {
+      "path": "package.json",
+      "bytes": 987,
+      "sha256": "de02e022f972f649fe1268ebaa963d69e404a24273ce6d8577be9d56e77628ae"
+    },
+    {
+      "path": "scripts/build.mjs",
+      "bytes": 745,
+      "sha256": "2b644f6013b2db08056d3f6d8d1e5b0185c9de5cc0f3910b0cbbe92e7ccfad4e"
+    },
+    {
+      "path": "server/index.js",
+      "bytes": 7104,
+      "sha256": "a17f3ae03b5b56aa4bcf05f9e65b2a7e23efca5c7dd2e366e9f9b707ec0beb28"
+    },
+    {
+      "path": "server/node.mjs",
+      "bytes": 2039,
+      "sha256": "6cfb9d60998b288506b14a071f94f25e47139fdea75a69d922304d35068cdd39"
+    },
+    {
+      "path": "server/profiles.js",
+      "bytes": 7238,
+      "sha256": "87af54e1913388c4ef20f5ea9c012e5efa6bc0f5abe434d56ab4e592ba67b97d"
+    },
+    {
+      "path": "server/sqlite-adapter.mjs",
+      "bytes": 1244,
+      "sha256": "e061ddbfcd092f84981f8e23282391b3ebdf2e50eae7f204b8978c958b85ba90"
+    },
+    {
+      "path": "tests/audio.test.mjs",
+      "bytes": 5395,
+      "sha256": "e205b40d55f9f719f66ff153c4a225b94509f6233d09db6578bf78c67addc42d"
+    },
+    {
+      "path": "tests/camera-input.test.mjs",
+      "bytes": 3176,
+      "sha256": "3814482b314fa3d7a73d8598763f3fceab251d151b432a8e286a8b1f1f6eb504"
+    },
+    {
+      "path": "tests/character-rig.test.mjs",
+      "bytes": 16933,
+      "sha256": "e709c3d816381b85011c205afe1e8415d49d7ea2f129f9e3168d8e5d479df4b7"
+    },
+    {
+      "path": "tests/controls.test.mjs",
+      "bytes": 3866,
+      "sha256": "37807593132c4c81c78740492e6a293b1184ae7ce3b11dba59056730982ae8d4"
+    },
+    {
+      "path": "tests/core.test.mjs",
+      "bytes": 3390,
+      "sha256": "3cf35fd9c3d4aa565dc74c7517f414e9f6e274efa8b5dd8320213de1013bd1ae"
+    },
+    {
+      "path": "tests/frame-safety.test.mjs",
+      "bytes": 3535,
+      "sha256": "a18c5e55cb612582531b710e0962388af9157bf193a48af10cd2b1d090416da5"
+    },
+    {
+      "path": "tests/gait-direction.test.mjs",
+      "bytes": 4956,
+      "sha256": "b6ede23f0417778d883350fe2bd9a94d6d4042024a2295f68f7862ca729a14c5"
+    },
+    {
+      "path": "tests/gameplay.test.mjs",
+      "bytes": 34008,
+      "sha256": "21c2838806cef6ce1f131e47bdd07015bc3a660e2f291b8788d36fa6bf3a00a0"
+    },
+    {
+      "path": "tests/network.test.mjs",
+      "bytes": 6383,
+      "sha256": "336b7109f535fd54cac91e0abcf559be383ca94f7b422bbb662c8d996377f9ff"
+    },
+    {
+      "path": "tests/profiles.test.mjs",
+      "bytes": 4500,
+      "sha256": "9c20f38c5b3cf875ad1cfca4d7184d4b3a20e04fd904e31a281981e3777a7e12"
+    },
+    {
+      "path": "tests/render-aim.test.mjs",
+      "bytes": 11487,
+      "sha256": "3602c803b56daa513d84a7f277188450ee6c50dd429f16d7060b846c2a755fd0"
+    },
+    {
+      "path": "tests/scene.test.mjs",
+      "bytes": 10499,
+      "sha256": "16fae841dff65063ab1313f54628b47c1aee9bfacbec997e9f04e4f83a876270"
+    },
+    {
+      "path": "tests/score-queue.test.mjs",
+      "bytes": 1494,
+      "sha256": "b9f665876ff0a9fdbf4582ce2d57d1fda32b99f07c28312568f41152d51c0f20"
+    },
+    {
+      "path": "tests/spatial-audio.test.mjs",
+      "bytes": 4282,
+      "sha256": "274f2b65e5359d4d5c9c12dbb5c9c51b6f6c651de5ed18e819d0080a173894a6"
+    },
+    {
+      "path": "tests/stance-aim.test.mjs",
+      "bytes": 2039,
+      "sha256": "798f2c649aa9996607258a6216222eca9561dd818af91bd3bf8bc93184311f35"
+    },
+    {
+      "path": "tests/upgrades.test.mjs",
+      "bytes": 2955,
+      "sha256": "d4bebbe80aec7b7ccf788199fb889f8f4c239950d125b9615612ba60b730b21f"
+    },
+    {
+      "path": "tests/weapon-pickup.test.mjs",
+      "bytes": 2223,
+      "sha256": "c91774d58b8e3a78403cdb84b21a2e6c6d3f919a1a6322c2dd3cfdec2a328464"
+    },
+    {
+      "path": "tests/world-progression.test.mjs",
+      "bytes": 3450,
+      "sha256": "ff7463cc107aafdd2b956db514a0ee9eb4d51337943b349f4c867f4f264f4f63"
+    },
+    {
+      "path": "vite.config.mjs",
+      "bytes": 1228,
+      "sha256": "e7c031fb8e6c1c3e5312692d14e5fceebfa3a0d0b84bcec9ffaa09325ee0a90c"
+    }
+  ]
+}

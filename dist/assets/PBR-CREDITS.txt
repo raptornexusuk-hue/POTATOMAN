@@ -1,0 +1,4 @@
+PBR material maps from Poly Haven, CC0 (https://polyhaven.com/license).
+Cobblestone Floor 08 — Rob Tuytel, https://polyhaven.com/a/cobblestone_floor_08
+Oak Veneer 02 — Jenelle van Heerden, https://polyhaven.com/a/oak_veneer_02
+Original 2048px cobblestone and 1024px oak diffuse, OpenGL normal and roughness maps.

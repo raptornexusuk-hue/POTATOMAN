@@ -1,0 +1,67 @@
+import * as T from './assets/three.module.js';
+import {mapId} from './map-catalogue.js';
+// Authored environmental sets: props belong to a street, garden, quay or working yard.
+export function dressWorld(w,map,level,night,r){
+ const root=w.root,half=map.n*3.2/2,family=mapId(level),stone=w.mat(0xcac1ac,'stone'),iron=w.mat(0x344349,null,{metalness:.65,roughness:.4}),wood=w.mat(0x997244,'wood');
+ const box=(mat,x,y,z,sx,sy,sz)=>w.mesh('rounded',mat,root,x,y,z,sx,sy,sz);
+ const plaque=(text,x,y,z,width=3,rotation=0)=>{const c=document.createElement('canvas');c.width=768;c.height=192;const ctx=c.getContext('2d');ctx.fillStyle='#183b3a';ctx.fillRect(0,0,768,192);ctx.strokeStyle='#d7b877';ctx.lineWidth=8;ctx.strokeRect(12,12,744,168);ctx.fillStyle='#fff0c8';ctx.font='bold 65px Georgia';ctx.textAlign='center';ctx.fillText(text,384,117,710);const tex=new T.CanvasTexture(c);tex.colorSpace=T.SRGBColorSpace;const m=w.mesh(new T.PlaneGeometry(width,width/4),new T.MeshStandardMaterial({map:tex,roughness:.65}),root,x,y,z);m.rotation.y=rotation;m.userData.ownGeometry=m.userData.ownMaterial=true;m.userData.ownTexture=tex;return m;};
+ const bench=(x,z,rotation=0)=>{const g=new T.Group();g.position.set(x,0,z);g.rotation.y=rotation;root.add(g);for(let j=0;j<4;j++)w.mesh('rounded',wood,g,0,.58,-.23+j*.15,1.9,.085,.12);for(let j=0;j<3;j++)w.mesh('rounded',wood,g,0,.84+j*.14,.30,1.9,.10,.07);for(const s of[-1,1]){w.mesh('rounded',iron,g,s*.70,.3,0,.085,.60,.58);w.mesh('rounded',iron,g,s*.70,.8,.29,.07,.80,.07);}return g;};
+ const flowerBed=(x,z,sx,sz)=>{box(stone,x,.15,z,sx,.3,sz);box(w.mat(0x493b28),x,.32,z,sx-.15,.06,sz-.15);for(let i=0;i<18;i++){const a=(i%6)/5-.5,b=Math.floor(i/6)/2-.5,px=x+a*(sx-.4),pz=z+b*(sz-.4);w.mesh('sphere',w.mat(0x3e643b),root,px,.43,pz,.15,.14,.15);w.mesh('sphere',w.mat([0xeeb444,0xb4414e,0xeee5d1][i%3]),root,px,.61,pz,.068,.095,.068);}};
+ const fence=(z)=>{for(let x=-half;x<=half;x+=2){box(wood,x,.65,z,.12,1.3,.12);}for(const y of[.45,.98])box(wood,0,y,z,half*2,.10,.10);};
+ // Fixed building sizes, map-relative street lengths, and reserved gaps at corners.
+ const slots=(count,margin=6)=>Array.from({length:count},(_,i)=>(i/(count-1)*2-1)*(half-margin));
+ const backdrop=(x,z,width,height,depth,yaw=z<0?0:Math.PI)=>{const g=w.building(x,z,width,height,r,night,1);g.scale.z=depth/4;g.rotation.y=yaw;g.userData.backdrop=true;return g;};
+ const eastCanal=(family==='village'||family==='harbour')&&map.waterCells.length===0;
+ // The playable roads are paved; fields and lawns are separate surfaces outside the paths.
+ if(family==='farm'){w.scene.fog.color.set(0xbed1bd);box(w.mat(0x7c9560),0,-.12,0,half*2+55,.10,half*2+55);}
+ const themeNames=family==='village'?['DE BOTERKELDER','KLOMPENS & CO.','DE GOUDEN SPUD','AARDAPPEL MARKT']:family==='harbour'?['KLOMPENS EXPORT','NORTH QUAY','SPUD SHIPPING','THE OLD BOATHOUSE']:['GOLDEN HARVEST','POTATO STORES','THE BUTTER BARN','FIELD OFFICE'];
+ // Give each building a pavement, entrance, trade sign and facade detail.
+ for(const [i,b]of(map.buildings??[]).entries()){
+  const front=b.z<0?1:-1,z=b.z+front*(b.d/2+.02),facing=front===1?0:Math.PI;
+  for(const side of[-1,1])box(stone,b.x+side*(b.w/2+.2),.05,b.z,.36,.10,b.d+.6);
+  for(const side of[-1,1])box(stone,b.x,.05,b.z+side*(b.d/2+.2),b.w+.6,.10,.36);
+  plaque(themeNames[i%4],b.x,2.75,z+.07*front,Math.min(4.5,b.w-.6),facing);
+  if(family==='village'){
+   const awning=box(w.mat(i%2?0x3d7373:0x9b4646,'wood'),b.x,2.4,z+.6*front,b.w*.72,.10,1.15);awning.rotation.x=front*.10;
+   for(let j=0;j<9;j++)box(w.mat(0xf0e4c8),b.x-b.w*.32+j*b.w*.08,2.41,z+.6*front,.18,.025,1.16);
+   // Window boxes are attached to the facade, not scattered around the street.
+   for(const side of[-1,1])flowerBed(b.x+side*b.w*.32,z+.13*front,1.1,.40);
+  }else if(family==='harbour'){
+   for(let j=0;j<9;j++)box(iron,b.x-b.w*.43+j*b.w*.108,1.15,z+.05*front,.055,2.2,.09);
+   for(const sx of[-1,1])box(iron,b.x+sx*(b.w/2-.15),3,z+.08*front,.12,5.7,.15);
+  }
+ }
+ // Four readable skylines, instead of the same ring of houses on every map.
+ if(family==='village'){
+  for(const side of[-1,1]){box(stone,0,.015,side*(half+1.25),half*2,.06,2.3);for(const [i,x]of slots(Math.min(8,Math.max(5,Math.ceil(half*2/11)))).entries())backdrop(x,side*(half+5),7.4,6.5+(i%3)*1.5,5.6);}
+  backdrop(0,-half-14,7,14,5.2);plaque('GOUDA',0,10,-half-11.1,3);
+  for(const side of[-1,1]){const x=side*(half+(side===1&&eastCanal?15:5.5));for(const z of[-half*.55,0,half*.55])backdrop(x,z,7.2,5.8,5.6,-side*Math.PI/2);const bank=side===1&&eastCanal?half+10.4:-half-1.5;box(stone,bank,.015,0,2.4,.06,half*2);for(const z of[-half*.65,half*.65]){bench(bank,z,-side*Math.PI/2);w.bin(bank,z+2,0);}w.bike(bank,half*.25,0);}
+  if(map.waterCells.length===0)w.addCanalBackdrop?.(map,night);
+ }else if(family==='estate'){
+  backdrop(0,-half-9,17,8,8.4);plaque('ROYAL BUTTER GARDENS',0,3,-half-4.30,6);
+  for(const side of[-1,1]){box(stone,0,.015,side*(half+3),half*2,.06,4.2);for(const x of[-half*.66,0,half*.66]){flowerBed(x,side*(half+1.8),6,1.4);bench(x,side*(half+3.2),side===1?0:Math.PI);}for(const x of[-half*.68,half*.68])backdrop(x,side*(half+8),7.5,5,6);for(const z of[-half*.65,0,half*.65])flowerBed(side*(half+1.8),z,1.4,5);}
+  // Gazebo, balustrade and formal avenue stay beyond the playable boundary.
+  const gz=half+8;for(let i=0;i<8;i++){const a=i*Math.PI/4;w.mesh('cylinder',stone,root,Math.cos(a)*3,1.7,gz+Math.sin(a)*3,.10,3.4,.10);}w.mesh(new T.ConeGeometry(3.8,1.5,8),w.mat(0x4e695b),root,0,4.1,gz).userData.ownGeometry=true;
+  if(map.walls.some(wall=>wall.prop==='fountain'))w.formalGarden(map);
+ }else if(family==='harbour'){
+  for(const side of[-1,1]){box(stone,0,.015,side*(half+1.5),half*2,.06,2.8);for(const [i,x]of slots(Math.min(7,Math.max(4,Math.floor((half*2-13)/11)+1)),6.5).entries())backdrop(x,side*(half+6),9,7+(i%2)*2,7.2);for(const z of[-half*.62,half*.62])backdrop(side*(half+(side===1&&eastCanal?15:6)),z,9,6.8,6.4,-side*Math.PI/2);}
+  for(const side of[-1,1]){const x=side*(half+(side===1&&eastCanal?11:3)),z=side*half*.18;box(iron,x,4.8,z,.5,9.6,.5);const boom=box(iron,x-side*3.4,8.8,z,7.2,.35,.45);boom.rotation.z=side*.2;box(iron,x-side*6.2,5.6,z,.055,5.5,.055);w.mesh('sphere',w.mat(0xa38654,'wood'),root,x-side*6.2,3,z,.7,.65,.7);for(let i=0;i<3;i++)w.crate(side*(half+1),side*(half*.43+i*1.2),0,1.1);}
+  if(map.waterCells.length)w.canalBridges(map);else w.addCanalBackdrop?.(map,true);
+ }else{
+  fence(half+1.2);fence(-half-1.2);
+  for(const side of[-1,1]){box(w.mat(0x67553b,'stone'),side*(half+9),-.025,0,12,.10,half*2-4);const field=w.mat(0x8d9b4f);for(const z of slots(12,3))box(field,side*(half+9),.10,z,12,.20,(half*2-6)/11*.55);for(const [i,x]of slots(3,7).entries()){const z=side*(half+7);if(side===-1&&i===1)backdrop(x,z,8,6,6);else{const g=barn(w,{x,z,w:8,d:6,h:4.5});g.userData.backdrop=true;}box(stone,x,.015,side*(half+2.8),4,.06,3.2);}}
+  // A windmill overlooking the field gives orientation from any part of the farm.
+  const gx=-half-8,gz=-half-9;w.mesh('cylinder',stone,root,gx,4,gz,2.2,8,2.2);w.mesh(new T.ConeGeometry(3,2.5,16),w.mat(0x5c5145),root,gx,9,gz).userData.ownGeometry=true;
+  for(let arm=0;arm<4;arm++){const group=new T.Group();group.position.set(gx,6,gz+2.4);group.rotation.z=arm*Math.PI/2+.3;root.add(group);w.mesh('rounded',wood,group,0,3,0,.20,6,.15);for(let j=0;j<7;j++)w.mesh('rounded',w.mat(0xd3c9a2),group,.6,1+j*.7,0,1.4,.10,.13);}
+  for(const side of[-1,1]){w.crate(half+3,side*4,0,1.2);w.crate(half+3,side*5.3,0,1.2);}
+ }
+ // Trees follow avenues and field boundaries, with room between trunks and walking routes.
+ for(let i=0;i<10;i++){const side=i<5?-1:1,offset=family==='estate'?6:family==='farm'?17:side===1&&eastCanal?10.4:12,x=side*(half+offset),z=(i%5-2)*(half-5)/2;w.tree(x,z,root,r);}
+ for(const side of[-1,1])for(const z of[-half+2,half-2])w.lamp(side*(half-2),z,0,night);
+ for(const prop of map.props??[]){if(prop.prop==='marketStall')w.stall(prop.x,prop.z,0,Math.round(prop.x));else if(prop.prop==='cargo'){box(wood,prop.x,.07,prop.z,2.35,.14,2.35);for(const side of[-1,1])for(const row of[-1,1])w.crate(prop.x+side*.58,prop.z+row*.58,.14,1.08);w.crate(prop.x,prop.z,1.22,.58);}else if(prop.prop==='hay'){const straw=w.mat(0xd9b365,'wood');box(straw,prop.x,.43,prop.z,2.3,.86,2.3);box(straw,prop.x,1.04,prop.z,1.6,.35,1.6);for(const side of[-1,1])box(w.mat(0x796845),prop.x+side*.7,.44,prop.z,.05,.89,2.33);}}
+ // Flush drainage grates sit by the kerb at repeatable street junctions.
+ if(family==='village'||family==='harbour')for(const x of[-half+3,half-3])for(const z of[-half+3,half-3])for(let j=0;j<5;j++)box(iron,x-.25+j*.12,.012,z,.055,.02,.6);
+ w.chunkInstances();w.batchStatic();
+}
+
+export function barn(w,b){const g=new T.Group();g.position.set(b.x,0,b.z);w.root.add(g);const red=w.mat(0x9c483b,'wood'),roof=w.mat(0x484c43,'wood'),trim=w.mat(0xe0d0a5,'wood');w.mesh('rounded',red,g,0,b.h/2,0,b.w,b.h,b.d);for(const side of[-1,1]){const m=w.mesh('rounded',roof,g,side*b.w*.27,b.h+.95,0,b.w*.65,.15,b.d+.5);m.rotation.z=-side*.52;for(let j=0;j<14;j++)w.mesh('rounded',trim,g,-b.w/2+j*b.w/13,b.h*.48,side*(b.d/2+.035),.035,b.h*.94,.035);w.mesh('rounded',w.mat(0x583a2c,'wood'),g,0,1.5,side*(b.d/2+.05),2.3,3,.10);for(const a of[-1,1]){const brace=w.mesh('rounded',trim,g,0,1.5,side*(b.d/2+.12),.10,3.6,.09);brace.rotation.z=a*.63;}}return g;}

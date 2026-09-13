@@ -1,0 +1,42 @@
+{
+  "mode": "built-in imagegen",
+  "requestedSize": [
+    2048,
+    2048
+  ],
+  "materials": [
+    {
+      "name": "potato-skin",
+      "prompt": "Use case: photorealistic-natural. Asset type: seamless diffuse color material map for POTATOMAN 3D game. Create one high-detail square texture image, requested 2048x2048 pixels. Show only an evenly lit flat surface of raw russet potato skin filling every pixel edge to edge. Warm fairly light tan with muted golden and pale beige mottling, detailed natural fine skin pores, tiny subtle potato eyes and dimples distributed sparsely and naturally. Strictly a FLAT seamless repeating texture color map with matching opposite edges, no recognizable whole potatoes, no curved object shading, no cut flesh, no plate, no food composition, no text. No directional light, gradients, vignette, borders, frame, cast shadows, gloss, dark burned coloration, or large dark blemishes. Photorealistic natural raw potato surface in neutral albedo-style illumination. Preserve believable subtle microdetail without exaggerated contrast.",
+      "source": "/workspace/scratch/9d5608a81327/generated_images/exec-99b6269c-a3a8-49c1-be30-ac870531dfab.png",
+      "path": "/workspace/scratch/9d5608a81327/materials-v04/potato-skin-color.png",
+      "actualSize": [
+        1254,
+        1254
+      ],
+      "mode": "RGB"
+    },
+    {
+      "name": "dutch-cobblestone",
+      "prompt": "Use case: photorealistic-natural. Asset type: seamless repeating diffuse color material map for a Dutch town street in a 3D game. Create one high-detail square texture image, requested 2048x2048 pixels. Full frame only old Dutch street cobblestones, seen straight overhead with orthographic projection. Believable weathered gray stone with warm subtle wear, individual irregular rectangular cobbles laid in staggered rows, small moss patches confined to narrow mortar joints. About 10 to 12 cobbles across. Flat albedo-style diffuse color map, uniform illumination across entire image, intricate realistic stone pores and understated surface chips. Must repeat seamlessly with matching opposite edges and continuous row spacing. No perspective or vanishing point, no objects, people, curbs, road markings, puddles, text, borders, or directional shadows. Gray stones remain readable and mostly medium gray, restrained fine moss.",
+      "source": "/workspace/scratch/9d5608a81327/generated_images/exec-fd0190f7-95f9-45d5-848d-82072d4409f4.png",
+      "path": "/workspace/scratch/9d5608a81327/materials-v04/dutch-cobblestone-color.png",
+      "actualSize": [
+        1254,
+        1254
+      ],
+      "mode": "RGB"
+    },
+    {
+      "name": "dutch-brick",
+      "prompt": "Use case: photorealistic-natural. Asset type: seamless diffuse color material map for Dutch masonry walls in a 3D game. Create one high-detail square texture image, requested 2048x2048 pixels. Show a straight-on orthographic flat surface of aged red-brown Dutch brick masonry, worn pale warm-gray lime mortar, about 8 full bricks across the width, many even horizontal staggered rows of traditional narrow bricks. Fine realistic clay pores, restrained chips, subtly varied earthy muted russet red, umber and terracotta brick colors with naturally worn edges. Surface fills all pixels edge to edge. Seamless repeating texture with matching opposite edges and continuous brick courses. Uniform neutral flat albedo illumination, no directional lighting, ambient gradient, cast shadows, perspective, architecture, openings, objects, graffiti, text, borders, or vignette. Photorealistic material, useful clean diffuse game map.",
+      "source": "/workspace/scratch/9d5608a81327/generated_images/exec-a060dbf8-e802-4a20-9f7a-e430823e0364.png",
+      "path": "/workspace/scratch/9d5608a81327/materials-v04/dutch-brick-color.png",
+      "actualSize": [
+        1254,
+        1254
+      ],
+      "mode": "RGB"
+    }
+  ]
+}

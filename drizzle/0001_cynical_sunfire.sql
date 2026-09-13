@@ -1,0 +1,1 @@
+ALTER TABLE `members` ADD `generation` text DEFAULT '' NOT NULL;

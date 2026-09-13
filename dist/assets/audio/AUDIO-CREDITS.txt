@@ -1,0 +1,48 @@
+POTATOMAN audio credits
+
+Music
+
+"Funk Game Loop" Kevin MacLeod (incompetech.com)
+Licensed under Creative Commons: By Attribution 4.0 License
+https://creativecommons.org/licenses/by/4.0/
+Source: https://incompetech.com/music/royalty-free/music.html
+Recording ISRC: USUAN1100839
+Download: https://incompetech.com/music/royalty-free/mp3-royaltyfree/Funk%20Game%20Loop.mp3
+Adaptation: 16-bar game-loop excerpt, trimmed, normalized to -18 LUFS, format conversion. Original pitch and tempo preserved.
+
+"Go Cart - Loop Mix" Kevin MacLeod (incompetech.com)
+Licensed under Creative Commons: By Attribution 4.0 License
+https://creativecommons.org/licenses/by/4.0/
+Source: https://incompetech.com/music/royalty-free/music.html
+Recording ISRC: USUAN1300008
+Download: https://incompetech.com/music/royalty-free/mp3-royaltyfree/Go%20Cart%20-%20Loop%20Mix.mp3
+Adaptation: MP3 encoder delay trimmed, normalized to -18 LUFS, format conversion. Original pitch and tempo preserved.
+
+License verification for both music tracks
+The creator's current catalog at https://incompetech.com/music/royalty-free/pieces.json contains each exact track, title, ISRC and download filename. The current catalog interface at https://incompetech.com/music/royalty-free/music.html presents the CC-BY 4.0 attribution above for every selected catalog track. The creator's licensing and FAQ pages confirm the free attribution route, permit edits, and specifically place video-game credits on an accessible Credits screen:
+https://incompetech.com/music/royalty-free/licenses/
+https://incompetech.com/music/royalty-free/faq.html
+The raw catalog and page HTML were preserved outside ready/ as verification evidence.
+
+Sound effects
+
+Kenney — Impact Sounds (1.0), CC0 1.0
+Source and pack license: https://kenney.nl/assets/impact-sounds
+https://creativecommons.org/publicdomain/zero/1.0/
+Includes all selected footstep, punch, wood, plank, metal impact and bell files. The original pack License.txt is included as kenney-impact-license.txt.
+
+Kenney Vleugels — RPG Audio, CC0 1.0
+Source and pack license: https://kenney.nl/assets/rpg-audio
+https://creativecommons.org/publicdomain/zero/1.0/
+Includes selected metal pot/click, cloth and knifeSlice swish files. The original pack License.txt is included as kenney-rpg-license.txt.
+
+rubberduck — 40 CC0 water / splash / slime SFX, CC0 1.0
+Source and author-posted license: https://opengameart.org/content/40-cc0-water-splash-slime-sfx
+https://creativecommons.org/publicdomain/zero/1.0/
+Includes loop_water_02.ogg, splash_01.ogg, splash_03.ogg, slime_01.ogg and slime_03.ogg.
+
+Effects were converted to mono 32 kHz MP3 for spatial playback. The game bundles MP3 copies. No synthetic replacement audio was generated. The exact source-file-to-game-file mapping is in asset-manifest.json.
+
+Recommended in-game concise credits
+Music: “Funk Game Loop” and “Go Cart - Loop Mix” by Kevin MacLeod (incompetech.com), CC BY 4.0. Edited for game playback. Sound effects: Kenney and rubberduck, CC0.
+Link creator names to the source sites and CC BY 4.0 to https://creativecommons.org/licenses/by/4.0/.
