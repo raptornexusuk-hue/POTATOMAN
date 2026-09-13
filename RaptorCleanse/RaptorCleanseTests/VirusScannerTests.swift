@@ -109,3 +109,72 @@ final class VirusScannerTests: XCTestCase {
         XCTAssertFalse(process.isRunning)
     }
 }
+
+/// The engine's version line is the only place the database date is available
+/// before a scan runs, and reading it wrong means either nagging about fresh
+/// definitions or staying quiet about stale ones.
+extension VirusScannerTests {
+    func testVersionLineWithDatabaseYieldsSignaturesAndDate() {
+        let parsed = VirusScanner.parseVersionLine("ClamAV 1.4.1/27500/Thu Jan 30 09:00:00 2025")
+        XCTAssertEqual(parsed.signatures, 27_500)
+        XCTAssertNotNil(parsed.date)
+        var components = DateComponents()
+        components.year = 2025; components.month = 1; components.day = 30
+        components.hour = 9; components.minute = 0; components.second = 0
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        XCTAssertEqual(parsed.date, calendar.date(from: components))
+    }
+
+    func testVersionLineWithoutDatabaseYieldsNothing() {
+        // What a fresh install prints before freshclam has ever run.
+        let parsed = VirusScanner.parseVersionLine("ClamAV 1.4.1")
+        XCTAssertNil(parsed.signatures)
+        XCTAssertNil(parsed.date)
+    }
+
+    func testUnparsableDateDoesNotInventOne() {
+        let parsed = VirusScanner.parseVersionLine("ClamAV 1.4.1/27500/not a date")
+        XCTAssertEqual(parsed.signatures, 27_500)
+        XCTAssertNil(parsed.date)
+    }
+
+    func testEngineWithNoDatabaseCountsAsStale() {
+        let engine = VirusEngine(executableURL: URL(fileURLWithPath: "/opt/homebrew/bin/clamscan"),
+                                 version: "ClamAV 1.4.1")
+        XCTAssertFalse(engine.hasDefinitions)
+        XCTAssertTrue(engine.definitionsAreStale)
+        XCTAssertNil(engine.definitionsAgeInDays)
+    }
+
+    func testFreshDatabaseIsNotStaleAndOldOneIs() {
+        let fresh = VirusEngine(executableURL: URL(fileURLWithPath: "/opt/homebrew/bin/clamscan"),
+                                version: "ClamAV 1.4.1", signatureCount: 100,
+                                databaseDate: Date().addingTimeInterval(-2 * 86_400))
+        XCTAssertTrue(fresh.hasDefinitions)
+        XCTAssertFalse(fresh.definitionsAreStale)
+
+        let stale = VirusEngine(executableURL: URL(fileURLWithPath: "/opt/homebrew/bin/clamscan"),
+                                version: "ClamAV 1.4.1", signatureCount: 100,
+                                databaseDate: Date().addingTimeInterval(-30 * 86_400))
+        XCTAssertTrue(stale.definitionsAreStale)
+        XCTAssertEqual(stale.definitionsAgeInDays, 30)
+    }
+
+    /// The seven-day refusal is the default, and relaxing it must be a visible,
+    /// deliberate change to the command rather than something that drifts.
+    func testStaleOverrideChangesOnlyTheAgeBound() {
+        let strict = VirusScanner.arguments(paths: ["/tmp/a"])
+        let relaxed = VirusScanner.arguments(paths: ["/tmp/a"], allowStaleDefinitions: true)
+        XCTAssertTrue(strict.contains("--fail-if-cvd-older-than=7"))
+        XCTAssertTrue(relaxed.contains("--fail-if-cvd-older-than=3650"))
+        XCTAssertEqual(strict.count, relaxed.count)
+        XCTAssertTrue(relaxed.contains("--official-db-only=yes"))
+        // Still nothing that could remove or quarantine a file.
+        for argument in relaxed {
+            XCTAssertFalse(argument.contains("--remove"))
+            XCTAssertFalse(argument.contains("--move"))
+            XCTAssertFalse(argument.contains("--copy"))
+        }
+    }
+}

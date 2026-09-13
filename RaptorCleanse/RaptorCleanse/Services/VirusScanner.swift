@@ -91,14 +91,46 @@ enum VirusScanner {
               let version = output.text.split(separator: "\n").map(String.init).first(where: { $0.hasPrefix("ClamAV ") }) else {
             throw VirusScannerError.unavailable("The selected engine did not return a valid ClamAV version. Check its installation and try again.")
         }
-        return VirusEngine(executableURL: resolved, version: version)
+        let details = parseVersionLine(version)
+        return VirusEngine(executableURL: resolved, version: version,
+                           signatureCount: details.signatures, databaseDate: details.date)
+    }
+
+    /// `clamscan --version` prints `ClamAV <version>/<signatures>/<database date>`
+    /// once a database is installed, and just `ClamAV <version>` before that.
+    /// Pure, so the parsing is covered by tests rather than by hoping.
+    static func parseVersionLine(_ line: String) -> (signatures: Int?, date: Date?) {
+        let parts = line.split(separator: "/", maxSplits: 2, omittingEmptySubsequences: false).map(String.init)
+        guard parts.count == 3 else { return (nil, nil) }
+        let signatures = Int(parts[1].trimmingCharacters(in: .whitespaces))
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.dateFormat = "EEE MMM d HH:mm:ss yyyy"
+        let text = parts[2].trimmingCharacters(in: .whitespaces)
+        return (signatures, formatter.date(from: text))
+    }
+
+    /// Runs `freshclam` from the same installation as the detected engine, so
+    /// updating definitions does not mean leaving the app for Terminal.
+    static func updateDefinitions(engine: VirusEngine, cancellation: VirusScanCancellation) throws -> String {
+        let updater = engine.executableURL.deletingLastPathComponent().appendingPathComponent("freshclam")
+        guard FileManager.default.isExecutableFile(atPath: updater.path) else {
+            throw VirusScannerError.unavailable("No freshclam was found next to \(engine.executableURL.path). Update the definitions from Terminal instead.")
+        }
+        let output = try run(executable: updater, arguments: ["--stdout"], cancellation: cancellation, outputLimit: 1_048_576)
+        guard output.exitCode == 0 else {
+            throw VirusScannerError.unavailable("freshclam exited with \(output.exitCode).\n\n\(output.text.suffix(1_200))")
+        }
+        return output.text
     }
 
     /// Files are enumerated by our consent policy; ClamAV never receives a directory argument.
     /// This makes recursive mode an app-controlled option and prevents engine traversal.
-    static func arguments(paths: [String]) -> [String] {
+    static func arguments(paths: [String], allowStaleDefinitions: Bool = false) -> [String] {
         ["--recursive=no", "--follow-dir-symlinks=0", "--follow-file-symlinks=0", "--cross-fs=no",
-         "--suppress-ok-results", "--official-db-only=yes", "--fail-if-cvd-older-than=7",
+         "--suppress-ok-results", "--official-db-only=yes",
+         "--fail-if-cvd-older-than=\(allowStaleDefinitions ? 3_650 : 7)",
          "--max-filesize=512M", "--max-scansize=1024M", "--max-scantime=120000",
          "--alert-exceeds-max=yes", "--alert-encrypted=yes", "--"] + paths
     }
@@ -108,7 +140,9 @@ enum VirusScanner {
         let snapshot: FileSnapshot
     }
 
-    static func scan(engine: VirusEngine, folder: URL, includeSubfolders: Bool, cancellation: VirusScanCancellation,
+    static func scan(engine: VirusEngine, folder: URL, includeSubfolders: Bool,
+                     allowStaleDefinitions: Bool = false,
+                     cancellation: VirusScanCancellation,
                      progress: @escaping @Sendable (VirusScanProgress) -> Void) -> VirusScanReport {
         var report = VirusScanReport(folder: folder, includedSubfolders: includeSubfolders,
                                      engineVersion: engine.version, startedAt: Date())
@@ -149,30 +183,46 @@ enum VirusScanner {
                             continue
                         }
                         let snapshot = SafetyPolicy.snapshot(metadata)
-                        guard (metadata.st_mode & S_IFMT) == S_IFREG, snapshot.byteCount > 0,
-                              snapshot.byteCount <= maximumFileBytes,
-                              !url.path.contains("\n"), !url.path.contains("\r"),
-                              FileManager.default.isReadableFile(atPath: url.path) else {
+                        guard (metadata.st_mode & S_IFMT) == S_IFREG else {
                             report.skippedEntries += 1
                             continue
                         }
+                        if snapshot.byteCount == 0 {
+                            // Nothing to scan and nothing missed.
+                            report.emptyFilesSkipped += 1
+                            continue
+                        }
+                        guard snapshot.byteCount <= maximumFileBytes,
+                              !url.path.contains("\n"), !url.path.contains("\r"),
+                              FileManager.default.isReadableFile(atPath: url.path) else {
+                            report.skippedEntries += 1
+                            report.coverageGaps += 1
+                            continue
+                        }
                         candidates.append(Candidate(url: url, snapshot: snapshot))
-                    } catch { report.skippedEntries += 1 }
+                    } catch {
+                        report.skippedEntries += 1
+                        report.coverageGaps += 1
+                    }
                     if entries % 250 == 0 {
                         progress(VirusScanProgress(completed: 0, total: candidates.count, message: "Checked \(entries) entries; \(candidates.count) eligible files…"))
                     }
                 }
                 if enumerationFailed {
                     report.skippedEntries += 1
+                    report.coverageGaps += 1
                     hadIncompleteBatch = true
                     if report.warnings.count < 80 { report.warnings.append("Could not finish reading a folder: \(directory.path)") }
                 }
             }
             if hitLimit { report.warnings.append("The 50,000-entry limit was reached. Choose a smaller folder to check the remaining entries.") }
-            if report.skippedEntries > 0 {
-                report.warnings.append("\(report.skippedEntries) entries were skipped: protected/cloud locations, links, packages, unreadable or changed files, empty files, unusual line-break filenames, or files larger than 512 MB.")
+            if report.emptyFilesSkipped > 0 {
+                report.warnings.append("\(report.emptyFilesSkipped) empty \(report.emptyFilesSkipped == 1 ? "file was" : "files were") skipped. An empty file has nothing to scan; this is not a gap in coverage.")
             }
-            hadIncompleteBatch = hadIncompleteBatch || hitLimit || report.skippedEntries > 0
+            if report.coverageGaps > 0 {
+                report.warnings.append("\(report.coverageGaps) \(report.coverageGaps == 1 ? "entry was" : "entries were") not checked: protected/cloud locations, links, packages, unreadable or changed files, unusual line-break filenames, or files larger than 512 MB.")
+            }
+            hadIncompleteBatch = hadIncompleteBatch || hitLimit || report.coverageGaps > 0
             var offset = 0
             while offset < candidates.count, !cancellation.isCancelled {
                 var batch: [Candidate] = []
@@ -198,6 +248,7 @@ enum VirusScanner {
                         paths.append(candidate.url.path)
                     } catch {
                         report.skippedEntries += 1
+                        report.coverageGaps += 1
                         hadIncompleteBatch = true
                     }
                 }
@@ -205,7 +256,9 @@ enum VirusScanner {
                 progress(VirusScanProgress(completed: offset - batch.count, total: candidates.count,
                                           message: "ClamAV is checking \(paths.count) files. Loading signatures can take a moment…"))
                 let remainingOutput = max(0, maximumOutputBytes - report.rawOutput.utf8.count)
-                let processOutput = try run(executable: engine.executableURL, arguments: arguments(paths: paths), cancellation: cancellation, outputLimit: remainingOutput)
+                let processOutput = try run(executable: engine.executableURL,
+                                            arguments: arguments(paths: paths, allowStaleDefinitions: allowStaleDefinitions),
+                                            cancellation: cancellation, outputLimit: remainingOutput)
                 report.rawOutput += processOutput.text
                 let parsed = VirusBatchSummary.parse(processOutput.text, allowedPaths: Set(paths))
                 report.scannedFiles += parsed.scannedFiles ?? 0
@@ -221,6 +274,7 @@ enum VirusScanner {
                         }
                     } catch {
                         report.skippedEntries += 1
+                        report.coverageGaps += 1
                         hadIncompleteBatch = true
                         if report.warnings.count < 80 { report.warnings.append("A file changed during scanning; check it again: \(candidate.url.path)") }
                     }

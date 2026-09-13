@@ -1,6 +1,6 @@
 # Raptor Cleanse — macOS
 
-**Dev Build v0.4.0 Alpha · Build 5**
+**Dev Build v0.4.1 Alpha · Build 6**
 More space. Less clutter.
 
 A native SwiftUI app for macOS 14 Sonoma or later, on Apple Silicon or Intel. It does
@@ -130,9 +130,13 @@ space, so its apparent size is not a promise of recoverable space.
 Pick a time range, tick what to remove, press **Clear now**. It covers every
 detected browser and profile at once.
 
-**Quit the browsers first (⌘Q).** A running browser holds its databases open and
-would rewrite whatever was removed, so running browsers are skipped — they are
-named in the panel before you press anything.
+If any browsers are open, the confirmation offers **Close browsers and clear**.
+Each browser is asked to quit exactly the way ⌘Q asks, so anything with unsaved
+work can still prompt you; any that ignore it after eight seconds are forced to
+close, and unsaved work in those is lost. Skipping the open ones stays available.
+
+A running browser has to be closed because it holds its databases open and would
+rewrite whatever was removed.
 
 This writes to the browser's own databases and is the only irreversible thing the
 app does, so it is bounded three ways: every database is **copied to Trash before
@@ -211,6 +215,18 @@ brew install clamav && freshclam
 `freshclam` matters as much as the install: the engine on its own has no malware
 signatures, and this app refuses definitions more than seven days old rather than
 reporting a clean result it cannot stand behind.
+
+If definitions are missing or stale, the app now says so **before** you scan and
+offers an **Update definitions** button that runs `freshclam` for you. If that
+fails with a permission error the database belongs to another user — run
+`sudo freshclam` in Terminal. You can also tick **Scan anyway with out-of-date
+definitions**, which lets a scan produce results at the cost of missing anything
+discovered since those signatures were published.
+
+macOS gates Desktop, Documents and Downloads for every app. The first scan of one
+of those folders prompts for access; if you decline, the scanner sees an empty
+folder and reports nothing found. Grant it under System Settings → Privacy &
+Security → Files and Folders.
 
 1. Install ClamAV using the [official macOS instructions](https://docs.clamav.net/manual/Installing.html#macos).
 2. Configure and update its signature database — see [signature management](https://docs.clamav.net/manual/Usage/SignatureManagement.html). Installing the engine alone may not install usable definitions.

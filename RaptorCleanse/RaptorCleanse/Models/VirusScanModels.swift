@@ -3,6 +3,21 @@ import Foundation
 struct VirusEngine: Sendable {
     let executableURL: URL
     let version: String
+    /// Parsed from the version line; nil when no database is installed at all.
+    var signatureCount: Int? = nil
+    var databaseDate: Date? = nil
+
+    /// The scanner refuses definitions older than a week rather than reporting a
+    /// clean result it cannot stand behind, so this is the difference between a
+    /// working scanner and one that always returns "Scan incomplete".
+    var definitionsAgeInDays: Int? {
+        guard let databaseDate else { return nil }
+        return Int(Date().timeIntervalSince(databaseDate) / 86_400)
+    }
+
+    var hasDefinitions: Bool { databaseDate != nil }
+
+    var definitionsAreStale: Bool { (definitionsAgeInDays ?? .max) >= 7 }
 }
 
 struct VirusScanProgress: Sendable {
@@ -37,6 +52,10 @@ struct VirusScanReport: Sendable {
     var scannedFiles = 0
     var alertedFiles = 0
     var skippedEntries = 0
+    /// Entries that were genuinely not checked, and so leave a gap in coverage.
+    var coverageGaps = 0
+    /// Empty files. Skipped, but there was nothing in them to miss.
+    var emptyFilesSkipped = 0
     var findings: [VirusFinding] = []
     var warnings: [String] = []
     var outcome: VirusScanOutcome = .incomplete

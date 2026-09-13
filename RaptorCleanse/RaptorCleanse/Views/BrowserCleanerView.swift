@@ -87,12 +87,12 @@ struct BrowserCleanerView: View {
                                    symbol: "person.badge.key", tone: .caution)
                 }
                 if !browsers.runningBrowserNames.isEmpty {
-                    CleanseCallout(text: "Quit \(browsers.runningBrowserNames.joined(separator: ", ")) with ⌘Q first. Open browsers are skipped, and would rewrite the data anyway.",
+                    CleanseCallout(text: "\(browsers.runningBrowserNames.joined(separator: ", ")) \(browsers.runningBrowserNames.count == 1 ? "is" : "are") open. \(Brand.name) can close \(browsers.runningBrowserNames.count == 1 ? "it" : "them") for you — you will be asked before it does.",
                                    symbol: "exclamationmark.triangle", tone: .caution)
                 }
 
                 HStack(spacing: BrandSpace.sm) {
-                    if browsers.isClearing {
+                    if browsers.isClearing || browsers.isQuittingBrowsers {
                         ProgressView().controlSize(.small)
                         Text(browsers.statusMessage).font(BrandFont.body.weight(.medium))
                     } else {
@@ -489,8 +489,10 @@ private struct BrowserClearConfirmation: View {
             .frame(maxHeight: 150)
 
             if !running.isEmpty {
-                CleanseCallout(text: "\(running.joined(separator: ", ")) \(running.count == 1 ? "is" : "are") still open and will be skipped. Quit with ⌘Q and clear again.",
+                CleanseCallout(text: "\(running.joined(separator: ", ")) \(running.count == 1 ? "is" : "are") open. Closing \(running.count == 1 ? "it" : "them") first is the only way this can clear \(running.count == 1 ? "its" : "their") data — a running browser holds its databases and would rewrite whatever was removed.",
                                symbol: "exclamationmark.triangle", tone: .caution)
+                CleanseCallout(text: "Each browser is asked to quit the same way ⌘Q asks, so anything with unsaved work can prompt you. Any that ignore it after eight seconds are forced to close, and unsaved work in those is lost.",
+                               symbol: "bolt", tone: .caution)
             }
             if !safari.isEmpty && (browsers.clearSelection.history || browsers.clearSelection.cookies) {
                 CleanseCallout(text: "macOS protects Safari's history and cookies from other apps. Safari's cache can be cleared here; for the rest, use Safari → History → Clear History.",
@@ -512,9 +514,20 @@ private struct BrowserClearConfirmation: View {
                 Button("Cancel") { dismiss() }
                     .buttonStyle(CleanseSecondaryButtonStyle())
                     .keyboardShortcut(.cancelAction)
-                Button("Clear now", action: browsers.confirmClear)
-                    .buttonStyle(CleansePrimaryButtonStyle())
-                    .disabled(targets.isEmpty)
+                if running.isEmpty {
+                    Button("Clear now", action: browsers.confirmClear)
+                        .buttonStyle(CleansePrimaryButtonStyle())
+                        .disabled(targets.isEmpty)
+                } else {
+                    // Skipping open browsers stays available, but it is not the
+                    // default: it is the option that does less than was asked.
+                    Button("Skip open browsers", action: browsers.confirmClear)
+                        .buttonStyle(CleanseSecondaryButtonStyle())
+                        .disabled(targets.isEmpty)
+                    Button("Close browsers and clear", action: browsers.confirmClearQuittingBrowsers)
+                        .buttonStyle(CleansePrimaryButtonStyle())
+                        .disabled(targets.isEmpty)
+                }
             }
         }
         .padding(BrandSpace.lg)

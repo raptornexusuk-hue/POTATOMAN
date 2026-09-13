@@ -174,8 +174,47 @@ final class BrowserModel: ObservableObject {
         return Array(Set(names)).sorted()
     }
 
+    @Published private(set) var isQuittingBrowsers = false
+
     var canClear: Bool {
-        hasAccess && !isClearing && !isRefreshing && !clearSelection.isEmpty && !clearTargets.isEmpty
+        hasAccess && !isClearing && !isQuittingBrowsers && !isRefreshing
+            && !clearSelection.isEmpty && !clearTargets.isEmpty
+    }
+
+    /// The running applications that clearing would otherwise skip.
+    private func runningBrowserApps() -> [NSRunningApplication] {
+        let identifiers = Set(clearTargets.flatMap { $0.browser.bundleIdentifiers })
+        return NSWorkspace.shared.runningApplications.filter { application in
+            guard let identifier = application.bundleIdentifier else { return false }
+            return identifiers.contains(identifier)
+        }
+    }
+
+    /// Asks each browser to quit, then insists. `terminate()` is the same polite
+    /// request ⌘Q makes, so a browser with unsaved work gets its usual chance to
+    /// say so; anything still running after eight seconds is forced.
+    ///
+    /// Returns the names of any that survived both, which is the only case the
+    /// caller has to report.
+    func quitRunningBrowsers() async -> [String] {
+        guard !runningBrowserApps().isEmpty else { return [] }
+        isQuittingBrowsers = true
+        defer { isQuittingBrowsers = false }
+
+        statusMessage = "Asking browsers to quit…"
+        for application in runningBrowserApps() { application.terminate() }
+        for _ in 0..<32 {
+            if runningBrowserApps().isEmpty { return [] }
+            try? await Task.sleep(nanoseconds: 250_000_000)
+        }
+
+        statusMessage = "Forcing the remaining browsers to close…"
+        for application in runningBrowserApps() { application.forceTerminate() }
+        for _ in 0..<12 {
+            if runningBrowserApps().isEmpty { return [] }
+            try? await Task.sleep(nanoseconds: 250_000_000)
+        }
+        return Array(Set(runningBrowserApps().compactMap(\.localizedName))).sorted()
     }
 
     func requestClear() {
@@ -184,13 +223,34 @@ final class BrowserModel: ObservableObject {
         showClearConfirmation = true
     }
 
+    /// Close the browsers first, then clear. This is the path that makes the
+    /// whole thing one action rather than "quit six apps, come back, press go".
+    func confirmClearQuittingBrowsers() {
+        guard canClear else { return }
+        showClearConfirmation = false
+        Task { [self] in
+            let stubborn = await self.quitRunningBrowsers()
+            guard stubborn.isEmpty else {
+                self.statusMessage = "Nothing was cleared."
+                self.errorMessage = "\(stubborn.joined(separator: ", ")) would not close, so nothing was cleared. Quit \(stubborn.count == 1 ? "it" : "them") by hand and try again."
+                return
+            }
+            self.performClear()
+        }
+    }
+
     func confirmClear() {
+        guard canClear else { return }
+        showClearConfirmation = false
+        performClear()
+    }
+
+    private func performClear() {
         guard canClear else { return }
         let targets = clearTargets
         let selection = clearSelection
         let range = clearRange
         let running = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
-        showClearConfirmation = false
         isClearing = true
         statusMessage = "Clearing \(selection.summary) · \(range.title.lowercased())…"
         Task { [self] in

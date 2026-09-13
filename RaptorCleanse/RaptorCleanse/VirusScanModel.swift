@@ -46,6 +46,57 @@ final class VirusScanModel: ObservableObject {
 
     @Published private(set) var scanAtLogin = false
     @Published private(set) var loginItemMessage: String?
+    @Published private(set) var isUpdatingDefinitions = false
+    @Published private(set) var updateOutput: String?
+    /// Set only by a deliberate choice. Scanning with stale definitions can miss
+    /// malware the engine would otherwise recognise.
+    @Published var allowStaleDefinitions = false
+
+    /// True when the engine exists but cannot produce a usable result, which is
+    /// the state that made the scanner look broken: it ran, and always failed.
+    var needsDefinitions: Bool {
+        guard let engine else { return false }
+        return !engine.hasDefinitions || (engine.definitionsAreStale && !allowStaleDefinitions)
+    }
+
+    var definitionsSummary: String {
+        guard let engine else { return "No engine detected." }
+        guard engine.hasDefinitions else {
+            return "The engine is installed but has no malware signatures yet. Nothing can be scanned until they are downloaded."
+        }
+        let days = engine.definitionsAgeInDays ?? 0
+        if days <= 0 { return "Signatures updated today\(engine.signatureCount.map { " · \($0.formatted()) definitions" } ?? "")." }
+        let age = "\(days) \(days == 1 ? "day" : "days") old"
+        return engine.definitionsAreStale
+            ? "Signatures are \(age). Scans refuse to report a clean result on definitions over 7 days old."
+            : "Signatures are \(age)\(engine.signatureCount.map { " · \($0.formatted()) definitions" } ?? "")."
+    }
+
+    /// Runs freshclam from the same installation as the engine.
+    func updateDefinitions() {
+        guard let engine, !isUpdatingDefinitions, !isScanning else { return }
+        isUpdatingDefinitions = true
+        message = nil
+        updateOutput = nil
+        let token = VirusScanCancellation()
+        cancellation = token
+        Task {
+            let result = await Task.detached(priority: .utility) { () -> Result<String, Error> in
+                Result { try VirusScanner.updateDefinitions(engine: engine, cancellation: token) }
+            }.value
+            isUpdatingDefinitions = false
+            cancellation = nil
+            switch result {
+            case .success(let text):
+                updateOutput = String(text.suffix(800))
+                message = "Definitions updated. Re-checking the engine…"
+                discoverEngine()
+            case .failure(let error):
+                // Permission is the usual cause with a system-wide database.
+                message = "Could not update definitions: \(error.localizedDescription)"
+            }
+        }
+    }
 
     /// Called once when the Virus scan page first appears: find the engine and
     /// pre-select a folder, so the page opens ready to scan rather than ready to
@@ -194,6 +245,7 @@ final class VirusScanModel: ObservableObject {
     func startScan() {
         guard canScan, let engine, let folder = selectedFolder else { return }
         let recurse = includeSubfolders
+        let stale = allowStaleDefinitions
         let token = VirusScanCancellation()
         cancellation = token
         report = nil
@@ -203,7 +255,8 @@ final class VirusScanModel: ObservableObject {
         progress = VirusScanProgress(completed: 0, total: 0, message: "Preparing the selected folder…")
         Task {
             let completedReport = await Task.detached(priority: .utility) {
-                VirusScanner.scan(engine: engine, folder: folder, includeSubfolders: recurse, cancellation: token) { [weak self] update in
+                VirusScanner.scan(engine: engine, folder: folder, includeSubfolders: recurse,
+                                  allowStaleDefinitions: stale, cancellation: token) { [weak self] update in
                     Task { @MainActor [weak self] in
                         guard let self, self.isScanning, !self.isCancelling else { return }
                         self.progress = update

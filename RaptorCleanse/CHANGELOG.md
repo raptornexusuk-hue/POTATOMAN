@@ -1,5 +1,55 @@
 # Changelog
 
+## 0.4.1 Alpha — Build 6
+
+Fixes the two reasons the previous build still did not do the job.
+
+### The scanner found nothing because its definitions were stale
+
+A scan of Desktop reported "Scan incomplete", 0 files scanned, with
+`ERROR: Virus database is older than 7 days!` buried among the notes. The engine
+was installed and running; it just had nothing usable to match against, and the
+app never said so before running a scan that could not succeed.
+
+- **Definition age is now read before scanning.** `clamscan --version` prints
+  `ClamAV <version>/<signatures>/<date>` once a database exists, so the app parses
+  it at detection time and warns up front instead of after a wasted run.
+- **Update definitions in place.** A button runs `freshclam` from the same
+  installation as the engine, shows its output, and re-checks afterwards.
+- **Scan anyway with out-of-date definitions** is available as a deliberate
+  choice, with the trade-off stated. The seven-day refusal remains the default.
+- Missing definitions and stale definitions are now different messages, because
+  they need different fixes.
+
+### "Scan incomplete" when nothing was actually missed
+
+A Desktop containing one zero-byte file (`.localized`, which macOS creates)
+reported a skipped entry, and any skip marked the whole scan incomplete.
+
+- Empty files are now counted separately and never mark a scan incomplete: there
+  is nothing in them to miss.
+- The result panel reports **Not checked** — entries that leave a real gap in
+  coverage — rather than a skip count that mixed the two together.
+- Added `NSDesktopFolderUsageDescription`, `NSDocumentsFolderUsageDescription`,
+  `NSDownloadsFolderUsageDescription` and `NSRemovableVolumesUsageDescription`.
+  macOS gates those folders for every app, and without these strings the prompt
+  is generic or never appears, leaving the scanner looking at an empty folder.
+
+### Browsers can be closed for you
+
+- **Close browsers and clear** is now the primary action when browsers are open.
+  Each is asked to quit exactly as ⌘Q asks, so anything with unsaved work can
+  still prompt; any that ignore it after eight seconds are forced to close.
+- Skipping open browsers stays available, but it is no longer the default: it is
+  the option that does less than was asked for.
+- If a browser survives both, nothing is cleared and the app says which one.
+
+### Added
+
+- 9 more tests: version-line parsing with and without a database, an unparsable
+  date, definition-age thresholds, and that relaxing the staleness bound changes
+  only that bound and adds nothing that could remove or quarantine a file.
+
 ## 0.4.0 Alpha — Build 5
 
 Acts on two things the previous build only reported on.

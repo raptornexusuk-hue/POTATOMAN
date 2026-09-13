@@ -28,7 +28,12 @@ struct VirusScanView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: BrandSpace.lg) {
                 introPanel
-                if model.engine == nil { setupPanel } else { quickScanPanel }
+                if model.engine == nil {
+                    setupPanel
+                } else {
+                    if model.needsDefinitions { definitionsPanel }
+                    quickScanPanel
+                }
                 if let message = model.message {
                     CleanseCallout(text: message, tone: .caution)
                 }
@@ -98,9 +103,9 @@ struct VirusScanView: View {
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
-                    Text("The version line includes signature details when available. Database readiness and age are checked when a scan starts.")
+                    Text(model.definitionsSummary)
                         .font(BrandFont.detail)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(model.needsDefinitions ? BrandColor.caution : .secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 ViewThatFits(in: .horizontal) {
@@ -209,6 +214,72 @@ struct VirusScanView: View {
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
+    /// The engine can be installed and still unable to produce a result: with no
+    /// signatures, or signatures over a week old, every scan ends as "incomplete"
+    /// with nothing scanned. That is what this panel exists to fix, in place.
+    private var definitionsPanel: some View {
+        CleansePanel {
+            VStack(alignment: .leading, spacing: BrandSpace.md) {
+                HStack(alignment: .top, spacing: BrandSpace.md) {
+                    CleanseIconTile(symbol: "arrow.down.doc", size: 48, tone: .caution)
+                    VStack(alignment: .leading, spacing: BrandSpace.xxs) {
+                        Text(model.engine?.hasDefinitions == true ? "Malware definitions are out of date" : "Malware definitions are missing")
+                            .font(BrandFont.heading)
+                        Text(model.definitionsSummary)
+                            .font(BrandFont.body)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
+                Text("ClamAV ships with no signatures of its own. Until they are downloaded, a scan reports nothing found because nothing could be checked — not because the files are clean.")
+                    .font(BrandFont.detail)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: BrandSpace.sm) {
+                    Button(action: model.updateDefinitions) {
+                        Label(model.isUpdatingDefinitions ? "Updating…" : "Update definitions", systemImage: "arrow.down.circle")
+                    }
+                    .buttonStyle(CleansePrimaryButtonStyle())
+                    .disabled(model.isUpdatingDefinitions || model.isScanning)
+                    if model.isUpdatingDefinitions {
+                        ProgressView().controlSize(.small)
+                        Text("Downloading from the official mirrors. This can take a few minutes.")
+                            .font(BrandFont.detail)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 0)
+                }
+
+                if let output = model.updateOutput {
+                    CleanseWell {
+                        Text(output)
+                            .font(BrandFont.mono)
+                            .textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
+                Text("If that fails with a permission error, the database is owned by another user. Run `sudo freshclam` in Terminal instead.")
+                    .font(BrandFont.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Divider()
+
+                Toggle("Scan anyway with out-of-date definitions", isOn: $model.allowStaleDefinitions)
+                    .font(BrandFont.body)
+                    .toggleStyle(.checkbox)
+                    .disabled(model.isScanning)
+                Text("Lets a scan run and report results, at the cost of missing anything discovered since these signatures were published.")
+                    .font(BrandFont.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
     /// Shown instead of the scan controls when there is no engine. The previous
     /// message pointed at a documentation page; this gives the actual command.
     private var setupPanel: some View {
@@ -307,7 +378,8 @@ struct VirusScanView: View {
                     HStack(alignment: .top, spacing: BrandSpace.md) {
                         CleanseMetric(label: "Files scanned", value: report.scannedFiles.formatted())
                         CleanseMetric(label: "Files with alerts", value: report.alertedFiles.formatted())
-                        CleanseMetric(label: "Entries skipped", value: report.skippedEntries.formatted())
+                        CleanseMetric(label: "Not checked", value: report.coverageGaps.formatted(),
+                                      detail: report.emptyFilesSkipped > 0 ? "\(report.emptyFilesSkipped.formatted()) empty files ignored" : nil)
                     }
                 }
 
