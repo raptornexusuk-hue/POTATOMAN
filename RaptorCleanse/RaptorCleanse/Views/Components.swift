@@ -17,12 +17,17 @@ extension CleanseSection {
 
 /// Filled emerald. One per view at most: the action the page exists for.
 ///
-/// Button styles resolve `isEnabled` and hover state inside a nested view.
-/// Reading the environment on the style value itself does not reliably update.
+/// Button styles resolve `isEnabled` and hover state inside a nested view, because
+/// reading the environment on the style value itself does not reliably update.
+///
+/// That nested view must not be called `Body`: `ButtonStyle` declares
+/// `associatedtype Body`, so a nested type with that name becomes the witness for
+/// it, and a `private` witness cannot satisfy an internal conformance. The result
+/// is "does not conform to protocol 'ButtonStyle'" pointing at the style itself.
 struct CleansePrimaryButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View { Body(configuration: configuration) }
+    func makeBody(configuration: Configuration) -> some View { StyledLabel(configuration: configuration) }
 
-    private struct Body: View {
+    private struct StyledLabel: View {
         let configuration: ButtonStyleConfiguration
         @Environment(\.isEnabled) private var isEnabled
         @State private var isHovering = false
@@ -50,9 +55,9 @@ struct CleansePrimaryButtonStyle: ButtonStyle {
 
 /// Bordered. Everything that is a real action but not the page's main one.
 struct CleanseSecondaryButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View { Body(configuration: configuration) }
+    func makeBody(configuration: Configuration) -> some View { StyledLabel(configuration: configuration) }
 
-    private struct Body: View {
+    private struct StyledLabel: View {
         let configuration: ButtonStyleConfiguration
         @Environment(\.isEnabled) private var isEnabled
         @State private var isHovering = false
@@ -78,9 +83,9 @@ struct CleanseSecondaryButtonStyle: ButtonStyle {
 
 /// Text only, for reversible in-place actions such as clearing a selection.
 struct CleanseQuietButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View { Body(configuration: configuration) }
+    func makeBody(configuration: Configuration) -> some View { StyledLabel(configuration: configuration) }
 
-    private struct Body: View {
+    private struct StyledLabel: View {
         let configuration: ButtonStyleConfiguration
         @Environment(\.isEnabled) private var isEnabled
         @State private var isHovering = false

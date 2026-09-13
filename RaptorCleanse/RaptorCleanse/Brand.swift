@@ -124,7 +124,7 @@ enum BrandColor {
 }
 
 /// The tone of a status message, so a view picks a role rather than a colour.
-enum BrandTone {
+enum BrandTone: Equatable {
     case positive, neutral, caution, critical
 
     var foreground: Color {
