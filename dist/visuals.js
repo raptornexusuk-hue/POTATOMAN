@@ -36,7 +36,9 @@ export function ambientDust(count=140,radius=26,riseHeight=5.5){
 }
 export function curveTube(points,r=.025){return new T.TubeGeometry(new T.CatmullRomCurve3(points.map(p=>new T.Vector3(...p))),20,r,8,false);}
 export function clogGeometry(){
- const shape=new T.Shape();shape.moveTo(-.145,-.29);shape.bezierCurveTo(-.26,-.25,-.28,.13,-.225,.34);shape.bezierCurveTo(-.19,.52,-.065,.73,0,.78);shape.bezierCurveTo(.065,.73,.19,.52,.225,.34);shape.bezierCurveTo(.28,.13,.26,-.25,.145,-.29);shape.quadraticCurveTo(0,-.34,-.145,-.29);
- const g=new T.ExtrudeGeometry(shape,{depth:.20,bevelEnabled:true,bevelThickness:.065,bevelSize:.045,bevelSegments:6,steps:1,curveSegments:24});g.rotateX(-Math.PI/2);g.rotateY(Math.PI);
- const p=g.attributes.position;for(let i=0;i<p.count;i++){const toe=Math.max(0,Math.min(1,(p.getZ(i)-.28)/.50));p.setY(i,p.getY(i)+.14*toe*toe);}g.computeVertexNormals();return g;
+ // A boat-shaped klomp: narrow heel, widest at the ball of the foot, drawn out to a long
+ // pointed toe that sweeps up — rather than the short flat oval it used to be.
+ const shape=new T.Shape();shape.moveTo(-.115,-.33);shape.bezierCurveTo(-.225,-.29,-.245,.10,-.205,.32);shape.bezierCurveTo(-.175,.53,-.060,.80,0,.94);shape.bezierCurveTo(.060,.80,.175,.53,.205,.32);shape.bezierCurveTo(.245,.10,.225,-.29,.115,-.33);shape.quadraticCurveTo(0,-.385,-.115,-.33);
+ const g=new T.ExtrudeGeometry(shape,{depth:.225,bevelEnabled:true,bevelThickness:.065,bevelSize:.042,bevelSegments:6,steps:1,curveSegments:24});g.rotateX(-Math.PI/2);g.rotateY(Math.PI);
+ const p=g.attributes.position;for(let i=0;i<p.count;i++){const toe=Math.max(0,Math.min(1,(p.getZ(i)-.26)/.66));p.setY(i,p.getY(i)+.26*toe*toe);}g.computeVertexNormals();return g;
 }

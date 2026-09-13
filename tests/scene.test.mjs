@@ -10,7 +10,7 @@ const w=new World({},renderer);await w.ready;World.prototype.loadMaterials=oldLo
 const players=[0,1,2,3].map(id=>({id,name:['YOU','MASH','ROAST','CHIP'][id],hp:100,x:0,z:0,yaw:0,pitch:0,respawn:0,runner:false,dashTime:0,shotAnim:0,catchTime:0,reload:0,gun:false,panX:0,panY:0,cameraDistance:5.6}));
 let maxMeshes=0;
 for(const l of LEVELS){const m=makeMap(l);w.build(m,l,players,false);assert.equal(w.characters.length,4);w.updatePlayers(players,1,1/60);let meshes=0;w.root.traverse(o=>{if(o.isMesh)meshes++;if(o.geometry?.attributes?.position){const pos=o.geometry.attributes.position;for(let i=0;i<pos.count;i++){assert.ok(Number.isFinite(pos.getX(i))&&Number.isFinite(pos.getY(i))&&Number.isFinite(pos.getZ(i)));}}});maxMeshes=Math.max(maxMeshes,meshes);if(l.mode==='race'){let p={...m.start};for(const next of route(m,p,m.exit).slice(1)){slideMove(p,next.x-p.x,next.z-p.z,m.walls);assert.ok(Math.hypot(p.x-next.x,p.z-next.z)<1e-5);}}}
-console.log(`PASS all 10 actual scene graphs build with finite geometry and clear maze routes (${maxMeshes} mesh objects max after batching)`);
+console.log(`PASS all ${LEVELS.length} actual scene graphs build with finite geometry and clear maze routes (${maxMeshes} mesh objects max after batching)`);
 const map=makeMap(LEVELS[0]);w.build(map,LEVELS[0],players,false);const p=map.toWorld(7,7);assert.ok(route(map,map.start,p).length>0);console.log('PASS navigation reaches the town square between full building blocks');
 assert.equal(boxContact3D(-4,2.5,0,4,2.5,0,{x:0,z:0,w:1,d:1,h:1.45},.1),Infinity);assert.ok(Number.isFinite(boxContact3D(-4,1,0,4,1,0,{x:0,z:0,w:1,d:1,h:1.45},.1)));console.log('PASS shots clear low cover at the correct height');
 const m=w.characters[0];players[0].runner=true;players[0].x=1;w.updatePlayers(players,2,1/60);const cape=Array.from(m.cape.geometry.attributes.position.array);players[0].x=1.1;w.updatePlayers(players,2.1,1/60);assert.notDeepEqual(Array.from(m.cape.geometry.attributes.position.array),cape);assert.ok(m.stride>0);players[0].runner=false;console.log('PASS equipped cape and movement drive stride and cloth deformation');
@@ -38,14 +38,14 @@ const disposalCounts=[];flow.group.traverse(o=>{for(const [flag,key]of[['ownGeom
 
 // Add after the existing scene tests. Captures actual geometry before batching.
 const {Box3}=await import('../dist/assets/three.module.js');
-const originalBatch=w.batchStatic,originalTree=w.tree;
+const originalBatch=w.batchStatic,originalTree=w.avenueTree;
 let backdrops,avenueTrees;
 w.batchStatic=function(){
  this.root.updateMatrixWorld(true);backdrops=[];
  this.root.traverse(o=>{if(o.userData.backdrop)backdrops.push({x:o.position.x,z:o.position.z,box:new Box3().setFromObject(o)});});
  return originalBatch.call(this);
 };
-w.tree=function(x,z,...args){avenueTrees.push({x,z});return originalTree.call(this,x,z,...args);};
+w.avenueTree=function(x,z,...args){avenueTrees.push({x,z});return originalTree.call(this,x,z,...args);};
 const overlapXZ=(a,b)=>Math.min(a.max.x,b.max.x)>Math.max(a.min.x,b.min.x)+1e-4&&Math.min(a.max.z,b.max.z)>Math.max(a.min.z,b.min.z)+1e-4;
 try{
  for(const bonus of[false,true])for(const level of LEVELS){
@@ -77,5 +77,5 @@ try{
    if(o.isInstancedMesh)assert.ok(o.instanceMatrix.array.every(Number.isFinite));
   });
  }
-}finally{w.batchStatic=originalBatch;w.tree=originalTree;}
-console.log('PASS all 20 normal/bonus backgrounds: separated geometry, full-width/side streets, map-relative tree avenues, dry canal banks and finite batching');
+}finally{w.batchStatic=originalBatch;w.avenueTree=originalTree;}
+console.log('PASS all ${LEVELS.length*2} normal/bonus backgrounds: separated geometry, full-width/side streets, map-relative tree avenues, dry canal banks and finite batching');

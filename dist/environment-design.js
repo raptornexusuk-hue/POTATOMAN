@@ -61,6 +61,42 @@ export function dressWorld(w,map,level,night,r){
   for(const side of[-1,1]){box(stone,0,.015,side*(half+1.5),half*2,.06,2.8);for(const [i,x]of slots(Math.min(7,Math.max(4,Math.floor((half*2-13)/11)+1)),6.5).entries())backdrop(x,side*(half+6),9,7+(i%2)*2,7.2);for(const z of[-half*.62,half*.62])backdrop(side*(half+(side===1&&eastCanal?15:6)),z,9,6.8,6.4,-side*Math.PI/2);}
   for(const side of[-1,1]){const x=side*(half+(side===1&&eastCanal?11:3)),z=side*half*.18;box(iron,x,4.8,z,.5,9.6,.5);const boom=box(iron,x-side*3.4,8.8,z,7.2,.35,.45);boom.rotation.z=side*.2;box(iron,x-side*6.2,5.6,z,.055,5.5,.055);w.mesh('sphere',w.mat(0xa38654,'wood'),root,x-side*6.2,3,z,.7,.65,.7);for(let i=0;i<3;i++)w.crate(side*(half+1),side*(half*.43+i*1.2),0,1.1);}
   if(map.waterCells.length)w.canalBridges(map);else w.addCanalBackdrop?.(map,true);
+ }else if(family==='quarry'){
+  // Stepped chalk terraces ring the cutting floor, with a gantry and spoil heaps behind them.
+  w.scene.fog.color.set(0xc4cdd2);
+  const chalk=w.mat(0xd7dad0,'stone'),chalkDark=w.mat(0xb3b9b4,'stone');
+  for(const side of[-1,1]){
+   box(chalk,0,.015,side*(half+2),half*2,.06,3.4);
+   for(let step=0;step<3;step++)box(step%2?chalkDark:chalk,0,.6+step*1.5,side*(half+6+step*3.2),half*2+step*6,1.5+step*1.5,3.2);
+   for(const x of[-half*.6,half*.6])backdrop(x,side*(half+5),7,5.5,5.4);
+  }
+  for(const side of[-1,1]){
+   const x=side*(half+4);
+   for(let step=0;step<3;step++)box(step%2?chalkDark:chalk,x+side*(step*3.0),.6+step*1.5,0,3.0,1.5+step*1.5,half*2+step*5);
+   // Gantry frame over the cut face.
+   box(iron,x,5.2,half*.35,.42,10.4,.42);box(iron,x,5.2,-half*.35,.42,10.4,.42);
+   const beam=box(iron,x,10.2,0,.5,.5,half*.75);beam.rotation.z=0;
+   for(let i=0;i<3;i++)w.crate(x-side*1.4,(i-1)*2.3,0,1.15);
+  }
+  for(let i=0;i<7;i++){const a=i*2.399,cone=w.mesh(new T.ConeGeometry(1.5+r()*1.1,1.6+r()*1.4,9),w.mat(0xc8c4b2,'stone'),root,Math.cos(a)*(half+13),.8,Math.sin(a)*(half+13));cone.userData.ownGeometry=true;}
+  plaque('CHALK QUARRY',0,4.2,-half-4.2,5);
+ }else if(family==='orchard'){
+  // Fruit rows outside the lanes, pressing sheds at the ends and crate stacks along the headland.
+  w.scene.fog.color.set(0xcdd8bd);
+  box(w.mat(0x87a35c),0,-.1,0,half*2+50,.10,half*2+50);
+  for(const side of[-1,1]){
+   box(w.mat(0xa8b477,'stone'),0,.015,side*(half+1.8),half*2,.06,3);
+   for(const [i,x]of slots(5,5).entries())backdrop(x,side*(half+6.5),6.6,5+(i%2)*1.2,5.2);
+   for(let row=0;row<3;row++)for(let i=0;i<6;i++){const tx=(i/5*2-1)*(half-3),tz=side*(half+11+row*4.5);w.tree(tx,tz,root,r);if(r()<.5)w.crate(tx+1.4,tz-1.6,0,.85);}
+   for(const z of[-half*.5,half*.5]){bench(side*(half+2.6),z,-side*Math.PI/2);}
+  }
+  for(const side of[-1,1]){
+   for(let row=0;row<2;row++)for(let i=0;i<5;i++)w.tree(side*(half+9+row*4.5),(i/4*2-1)*(half-3),root,r);
+   // Pressing shed with barrel stacks on the headland.
+   const g=barn(w,{x:side*(half+5),z:0,w:7,d:5,h:4});g.userData.backdrop=true;
+   for(let i=0;i<4;i++){const barrel=w.mesh('cylinder',w.mat(0x7a4f2c,'wood'),root,side*(half+2.4),.42,(i-1.5)*1.5,.36,.85,.36);}
+  }
+  plaque('CIDER ORCHARD',0,3.4,-half-3.4,5);
  }else{
   fence(half+1.2);fence(-half-1.2);
   for(const side of[-1,1]){box(w.mat(0x67553b,'stone'),side*(half+9),-.025,0,12,.10,half*2-4);const field=w.mat(0x8d9b4f);for(const z of slots(12,3))box(field,side*(half+9),.10,z,12,.20,(half*2-6)/11*.55);for(const [i,x]of slots(3,7).entries()){const z=side*(half+7);if(side===-1&&i===1)backdrop(x,z,8,6,6);else{const g=barn(w,{x,z,w:8,d:6,h:4.5});g.userData.backdrop=true;}box(stone,x,.015,side*(half+2.8),4,.06,3.2);}}
@@ -72,9 +108,13 @@ export function dressWorld(w,map,level,night,r){
  // Trees follow avenues and field boundaries, with room between trunks and walking routes.
  // A denser tree line reads as an actual avenue rather than a scattering of six trunks.
  const treesPerSide=8;
- for(let i=0;i<treesPerSide*2;i++){const side=i<treesPerSide?-1:1,offset=family==='estate'?6:family==='farm'?17:side===1&&eastCanal?10.4:12,local=i%treesPerSide,x=side*(half+offset),z=(local/(treesPerSide-1)*2-1)*(half-5);w.tree(x,z,root,r);}
+ for(let i=0;i<treesPerSide*2;i++){const side=i<treesPerSide?-1:1,offset=family==='estate'?6:family==='farm'?17:family==='quarry'?16:family==='orchard'?20:side===1&&eastCanal?10.4:12,local=i%treesPerSide,x=side*(half+offset),z=(local/(treesPerSide-1)*2-1)*(half-5);w.avenueTree(x,z,root,r);}
  for(const side of[-1,1])for(const z of[-half+2,half-2])w.lamp(side*(half-2),z,0,night);
- for(const prop of map.props??[]){if(prop.prop==='marketStall')w.stall(prop.x,prop.z,0,Math.round(prop.x));else if(prop.prop==='cargo'){box(wood,prop.x,.07,prop.z,2.35,.14,2.35);for(const side of[-1,1])for(const row of[-1,1])w.crate(prop.x+side*.58,prop.z+row*.58,.14,1.08);w.crate(prop.x,prop.z,1.22,.58);}else if(prop.prop==='hay'){const straw=w.mat(0xd9b365,'wood');box(straw,prop.x,.43,prop.z,2.3,.86,2.3);box(straw,prop.x,1.04,prop.z,1.6,.35,1.6);for(const side of[-1,1])box(w.mat(0x796845),prop.x+side*.7,.44,prop.z,.05,.89,2.33);}}
+ for(const prop of map.props??[]){if(prop.prop==='marketStall')w.stall(prop.x,prop.z,0,Math.round(prop.x));else if(prop.prop==='cargo'){box(wood,prop.x,.07,prop.z,2.35,.14,2.35);for(const side of[-1,1])for(const row of[-1,1])w.crate(prop.x+side*.58,prop.z+row*.58,.14,1.08);w.crate(prop.x,prop.z,1.22,.58);}else if(prop.prop==='hay'){const straw=w.mat(0xd9b365,'wood');box(straw,prop.x,.43,prop.z,2.3,.86,2.3);box(straw,prop.x,1.04,prop.z,1.6,.35,1.6);for(const side of[-1,1])box(w.mat(0x796845),prop.x+side*.7,.44,prop.z,.05,.89,2.33);}
+  else if(prop.prop==='stoneBlock'){const cut=w.mat(0xd2d5cb,'stone');box(cut,prop.x,.55,prop.z,2.4,1.1,2.4);box(w.mat(0xbcc0b7,'stone'),prop.x,1.24,prop.z,1.9,.3,1.9);for(const side of[-1,1])box(w.mat(0x8d9189),prop.x+side*1.15,.55,prop.z,.08,1.05,2.3);}
+  else if(prop.prop==='spoil'){const rubble=w.mat(0xc6c2b0,'stone');for(let i=0;i<5;i++){const a=i*2.399,chunk=w.mesh('rounded',rubble,root,prop.x+Math.cos(a)*.6,.22+(i%2)*.18,prop.z+Math.sin(a)*.6,.7,.5,.65);chunk.rotation.y=a;}box(rubble,prop.x,.12,prop.z,2.2,.24,2.2);}
+  else if(prop.prop==='cider'){const oak=w.mat(0x7a4f2c,'wood');for(const [dx,dz]of[[-.55,-.55],[.55,-.55],[-.55,.55],[.55,.55]]){const barrel=w.mesh('cylinder',oak,root,prop.x+dx,.45,prop.z+dz,.4,.9,.4);}box(w.mat(0x93643b,'wood'),prop.x,.95,prop.z,2.1,.12,2.1);w.crate(prop.x,prop.z,1.02,.7);}
+  else if(prop.prop==='crateStack'){for(let i=0;i<3;i++)w.crate(prop.x+(i%2?.25:-.2),prop.z+(i===2?.3:-.15),i*.72,.78);box(w.mat(0x5c6a55),prop.x,.05,prop.z,2.2,.10,2.2);}}
  // Flush drainage grates sit by the kerb at repeatable street junctions.
  if(family==='village'||family==='harbour')for(const x of[-half+3,half-3])for(const z of[-half+3,half-3])for(let j=0;j<5;j++)box(iron,x-.25+j*.12,.012,z,.055,.02,.6);
  w.chunkInstances();w.batchStatic();

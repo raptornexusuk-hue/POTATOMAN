@@ -1,3 +1,29 @@
+## Update 0.17.0
+
+Arms now use the body's textured potato skin, so limbs, torso and legs match instead of the
+arms reading as pale plastic. Shoulders, elbow poles and the resting pose are placed on the
+aim-aligned left/right axis, so both arms hang at the sides of the quarter-turned torso rather
+than off its front. Scatter and RPG are held one-handed: a potato torso is wider than the arms
+are long, so the old support grip stretched a straight upper arm through the chest. The sleeve
+tapers from a fuller deltoid to a slimmer wrist. Eyes blink with real skin eyelids instead of
+squashing the eyeball, sit under soft brow ridges, and track the direction of travel.
+
+Klompens are about 10% smaller and carry far more carving: a painted tulip spray with stem and
+leaves, heel chevrons, beaded side borders, a scalloped collar and toe volutes.
+
+Two new worlds join the circuit. Chalk Quarry has stepped terraces, a gantry over the cut face,
+spoil heaps and cut stone blocks for hard cover. Cider Orchard has fruit rows, pressing sheds,
+barrel stacks and mown lanes. Four new levels bring the circuit to fourteen: Quarry Quarrel,
+Cider Run, Stone Cold Smash and Orchard Ambush. The circuit order, snapshot bounds, maze
+leaderboards and HUD counts are all derived from the level list rather than fixed at ten.
+
+Bots no longer file down one identical groove: the route finder takes a per-bot expansion order,
+so rivals take genuinely different equally-short lanes, and each bot holds its own lateral lane
+alongside the shared path. Respawning resets the look angle, so dying while aiming down no
+longer drops you back in staring at the ground.
+
+Refresh all clients before testing; the snapshot protocol remains 10.
+
 ## Update 0.16.0
 
 Shoulder sockets now overlap the actual potato skin, and the upper/lower arm links are about 5% shorter. The existing shoulder–elbow–wrist rig retains its fixed bone lengths and stable bend plane. Both arms respond to travel, including the carried potato, with opposite arm/leg phasing and a restrained torso roll and twist. The throwing hand blends out of its walking motion before wind-up and back after recovery.
@@ -136,9 +162,9 @@ Voice snippets are occasional: 22–34 seconds between lines, no immediate repea
 
 Rendering uses spatial batches and cheaper distant foliage while preserving near detail and a sharper adaptive-resolution floor. Real hardware validation is still needed; see TESTING.md.
 
-# POTATOMAN — by The Klompens · testing build 0.16.0
+# POTATOMAN — by The Klompens · testing build 0.17.0
 
-**Clogs on, Game on. Totally Mash.** A third-person browser game with ten levels, potato combat, timed maze races, bonus hunts, local split-screen and friend rooms for exactly three devices.
+**Clogs on, Game on. Totally Mash.** A third-person browser game with fourteen levels, potato combat, timed maze races, bonus hunts, local split-screen and friend rooms for exactly three devices.
 
 ## Play and controls
 
@@ -186,7 +212,7 @@ The title, Totally Mash subtitle, byline and menu links use a clearer responsive
 
 ## Levels and rules
 
-Ten levels combine four distinct worlds with combat, capture, destruction, an assault course and increasingly long mazes. Maze shortest routes are 52, 68, 88 and 112 grid steps. All racers share a start and finish; fastest completed escape across repeated attempts wins. Compass cues and visited-cell trail marks aid navigation. Crate hits have damage feedback, capture zones show contest/relocation status, and knockouts add objective points only in battle modes.
+Fourteen levels combine six distinct worlds with combat, capture, destruction, an assault course and increasingly long mazes. Maze shortest routes are 52, 68, 88 and 112 grid steps. All racers share a start and finish; fastest completed escape across repeated attempts wins. Compass cues and visited-cell trail marks aid navigation. Crate hits have damage feedback, capture zones show contest/relocation status, and knockouts add objective points only in battle modes.
 
 Main round winners receive three circuit points. Ties share victory. The rotating bonus runner moves faster, visits two checkpoints and escapes while hunters collect Masher guns. Runner escape awards one point and gives hunters 10% slower potato projectiles for the next main round's first 15 seconds. Hunter victory awards each hunter one point. Penalties never stack and have no effect in combat-free races.
 

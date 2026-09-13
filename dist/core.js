@@ -11,6 +11,10 @@ export const LEVELS=[
  {name:'Quayside Domination',tag:'HARBOUR • NIGHT',mode:'capture',size:21,theme:'depot',seed:96,detail:'Fight between containers for a moving control zone.',skill:'Rotate and intercept'},
  {name:'The Butter Run',tag:'HARBOUR ASSAULT COURSE • SUNSET',mode:'assault',size:21,theme:'course',seed:114,detail:'Jump onto each numbered platform, duck through the three low gates, then reach the exit. Fastest completed run wins.',skill:'Jump · land · keep momentum'},
  {name:'The Midnight Maze',tag:'OLD TOWN • NIGHT',mode:'race',size:23,theme:'night',seed:129,detail:'Twisting brick alleys and longer routes. Fastest complete escape wins.',skill:'Navigate under pressure'},
+ {name:'Quarry Quarrel',tag:'CHALK QUARRY • OVERCAST',mode:'battle',size:19,theme:'quarry',seed:157,detail:'Fight across the cutting floor. Stone blocks give cover; the gantry lane is the fast flank.',skill:'Use hard cover'},
+ {name:'Cider Run',tag:'ORCHARD • MORNING',mode:'race',size:25,theme:'grove',seed:152,detail:'Race the mown lanes between fruit rows. Fastest complete escape wins.',skill:'Read the rows'},
+ {name:'Stone Cold Smash',tag:'CUTTING FLOOR • AFTERNOON',mode:'smash',size:19,theme:'pit',seed:181,detail:'Break the marked blocks stacked around the cutting floor before your rivals do.',skill:'Pick your target'},
+ {name:'Orchard Ambush',tag:'CIDER ORCHARD • GOLDEN HOUR',mode:'capture',size:21,theme:'orchard',seed:194,detail:'Hold the pressing yard while rivals close in through the fruit rows.',skill:'Hold and rotate'},
  {name:'The Final Mash',tag:'FORTRESS GARDEN • STORM',mode:'race',size:27,theme:'fort',seed:143,detail:'The longest maze and the quickest rivals. One final escape.',skill:'Bring it all together'}
 ];
 export const MODES={battle:'TOTALLY MASH',race:'MAZE RACE',assault:'BUTTER RUN · TIME TRIAL',capture:'KING OF THE CROP',smash:'BANGERS & SMASH'};
@@ -57,6 +61,10 @@ export function makeMap(level,bonus=false){
    if(family==='village')for(const x of[4,n-5])for(const z of[6,n-7])addProp(x,z,'bin',1.45,1.1);
    if(family==='harbour')for(const x of[5,n-6])for(const z of[6,n-7])addProp(x,z,'cargo',1.8);
    if(family==='farm')for(const x of[mid-3,mid+3])for(const z of[mid-1,mid+1])addProp(x,z,'hay',1.25);
+   // Cut blocks on the quarry floor and pressing barrels in the orchard yard give each new
+   // world its own hard cover, placed on the same authored grid as the other families.
+   if(family==='quarry'){for(const x of[mid-3,mid+3])for(const z of[mid-2,mid+2])addProp(x,z,'stoneBlock',1.75,2.6);for(const x of[5,n-6])for(const z of[6,n-7])addProp(x,z,'spoil',1.2,2.4);}
+   if(family==='orchard'){for(const x of[mid-3,mid+3])for(const z of[mid-1,mid+1])addProp(x,z,'cider',1.35,2.3);for(const x of[4,n-5])for(const z of[6,n-7])addProp(x,z,'crateStack',1.5,2.2);}
   }
  }
  if(bonus){for(const [cx,cz] of [[3,3],[n-4,n-4],[Math.floor(n/2),n-3]])for(const[dx,dz]of[[0,0],[1,0],[-1,0],[0,1],[0,-1]])grid[cz+dz][cx+dx]=0;}
@@ -80,12 +88,15 @@ export function makeMap(level,bonus=false){
  }
  return map;
 }
-export function route(map,start,end){
+// BFS expansion order decides which of the equally-short paths comes back. Rotating it per
+// bot spreads them across parallel lanes instead of filing down one identical groove.
+const DIR_ORDERS=[[[1,0],[-1,0],[0,1],[0,-1]],[[0,1],[0,-1],[1,0],[-1,0]],[[-1,0],[1,0],[0,-1],[0,1]],[[0,-1],[0,1],[-1,0],[1,0]],[[1,0],[0,1],[-1,0],[0,-1]],[[0,-1],[-1,0],[0,1],[1,0]]];
+export function route(map,start,end,variant=0){
  const originalStart=map.toCell(start.x,start.z),originalEnd=map.toCell(end.x,end.z);
  const resolve=pos=>{const c=map.toCell(pos.x,pos.z);if(map.grid[c.z]?.[c.x]===0)return c;let candidates=[];for(let z=Math.max(1,c.z-2);z<=Math.min(map.n-2,c.z+2);z++)for(let x=Math.max(1,c.x-2);x<=Math.min(map.n-2,c.x+2);x++){if(map.grid[z][x]!==0)continue;const w=map.toWorld(x,z);if(!map.walls.some(wall=>segmentBox(pos.x,pos.z,w.x,w.z,wall,.42)))candidates.push({x,z,d:Math.hypot(pos.x-w.x,pos.z-w.z)});}return candidates.sort((a,b)=>a.d-b.d)[0]??null;};
  const a=resolve(start),b=resolve(end);if(!a||!b)return[];const queue=[a],seen=new Map([[a.x+','+a.z,null]]);let goal=null;
  for(let i=0;i<queue.length;i++){let p=queue[i],key=p.x+','+p.z;if(p.x===b.x&&p.z===b.z){goal=key;break;}
- for(const [dx,dz]of[[1,0],[-1,0],[0,1],[0,-1]]){const x=p.x+dx,z=p.z+dz,k=x+','+z;if(map.grid[z]?.[x]===0&&!seen.has(k)){seen.set(k,key);queue.push({x,z});}}}
+ for(const [dx,dz]of DIR_ORDERS[((variant%DIR_ORDERS.length)+DIR_ORDERS.length)%DIR_ORDERS.length]){const x=p.x+dx,z=p.z+dz,k=x+','+z;if(map.grid[z]?.[x]===0&&!seen.has(k)){seen.set(k,key);queue.push({x,z});}}}
  if(!goal)return[];const path=[];while(goal){const [x,z]=goal.split(',').map(Number);path.push(map.toWorld(x,z));goal=seen.get(goal);}path.reverse();if(map.grid[originalStart.z]?.[originalStart.x]!==0)path.unshift({x:start.x,z:start.z});if(map.grid[originalEnd.z]?.[originalEnd.x]!==0)path.push({x:end.x,z:end.z});return path;
 }
 export function blocked(x,z,r,walls,y=0,height=STANDING_HEIGHT){return walls.some(w=>y<(w.base??0)+(w.h??2.65)-.035&&y+height>(w.base??0)+.025&&Math.abs(x-w.x)<w.w/2+r&&Math.abs(z-w.z)<w.d/2+r);}
@@ -134,8 +145,12 @@ export function circuitLevels(seed=0){
  const order=LEVELS.map((_,i)=>i);if(!seed)return order;const random=rng(seed);
  // Alternate combat and movement challenges; each new circuit opens somewhere different.
  const shuffle=items=>{for(let i=items.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[items[i],items[j]]=[items[j],items[i]];}return items;};
- const combat=shuffle([0,2,3,5,6]),trials=shuffle([1,4,7,8]);const mixed=[];
- for(let i=0;i<5;i++){mixed.push(combat[i]);if(i<4)mixed.push(trials[i]);}mixed.push(9);return mixed;
+ // Derived from the level list so added levels join the rotation without retuning index tables.
+ const last=LEVELS.length-1,pool=order.filter(i=>i!==last);
+ const combat=shuffle(pool.filter(i=>!isTrial(LEVELS[i]))),trials=shuffle(pool.filter(i=>isTrial(LEVELS[i]))),mixed=[];
+ let t=0;for(let i=0;i<combat.length;i++){mixed.push(combat[i]);const want=Math.round((i+1)*trials.length/combat.length);while(t<want&&t<trials.length)mixed.push(trials[t++]);}
+ while(t<trials.length)mixed.push(trials[t++]);
+ mixed.push(last);return mixed;
 }
 export function roundLevel(index,seed=0){const id=circuitLevels(seed)[index];return{...LEVELS[id],id,seed:LEVELS[id].seed+(seed?((seed+index*997)%100000):0)};}
 export function playableMap(level,bonus=false,duration=120){

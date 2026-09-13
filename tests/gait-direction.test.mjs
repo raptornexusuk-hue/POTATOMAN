@@ -36,8 +36,9 @@ m.walk=0;m.lastX=p.x;m.lastZ=p.z;w.updatePlayers([p],0,0);assert.equal(m.bob.rot
 console.log('PASS opposite arm/leg swing in every direction, carried-potato motion and restrained torso wobble returning to rest');
 
 // Expressions follow the live throw clock and reset when the action finishes.
-Object.assign(p,{weapon:'throw',shotDuration:.46,shotAnim:0});w.updatePlayers([p],0,0);const openEye=m.eyes[0].scale.y,idleBrow=m.brows[0].position.y;
-assert.equal(m.mouth.visible,false);p.shotAnim=.46-.12;w.updatePlayers([p],0,0);assert.ok(m.eyes[0].scale.y<openEye-.1);assert.ok(m.brows[0].position.y<idleBrow);assert.ok(m.mouth.visible&&m.mouth.scale.y>.5);
-p.shotAnim=0;w.updatePlayers([p],0,0);assert.equal(m.mouth.visible,false);assert.equal(m.eyes[0].scale.y,openEye);assert.equal(m.brows[0].position.y,idleBrow);
+Object.assign(p,{weapon:'throw',shotDuration:.46,shotAnim:0});w.updatePlayers([p],0,0);const openLid=m.lids[0].rotation.x,idleBrow=m.brows[0].position.y;
+// Effort narrows the eye by dropping the actual lid over it, not by squashing the eyeball.
+assert.equal(m.mouth.visible,false);p.shotAnim=.46-.12;w.updatePlayers([p],0,0);assert.ok(m.lids[0].rotation.x>openLid+.1);assert.ok(m.brows[0].position.y<idleBrow);assert.ok(m.mouth.visible&&m.mouth.scale.y>.5);
+p.shotAnim=0;w.updatePlayers([p],0,0);assert.equal(m.mouth.visible,false);assert.equal(m.lids[0].rotation.x,openLid);assert.equal(m.brows[0].position.y,idleBrow);
 assert.ok(m.gun.children.filter(o=>o.isMesh).length<=10,'detailed gun is batched into a bounded number of material draws');
 console.log('PASS throw anticipation, effort/exhale and facial recovery; detailed launcher retains bounded draw calls');

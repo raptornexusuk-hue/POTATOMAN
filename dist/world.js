@@ -56,7 +56,7 @@ export class World{
   this.characters.forEach(m=>m.label.dispose());
   if(this.root){this.scene.remove(this.root);this.root.traverse(o=>{if(o.isInstancedMesh)o.dispose();if(o.isLight&&o.shadow)o.shadow.dispose();if(o.userData.ownGeometry)o.geometry.dispose();if(o.userData.ownMaterial)o.material.dispose();if(o.userData.ownTexture)o.userData.ownTexture.dispose();});}
   this.root=new T.Group();this.scene.add(this.root);this.map=map;this.level=level;this.isBonus=bonus;this.solids=[...map.walls,...map.platforms];this.wallMeshes=[];this.effects=[];this.projectileMeshes.clear();this.characters=[];this.cameraReady=[false,false];this.water=null;this.waterSurfaces=[];this.waterFlows=[];this.ambientParticles=null;this.leafClock??={value:0};
-  const night=['canal','depot','shop','night','fort'].includes(level.theme),hedge=['hedge','garden','corn','fort'].includes(level.theme),r=rng(level.seed),root=this.root;
+  const night=['canal','depot','shop','night','fort'].includes(level.theme),hedge=['hedge','garden','corn','fort','orchard','grove'].includes(level.theme),stoneWorld=['quarry','pit'].includes(level.theme),r=rng(level.seed),root=this.root;
   this.environment(night);this.scene.background.set(night?0x182d45:0x87b8c9);this.scene.fog.color.copy(this.scene.background);this.renderer.toneMappingExposure=night?1.2:1.03;
   root.add(makeSky(night,level.theme==='fort'));root.add(new T.HemisphereLight(night?0xadc3fa:0xc1e2fa,0x71614c,night?.7:.75));
   const sun=this.sun=new T.DirectionalLight(night?0xbed6ff:0xffdfab,night?2.1:3.2);sun.position.set(-25,50,20);sun.castShadow=true;sun.shadow.mapSize.set(this.qualityMode==='cinematic'?2048:this.qualityMode==='high'?1536:768,this.qualityMode==='cinematic'?2048:this.qualityMode==='high'?1536:768);const d=map.n*CELL*.55;Object.assign(sun.shadow.camera,{left:-d,right:d,top:d,bottom:-d,near:1,far:120});sun.shadow.bias=-.0004;sun.shadow.normalBias=.04;root.add(sun);
@@ -69,7 +69,7 @@ export class World{
   const half=map.n*CELL/2;
   for(const w of map.walls)if(w.prop==='bin')this.bin(w.x,w.z,0).scale.setScalar(1.5);
   for(const b of map.buildings??[]){const g=mapId(level)==='farm'?barn(this,b):this.building(b.x,b.z,b.w,b.h,r,night);if(mapId(level)!=='farm')g.scale.z=b.d/4;this.mesh('box',this.mat(0xd5cbbb,'stone'),root,b.x,.025,b.z,b.w+1.4,.05,b.d+1.4);}
-  const wallMat=this.mat(hedge?(level.theme==='corn'?0xb7ac4f:0x496b45):(['depot','shop'].includes(level.theme)?0x93a4a5:0xf0dbbc),hedge?'hedge':'brick');
+  const wallMat=this.mat(hedge?(level.theme==='corn'?0xb7ac4f:['orchard','grove'].includes(level.theme)?0x59813f:0x496b45):stoneWorld?0xd6d8ce:(['depot','shop'].includes(level.theme)?0x93a4a5:0xf0dbbc),hedge?'hedge':stoneWorld?'stone':'brick');
   const im=new T.InstancedMesh(this.geo.rounded,wallMat,map.walls.length),dummy=new T.Object3D();im.castShadow=im.receiveShadow=true;
   map.walls.forEach((w,i)=>{dummy.position.set(w.x,w.h/2,w.z);dummy.scale.set((w.prop||w.architecture)?0:w.w,(w.prop||w.architecture)?0:w.h,(w.prop||w.architecture)?0:w.d);dummy.updateMatrix();im.setMatrixAt(i,dummy.matrix);});root.add(im);this.wallMeshes.push(im);
   if(hedge){const foliage=new T.InstancedMesh(this.textures.foliage?this.geo.leaf:this.geo.leafPlain,this.leaves(),map.walls.length*10);map.walls.forEach((w,i)=>{for(let j=0;j<10;j++){const angle=j*2.399;dummy.position.set(w.x+Math.cos(angle)*w.w*.47,w.h-.15+(j%3)*.10,w.z+Math.sin(angle)*w.d*.47);dummy.rotation.set((j%3-1)*.6,angle,Math.sin(angle)*.5);dummy.scale.setScalar(w.prop||w.architecture?0:1.15);dummy.updateMatrix();foliage.setMatrixAt(i*10+j,dummy.matrix);foliage.setColorAt(i*10+j,new T.Color(level.theme==='corn'?0xd0c78a:j%2?0xced39c:0xabc195));}});foliage.castShadow=false;foliage.receiveShadow=true;root.add(foliage);dummy.rotation.set(0,0,0);}
@@ -134,6 +134,8 @@ export class World{
  }
  leaves(){const key='oak-leaf-clusters';if(!this.materials.has(key))this.materials.set(key,leafMaterial(this.textures.foliage??null,this.leafClock));return this.materials.get(key);}
  tree(x,z,parent,r){return addTree(this,x,z,parent,r);}
+ // The boundary avenue is a distinct call so decorative planting (orchard rows) stays separable.
+ avenueTree(x,z,parent,r){return this.tree(x,z,parent,r);}
  bin(x,z,y){const g=new T.Group();g.position.set(x,y,z);this.root.add(g);this.mesh('rounded',this.mat(0x284b48),g,0,.48,0,.66,.86,.65);this.mesh('rounded',this.mat(0x233c3b),g,0,.95,0,.74,.12,.74);this.mesh('box',this.mat(0xb7c5a8),g,0,.58,.333,.25,.25,.012);for(const a of[-.25,.25]){const m=this.mesh('cylinder',this.mat(0x202629),g,a,.14,-.25,.11,.08,.11);m.rotation.z=Math.PI/2;}return g;}
  crate(x,z,y,s=1){const g=new T.Group();g.position.set(x,y,z);this.root.add(g);this.mesh('rounded',this.mat(0xae864e,'wood'),g,0,s*.5,0,s,s,s);for(let i of[-1,1])for(let j of[-1,1])this.mesh('box',this.mat(0xd8b576,'wood'),g,i*s*.38,s*.5,j*s*.51,.08,s,.035);return g;}
  lamp(x,z,y,night){const g=new T.Group();g.position.set(x,y,z);this.root.add(g);this.mesh('cylinder',this.mat(0x26363c,null,{metalness:.5}),g,0,1.8,0,.065,3.6,.065);this.mesh('box',this.mat(0xffe3a1,null,{emissive:0xffd38b,emissiveIntensity:night?1.2:.25}),g,0,3.65,0,.3,.45,.3);this.mesh('cone',this.mat(0x26363c),g,0,3.98,0,.34,.25,.34);}
@@ -170,9 +172,13 @@ export class World{
   // Alternate light baked and golden russet skins consistently on every client.
   const skin=this.mat(id%2?0xe7c38e:0xc68b49,'skin',{roughness:.88,bumpScale:.037,envMapIntensity:.28}),dark=this.mat(0x352719,null,{roughness:.65}),white=this.mat(0xfff6df,null,{roughness:.25}),wood=this.clogMaterial(),iris=this.mat([0x778146,0x50787e,0x987343,0x6b7190][id],null,{roughness:.32});const bob=new T.Group();g.add(bob);
   const body=this.mesh('potato',skin,bob,0,1.09,0,.635,.86,.48);body.rotation.z=-.045;
-  const brows=[],eyes=[],cheeks=[],pupils=[];
+  const brows=[],eyes=[],cheeks=[],pupils=[],lids=[];
   for(const sign of[-1,1]){const x=sign*.225,eye=new T.Group();eye.position.set(x,1.40,.392);bob.add(eye);this.mesh(this.geo.sphere,white,eye,0,0,0,.172,.155,.087);const gaze=new T.Group();eye.add(gaze);this.mesh(this.geo.sphere,iris,gaze,0,-.01,.082,.101,.105,.022);this.mesh(this.geo.sphere,dark,gaze,0,-.008,.101,.054,.065,.011);this.mesh(this.geo.sphere,white,gaze,-.023,.029,.115,.018,.019,.006);eyes.push(eye);pupils.push(gaze);
+   // A real skin eyelid swinging down over the eyeball, instead of squashing the whole eye flat.
+   const lidPivot=new T.Group();eye.add(lidPivot);this.mesh(this.geo.sphere,skin,lidPivot,0,.10,-.01,.188,.175,.10);lids.push(lidPivot);
    const brow=this.mesh(curveTube([[-.145,0,-.012],[0,.031,.008],[.145,.014,-.012]],.023),this.mat(0x78502c,null,{roughness:.9}),bob,x,1.602,.432);brow.userData.ownGeometry=true;brows.push(brow);
+   // Soft skin ridge above each eye gives the brow something to sit on.
+   this.mesh(this.geo.sphere,skin,bob,x,1.556,.408,.20,.075,.10);
    cheeks.push(this.mesh(this.geo.sphere,skin,bob,sign*.32,1.08,.345,.17,.115,.13));
   }
   this.mesh(this.geo.sphere,skin,bob,0,1.18,.432,.10,.11,.08);
@@ -182,15 +188,36 @@ export class World{
 
   const arms=[],forearms=[],legs=[];
   for(const sign of[-1,1]){const arm=makeArm(this,g,skin,sign);arms.push(arm);forearms.push(arm.userData.lower);
-   const leg=new T.Group();leg.position.x=sign*.38;g.add(leg);const thigh=this.mesh('sphere',skin,leg,0,.69,0,.115,.22,.12),shin=this.mesh('sphere',skin,leg,0,.40,0,.125,.21,.135),knee=this.mesh('sphere',skin,leg,0,.53,.08,.13,.13,.13),foot=new T.Group();leg.add(foot);foot.position.y=.09;foot.rotation.y=sign*.32;foot.scale.set(.62,.80,.62);
-   this.mesh('clog',wood,foot,0,0,.04,1.13,1,1.13);this.mesh('sphere',this.mat(0x63431e),foot,0,.264,-.065,.14,.014,.155);
-   const rim=this.mesh(new T.TorusGeometry(.14,.023,10,28),wood,foot,0,.281,-.065);rim.rotation.x=Math.PI/2;rim.scale.y=1.13;rim.userData.ownGeometry=true;
+   const leg=new T.Group();leg.position.x=sign*.38;g.add(leg);const thigh=this.mesh('sphere',skin,leg,0,.69,0,.115,.22,.12),shin=this.mesh('sphere',skin,leg,0,.40,0,.125,.21,.135),knee=this.mesh('sphere',skin,leg,0,.53,.08,.13,.13,.13),foot=new T.Group();leg.add(foot);foot.position.y=.09;foot.rotation.y=sign*.32;foot.scale.set(.56,.76,.56);
+   this.mesh('clog',wood,foot,0,0,.04,1.13,1,1.13);
+   // The reshaped klomp sits a little taller, so opening and carving ride on one lifted trim group.
+   const trim=new T.Group();trim.position.y=.028;foot.add(trim);
+   this.mesh('sphere',this.mat(0x63431e),trim,0,.264,-.065,.14,.014,.155);
+   const rim=this.mesh(new T.TorusGeometry(.14,.023,10,28),wood,trim,0,.281,-.065);rim.rotation.x=Math.PI/2;rim.scale.y=1.13;rim.userData.ownGeometry=true;
    this.mesh('clog',this.mat(0x815c28,'wood'),foot,0,-.02,.04,1.15,.17,1.15);
-   for(let j=0;j<3;j++){const decoration=this.mesh(curveTube([[-.16,.23,.25+j*.047],[0,.278,.27+j*.047],[.16,.23,.25+j*.047]],.012),this.mat(0x735027),foot);decoration.userData.ownGeometry=true;}
-   const carving=this.mat(0x835126,null,{roughness:.6});
-   // Dark tulip inlays and fine engraved borders follow the raised yellow instep.
-   for(const side of[-1,1]){for(let j=0;j<2;j++){const leaf=this.mesh(curveTube([[side*.06,.295,.25],[side*(.105+j*.025),.302,.32+j*.025],[side*.065,.29,.405]],.007),carving,foot);leaf.userData.ownGeometry=true;}const seam=this.mesh(curveTube([[side*.21,.10,-.15],[side*.22,.115,.20],[side*.13,.17,.60],[side*.018,.245,.82]],.006),carving,foot);seam.userData.ownGeometry=true;}
-   const tulip=this.mesh(curveTube([[-.055,.302,.44],[-.042,.327,.50],[0,.315,.48],[.042,.327,.50],[.055,.302,.44],[0,.296,.41],[-.055,.302,.44]],.009),carving,foot);tulip.userData.ownGeometry=true;
+   for(let j=0;j<3;j++){const decoration=this.mesh(curveTube([[-.16,.23,.25+j*.047],[0,.278,.27+j*.047],[.16,.23,.25+j*.047]],.012),this.mat(0x735027),trim);decoration.userData.ownGeometry=true;}
+   const carving=this.mat(0x835126,null,{roughness:.6}),inlay=this.mat(0xb5342f,null,{roughness:.5}),detail=[];
+   const carve=(points,r=.007,mat=carving)=>{const piece=this.mesh(curveTube(points,r),mat,trim);piece.userData.ownGeometry=true;detail.push(piece);return piece;};
+   // Painted Dutch folk work: tulip spray on the instep, chevroned heel, beaded side borders
+   // and a scalloped collar, in the carved/painted style of a real klomp.
+   for(const side of[-1,1]){
+    for(let j=0;j<2;j++)carve([[side*.06,.295,.25],[side*(.105+j*.025),.302,.32+j*.025],[side*.065,.29,.405]]);
+    carve([[side*.21,.10,-.15],[side*.22,.115,.20],[side*.13,.17,.60],[side*.018,.245,.82]],.006);
+    // Beaded border following the upper edge of each side wall.
+    for(let j=0;j<6;j++){const t=j/5,bead=this.mesh(this.geo.smallSphere,carving,trim,side*(.225-t*.10),.135+t*.075,-.08+t*.62,.018,.018,.018);detail.push(bead);}
+    // Scrolled volute curling back from the toe.
+    carve([[side*.15,.20,.58],[side*.19,.25,.46],[side*.12,.275,.38],[side*.05,.255,.44]],.0055);
+   }
+   // Heel chevrons.
+   for(let j=0;j<3;j++)carve([[-.15,.10+j*.045,-.245+j*.03],[0,.165+j*.045,-.16+j*.03],[.15,.10+j*.045,-.245+j*.03]],.0075);
+   // Scalloped collar around the foot opening.
+   for(let j=0;j<10;j++){const a=j*Math.PI*2/10,scallop=this.mesh(this.geo.smallSphere,carving,trim,Math.sin(a)*.155,.288,-.065+Math.cos(a)*.175,.022,.014,.022);detail.push(scallop);}
+   // Tulip spray on the toe: painted bloom, stem and paired leaves.
+   carve([[-.055,.302,.44],[-.042,.327,.50],[0,.315,.48],[.042,.327,.50],[.055,.302,.44],[0,.296,.41],[-.055,.302,.44]],.009,inlay);
+   carve([[0,.298,.40],[0,.30,.34],[0,.295,.28]],.005);
+   for(const side of[-1,1])carve([[0,.297,.33],[side*.055,.305,.355],[side*.075,.298,.40]],.0045);
+   carve([[-.085,.295,.56],[0,.335,.615],[.085,.295,.56]],.008,inlay);
+   this.mesh(this.geo.smallSphere,inlay,trim,0,.325,.50,.028,.020,.028);
    leg.userData={thigh,shin,knee,foot};legs.push(leg);
   }
   const capeGeo=new T.PlaneGeometry(1.36,1.30,20,22),cp=capeGeo.attributes.position;for(let i=0;i<cp.count;i++){const y=cp.getY(i),t=(.65-y)/1.3;cp.setX(i,cp.getX(i)*(.47+t*.60));cp.setZ(i,Math.sin(cp.getX(i)*16)*.022*t);}capeGeo.computeVertexNormals();
@@ -202,7 +229,7 @@ export class World{
   const crown=new T.Group();crown.position.set(0,1.95,0);bob.add(crown);const gold=this.mat(0xffd365,null,{metalness:.85,roughness:.25});const band=this.mesh(new T.CylinderGeometry(.38,.35,.16,32,1,true),gold,crown,0,.02,0);band.userData.ownGeometry=true;for(let j=0;j<5;j++){const a=j*Math.PI*2/5;const point=this.mesh(new T.ConeGeometry(.10,.31,8),gold,crown,Math.sin(a)*.32,.23,Math.cos(a)*.32);point.userData.ownGeometry=true;this.mesh('sphere',this.mat(0xb52737,null,{metalness:.3,roughness:.18}),crown,Math.sin(a)*.37,.04,Math.cos(a)*.37,.045,.055,.03);}crown.visible=false;
   const label=new PlayerLabel(colors[id]);this.root.add(label.sprite);
   const fadeMaterials=[];g.traverse(o=>{if(o.isMesh){o.material=o.material.clone();o.material.transparent=false;o.userData.ownMaterial=true;fadeMaterials.push(o.material);}});
-  return{g,shadow,label,fadeMaterials,crouchBlend:0,bob,arms,forearms,legs,cape,capeBase,clasp,crown,heldSpud,gun,eyes,brows,cheeks,pupils,smile,mouth,lip,hurt:0,joy:0,lastHP:null,stride:0,walk:0,lastX:null,lastZ:null,blinkAt:2.5+id*.7};
+  return{g,shadow,label,fadeMaterials,crouchBlend:0,bob,arms,forearms,legs,cape,capeBase,clasp,crown,heldSpud,gun,eyes,brows,cheeks,pupils,lids,smile,mouth,lip,hurt:0,joy:0,gaze:0,lastHP:null,stride:0,walk:0,lastX:null,lastZ:null,blinkAt:2.5+id*.7};
  }
  updatePlayers(players,time,dt){const {hip,ankle,knee,direction,inverse,up:upAxis,forward}=this.scratch,aimPlayers=this.isBonus?players.filter(q=>q.runner):players;players.forEach((p,i)=>{const m=this.characters[i];m.g.visible=p.respawn<=0;const dx=m.lastX===null?0:p.x-m.lastX,dz=m.lastZ===null?0:p.z-m.lastZ,travelled=Math.hypot(dx,dz);m.lastX=p.x;m.lastZ=p.z;
   const speed=travelled<2?travelled/Math.max(dt,.001):0;const smoothing=1-Math.exp(-10*dt);m.walk+=(Math.min(speed/6,1.35)-m.walk)*smoothing;if(travelled<2)m.stride+=travelled*2.8;else{m.walk=0;m.stride=0;}
@@ -225,7 +252,12 @@ export class World{
   m.cape.visible=m.clasp.visible=!!p.runner;m.crown.visible=(p.winStreak??0)>=3;
   const blink=Math.max(0,1-Math.abs((time+i*.73)%4.1-3.9)/.095);if(m.lastHP!==null&&p.hp<m.lastHP&&p.respawn<=0)m.hurt=1;m.lastHP=p.hp;m.hurt=Math.max(0,m.hurt-dt*3.5);m.joy+=((p.catchTime>0?1:p.runner?.35:0)-m.joy)*(1-Math.exp(-8*dt));
   const throwing=p.weapon==='throw'&&!p.runner&&p.shotAnim>0,throwClock=throwing?Math.max(0,(p.shotDuration??.46)-p.shotAnim):0,effort=throwing?Math.sin(Math.PI*Math.min(1,throwClock/.27)):0,exhale=throwing?Math.exp(-Math.pow((throwClock-.145)/.055,2)):0;
-  m.eyes.forEach(e=>e.scale.y=(1-blink*.92)*(1-m.hurt*.25-effort*.19+m.joy*.03));m.pupils.forEach(g=>{g.position.y=Math.sin(p.pitch??0)*.014-effort*.004;g.position.x=effort*.006;});
+  // Lids do the closing; the eyeball keeps its shape and only squashes a little under a wince.
+  const shut=Math.min(1,blink+m.hurt*.45+effort*.30);
+  m.lids.forEach(l=>l.rotation.x=shut*1.62);m.eyes.forEach(e=>e.scale.y=1-m.hurt*.10+m.joy*.03);
+  // Eyes lead the turn and follow the aim, so the head reads as looking where the player looks.
+  m.gaze+=((travelled>.004?Math.max(-1,Math.min(1,(m.gaitX??0)*1.6)):0)-m.gaze)*(1-Math.exp(-6*dt));
+  m.pupils.forEach(g=>{g.position.y=Math.sin(p.pitch??0)*.016-effort*.004;g.position.x=m.gaze*.022+effort*.006;});
   m.brows.forEach((b,j)=>{b.position.y=1.602+m.joy*.028-m.hurt*.012-effort*.022;b.rotation.z=(j?1:-1)*(m.hurt*.08+effort*.11+walk*.006);});m.cheeks.forEach(c=>{c.position.y=1.08+effort*.022+m.joy*.012;c.scale.y=.115*(1+effort*.12);});
   m.mouth.visible=exhale>.025;m.mouth.scale.set(1-effort*.12,.05+exhale*.66,1);m.lip.scale.y=1+effort*.3;m.smile.scale.set(1+m.joy*.10-effort*.06,1-m.hurt*.35,1);
   if(m.cape.visible){const pos=m.cape.geometry.attributes.position;for(let k=0;k<pos.count;k++){const x=m.capeBase[k*3],y=m.capeBase[k*3+1],a=(.65-y)/1.3;pos.setZ(k,m.capeBase[k*3+2]-a*(.09+Math.min(speed,10)*.034)+Math.sin(time*7-x*5+a*5)*a*(.022+walk*.065));}pos.needsUpdate=true;const normalTick=Math.floor(time*24+i/4);if(normalTick!==m.normalTick){m.cape.geometry.computeVertexNormals();m.normalTick=normalTick;}}
