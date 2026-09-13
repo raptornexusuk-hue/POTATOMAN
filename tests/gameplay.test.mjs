@@ -62,7 +62,7 @@ console.log('PASS Chill bots delay acquisition, hold aim, fire less often and ne
 a.setOnline(null);a.init(7);let courseTicks=0;while(a.snapshot().state==='playing'&&courseTicks++<14402)a.tick(dt);
 for(const p of a.snapshot().players.slice(1))assert.ok(Number.isFinite(p.best),`Assault bot ${p.id} failed at platform ${p.courseStep}, y=${p.y}`);
 console.log('PASS every Chill bot completes the full jumping assault course within two minutes');
-a.init(0);let powers=a.snapshot();assert.equal(powers.pickups.filter(p=>p.kind!=='weapon').length,6);const boost=powers.pickups.find(b=>b.kind==='run'),hero=powers.players[0];Object.assign(hero,{x:boost.x,z:boost.z});a.tick(dt);assert.ok(hero.runBoost>11);assert.equal(boost.collected,true);Object.assign(hero,{x:mapStartSafe(powers).x,z:mapStartSafe(powers).z});for(let i=0;i<2161;i++)a.tick(dt);assert.equal(boost.collected,false);assert.equal(hero.runBoost,0);
+a.init(0);let powers=a.snapshot();assert.equal(powers.pickups.filter(p=>p.kind!=='weapon').length,4);const boost=powers.pickups.find(b=>b.kind==='run'),hero=powers.players[0];Object.assign(hero,{x:boost.x,z:boost.z});a.tick(dt);assert.ok(hero.runBoost>11);assert.equal(boost.collected,true);Object.assign(hero,{x:mapStartSafe(powers).x,z:mapStartSafe(powers).z});for(let i=0;i<2161;i++)a.tick(dt);assert.equal(boost.collected,false);assert.equal(hero.runBoost,0);
 function mapStartSafe(s){return s.map.toWorld(1,1);}
 hero.fireBoost=12;hero.throwCD=0;a.fire(hero);assert.equal(hero.throwCD,.62*.53);for(let i=0;i<40;i++)a.tick(dt);hero.fireBoost=0;hero.throwCD=0;a.fire(hero);assert.equal(hero.throwCD,.62);
 console.log('PASS shared pickups collect once, expire, respawn and change actual fire cadence');

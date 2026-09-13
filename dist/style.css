@@ -72,3 +72,29 @@
 
 /* Keep the original large wordmark legible while the match panel stays left. */
 #loading{background:radial-gradient(ellipse at 50% 35%,#24404d,#101d24 72%)}.loading-identity{display:flex;flex-direction:column;align-items:center;gap:24px}.loading-wordmark{display:block;width:min(680px,88vw);height:auto;filter:drop-shadow(0 12px 20px #0008)}.loading-identity p{margin:0;font-size:18px;color:#f2d79a}.loading-progress{width:180px;height:4px;border-radius:4px;background:#ffffff20;overflow:hidden}.loading-progress::after{content:"";display:block;width:40%;height:100%;background:#ffcf58;animation:planting 1.1s ease-in-out infinite alternate}@keyframes planting{to{transform:translateX(150%)}}@media(prefers-reduced-motion:reduce){.loading-progress::after{animation:none;width:100%}}
+
+/* Each menu/dialog gets its own accent and icon so the screens read as distinct places, not repeats of one template. Layout/structure are untouched — cover art is untouched too. */
+:root{--accent-levels:#7ecbb6;--accent-settings:#f2b76b;--accent-board:#c9a4ff;--accent-profile:#ff9fc5;--accent-pad:#7fb8ff;--accent-art:#ffce42;--accent-online:#72c2be}
+#levelsDialog{border-color:var(--accent-levels)}#levelsDialog .dialog-head small{color:var(--accent-levels)}#levelsDialog .dialog-head small::before{content:"🗺 "}
+#settingsDialog{border-color:var(--accent-settings)}#settingsDialog .dialog-head small{color:var(--accent-settings)}#settingsDialog .dialog-head small::before{content:"⚙ "}
+#leaderboardDialog{border-color:var(--accent-board)}#leaderboardDialog .dialog-head small{color:var(--accent-board)}#leaderboardDialog .dialog-head small::before{content:"🏆 "}
+#profileDialog{border-color:var(--accent-profile)}#profileDialog .dialog-head small{color:var(--accent-profile)}#profileDialog .dialog-head small::before{content:"🥔 "}
+#controllerDialog{border-color:var(--accent-pad)}#controllerDialog .dialog-head small{color:var(--accent-pad)}#controllerDialog .dialog-head small::before{content:"🎮 "}
+#artDialog .dialog-head small::before{content:"🎨 "}
+#onlineDialog{border-color:var(--accent-online)}#onlineDialog .dialog-head small{color:var(--accent-online)}#onlineDialog .dialog-head small::before{content:"🌐 "}
+#pauseDialog .dialog-head small::before{content:"⏸ "}#resultDialog .dialog-head small::before{content:"🥇 "}
+dialog{box-shadow:0 30px 150px #000c,0 0 0 1px #ffffff08 inset}
+.menu-links button{position:relative;transition:transform .15s ease}
+.menu-links button:hover{transform:translateX(3px)}
+#levelsButton:hover{color:var(--accent-levels)}#controlsButton:hover{color:var(--accent-settings)}#leaderboardButton:hover{color:var(--accent-board)}#profileButton:hover{color:var(--accent-profile)}#controllerButton:hover{color:var(--accent-pad)}#artButton:hover{color:var(--accent-art)}
+.menu .play.primary{background:linear-gradient(120deg,#ffce42,#ffb545,#ffce42);background-size:220% 100%;box-shadow:0 4px 0 #b98517,0 0 26px #ffce4255;transition:background-position .5s ease,box-shadow .2s ease}
+.menu .play.primary:hover{background-position:100% 0;box-shadow:0 4px 0 #b98517,0 0 40px #ffce4299}
+.menu .online-play{position:relative;overflow:hidden}
+.menu .online-play::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 12% 50%,#72c2be33,transparent 60%);pointer-events:none}
+.session-pick .active{box-shadow:inset 0 0 0 1px #ffffff2e}
+.menu-worlds button{position:relative;overflow:hidden;transition:transform .18s ease,border-color .18s ease}
+.menu-worlds button:hover{transform:translateY(-3px);border-color:var(--map-color)}
+.menu-worlds button::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;background:var(--map-color);opacity:.85}
+.level-card{transition:transform .15s ease,box-shadow .15s ease}.level-card:hover{transform:translateY(-2px);box-shadow:0 10px 26px #0006}
+.map-tabs button.active{box-shadow:0 0 18px #ffd26955}
+@media(prefers-reduced-motion:reduce){.menu .play.primary,.menu-worlds button,.level-card{transition:none}.menu .play.primary{background-position:0 0}}

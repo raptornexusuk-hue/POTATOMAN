@@ -112,9 +112,12 @@ function loadRound(isBonus,hostDuration=null){
  world.updatePlayers(players,time,STEP);world.syncProjectiles(shots);world.viewSettings=settings;world.render(online?[localPlayer()]:players,duo,STEP);listenToWorld();acc=0;last=performance.now();
 }
 function spawnPowerups(){
- const level=currentLevel(),random=rng(level.seed+4207),trial=isTrial(level),kinds=trial?['run','jump']:['run','fire','jump'];
- const free=[];for(let z=2;z<map.n-2;z++)for(let x=2;x<map.n-2;x++){const p=map.toWorld(x,z);if(Math.hypot(p.x,p.z)>3&&!map.grid[z][x]&&!blocked(p.x,p.z,1,map.walls)&&!map.platforms.some(w=>Math.hypot(w.x-p.x,w.z-p.z)<2))free.push(p);}
- const chosen=[];for(let id=0;id<6&&free.length;id++){let at=Math.floor(random()*free.length),p=free.splice(at,1)[0];while(free.length&&chosen.some(c=>Math.hypot(c.x-p.x,c.z-p.z)<4))p=free.splice(Math.floor(random()*free.length),1)[0];chosen.push(p);const kind=kinds[id%kinds.length],item={...p,id,kind,owner:-1,collected:false,respawn:0};item.mesh=world.powerup?.(p.x,p.z,kind)??world.marker(p.x,p.z,POWERUPS[kind].color,'boost');pickups.push(item);}
+ const level=currentLevel(),random=rng(level.seed+4207),trial=isTrial(level),kinds=trial?['run','jump']:['run','fire','jump'],half=(map.n-2)*CELL/2,count=trial?2:4;
+ const candidates=maxRadius=>{const list=[];for(let z=2;z<map.n-2;z++)for(let x=2;x<map.n-2;x++){const p=map.toWorld(x,z),d=Math.hypot(p.x,p.z);if(d>3&&d<=maxRadius&&!map.grid[z][x]&&!blocked(p.x,p.z,1,map.walls)&&!map.platforms.some(w=>Math.hypot(w.x-p.x,w.z-p.z)<2))list.push(p);}return list;};
+ // Fewer boosts, clustered around the contested midfield rather than scattered into quiet corners;
+ // fall back to the full map only if a tight maze leaves too few candidates near the centre.
+ let free=candidates(Math.max(9,half*.42));if(free.length<count*3)free=candidates(half+1);
+ const chosen=[];for(let id=0;id<count&&free.length;id++){let at=Math.floor(random()*free.length),p=free.splice(at,1)[0];while(free.length&&chosen.some(c=>Math.hypot(c.x-p.x,c.z-p.z)<4))p=free.splice(Math.floor(random()*free.length),1)[0];chosen.push(p);const kind=kinds[id%kinds.length],item={...p,id,kind,owner:-1,collected:false,respawn:0};item.mesh=world.powerup?.(p.x,p.z,kind)??world.marker(p.x,p.z,POWERUPS[kind].color,'boost');pickups.push(item);}
 }
 function spawnWeaponPads(){const item=createWeaponPickup(map,currentLevel().seed,bonus);item.mesh=world.weaponDrop?.(item.x,item.z,item.weapon,item.ammo)??world.crate(item.x,item.z,0,.8);pickups.push(item);}
 function sharedWeapon(){return pickups.find(p=>p.kind==='weapon');}

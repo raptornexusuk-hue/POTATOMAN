@@ -26,9 +26,20 @@ export function dressWorld(w,map,level,night,r){
    for(let j=0;j<9;j++)box(w.mat(0xf0e4c8),b.x-b.w*.32+j*b.w*.08,2.41,z+.6*front,.18,.025,1.16);
    // Window boxes are attached to the facade, not scattered around the street.
    for(const side of[-1,1])flowerBed(b.x+side*b.w*.32,z+.13*front,1.1,.40);
+   // Seed-varied doorstep clutter keeps the same authored street from looking identical every circuit.
+   if(r()<.7)w.crate(b.x-b.w*.42,z+.95*front,0,.72+r()*.3);
+   if(r()<.6)w.bin(b.x+b.w*.42,z+.7*front,0);
+   if(r()<.45){const barrel=w.mesh('cylinder',w.mat(0x6b4a2c,'wood'),root,b.x+(r()<.5?-1:1)*b.w*.2,.4,z+1.2*front,.32,.8,.32);barrel.rotation.x=r()<.3?Math.PI/2:0;}
   }else if(family==='harbour'){
    for(let j=0;j<9;j++)box(iron,b.x-b.w*.43+j*b.w*.108,1.15,z+.05*front,.055,2.2,.09);
    for(const sx of[-1,1])box(iron,b.x+sx*(b.w/2-.15),3,z+.08*front,.12,5.7,.15);
+   // A stack of loading crates and a coiled rope by the warehouse door, count varies by seed.
+   for(let k=0;k<1+Math.floor(r()*3);k++)w.crate(b.x-b.w*.3+k*1.1,z+1.3*front,0,.85+r()*.25);
+   if(r()<.55){const rope=w.mesh(new T.TorusGeometry(.4,.09,6,20),w.mat(0xc9a25a,'wood'),root,b.x+b.w*.35,.1,z+1.0*front);rope.rotation.x=Math.PI/2;rope.userData.ownGeometry=true;}
+  }else if(family==='farm'){
+   // Farm fronts otherwise had only a plaque and paving; bales and tools fill the yard.
+   for(let k=0;k<2+Math.floor(r()*3);k++){const straw=w.mat(0xd9b365,'wood');box(straw,b.x-b.w*.3+k*.95,.35,z+1.1*front,.7,.7,.7);}
+   if(r()<.6){const fork=new T.Group();fork.position.set(b.x+b.w*.35,0,z+.9*front);fork.rotation.y=r()*6.28;root.add(fork);w.mesh('cylinder',wood,fork,0,.9,0,.035,1.8,.035);for(const side of[-1,1])w.mesh('cylinder',w.mat(0x5b5f5a,null,{metalness:.4}),fork,side*.07,1.75,.05,.02,.32,.02);}
   }
  }
  // Four readable skylines, instead of the same ring of houses on every map.
@@ -40,6 +51,9 @@ export function dressWorld(w,map,level,night,r){
  }else if(family==='estate'){
   backdrop(0,-half-9,17,8,8.4);plaque('ROYAL BUTTER GARDENS',0,3,-half-4.30,6);
   for(const side of[-1,1]){box(stone,0,.015,side*(half+3),half*2,.06,4.2);for(const x of[-half*.66,0,half*.66]){flowerBed(x,side*(half+1.8),6,1.4);bench(x,side*(half+3.2),side===1?0:Math.PI);}for(const x of[-half*.68,half*.68])backdrop(x,side*(half+8),7.5,5,6);for(const z of[-half*.65,0,half*.65])flowerBed(side*(half+1.8),z,1.4,5);}
+  // Clipped topiary urns along the promenade, count and spacing vary with the level seed.
+  const urnCount=5+Math.floor(r()*4);
+  for(let side of[-1,1])for(let i=0;i<urnCount;i++){const z=(i/(urnCount-1)*2-1)*(half-2),urn=w.mat(0xd8c9a3,'stone');w.mesh('cylinder',urn,root,side*(half+2.5),.3,z,.24,.55,.24);w.mesh('sphere',w.mat(0x3f6b41,'hedge'),root,side*(half+2.5),.85,z,.34,.4,.34);}
   // Gazebo, balustrade and formal avenue stay beyond the playable boundary.
   const gz=half+8;for(let i=0;i<8;i++){const a=i*Math.PI/4;w.mesh('cylinder',stone,root,Math.cos(a)*3,1.7,gz+Math.sin(a)*3,.10,3.4,.10);}w.mesh(new T.ConeGeometry(3.8,1.5,8),w.mat(0x4e695b),root,0,4.1,gz).userData.ownGeometry=true;
   if(map.walls.some(wall=>wall.prop==='fountain'))w.formalGarden(map);
@@ -56,7 +70,9 @@ export function dressWorld(w,map,level,night,r){
   for(const side of[-1,1]){w.crate(half+3,side*4,0,1.2);w.crate(half+3,side*5.3,0,1.2);}
  }
  // Trees follow avenues and field boundaries, with room between trunks and walking routes.
- for(let i=0;i<10;i++){const side=i<5?-1:1,offset=family==='estate'?6:family==='farm'?17:side===1&&eastCanal?10.4:12,x=side*(half+offset),z=(i%5-2)*(half-5)/2;w.tree(x,z,root,r);}
+ // A denser tree line reads as an actual avenue rather than a scattering of six trunks.
+ const treesPerSide=8;
+ for(let i=0;i<treesPerSide*2;i++){const side=i<treesPerSide?-1:1,offset=family==='estate'?6:family==='farm'?17:side===1&&eastCanal?10.4:12,local=i%treesPerSide,x=side*(half+offset),z=(local/(treesPerSide-1)*2-1)*(half-5);w.tree(x,z,root,r);}
  for(const side of[-1,1])for(const z of[-half+2,half-2])w.lamp(side*(half-2),z,0,night);
  for(const prop of map.props??[]){if(prop.prop==='marketStall')w.stall(prop.x,prop.z,0,Math.round(prop.x));else if(prop.prop==='cargo'){box(wood,prop.x,.07,prop.z,2.35,.14,2.35);for(const side of[-1,1])for(const row of[-1,1])w.crate(prop.x+side*.58,prop.z+row*.58,.14,1.08);w.crate(prop.x,prop.z,1.22,.58);}else if(prop.prop==='hay'){const straw=w.mat(0xd9b365,'wood');box(straw,prop.x,.43,prop.z,2.3,.86,2.3);box(straw,prop.x,1.04,prop.z,1.6,.35,1.6);for(const side of[-1,1])box(w.mat(0x796845),prop.x+side*.7,.44,prop.z,.05,.89,2.33);}}
  // Flush drainage grates sit by the kerb at repeatable street junctions.

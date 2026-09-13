@@ -32,7 +32,7 @@ const drawn=[];Object.assign(renderer,{setScissorTest(){},setViewport(){},setSci
 players.forEach(p=>Object.assign(p,{hp:100,runner:false,respawn:0}));w.updatePlayers(players,4,1/60);w.render(players,true,1/60);assert.equal(drawn.length,2);assert.ok(drawn.every(view=>view.length===4&&view.every(size=>size===view[0])));drawn.length=0;w.render([players[2]],false,1/60);assert.equal(drawn[0].length,4,'online guest camera retains every player label');
 let textureDisposals=0,materialDisposals=0;for(const m of w.characters){m.label.texture.addEventListener('dispose',()=>textureDisposals++);m.label.material.addEventListener('dispose',()=>materialDisposals++);}w.build(map,LEVELS[0],players,false);assert.equal(textureDisposals,4);assert.equal(materialDisposals,4);assert.equal(w.root.children.filter(o=>o.isSprite).length,4);
 console.log('PASS overhead names/health update, 140HP transformation, respawn, wall occlusion, split-screen/guest sizing and texture cleanup');
-w.textures.foliage=new Texture();w.materials.delete('oak-leaf-clusters');const garden=LEVELS.find(l=>l.theme==='garden');w.build(makeMap(garden),garden,players,false);const trees=w.root.children.filter(o=>o.userData.treeCards);assert.equal(trees.length,10);assert.ok(trees.every(t=>t.geometry===w.geo.leaf&&t.material.map===w.textures.foliage&&t.material.alphaTest>.3&&t.castShadow));
+w.textures.foliage=new Texture();w.materials.delete('oak-leaf-clusters');const garden=LEVELS.find(l=>l.theme==='garden');w.build(makeMap(garden),garden,players,false);const trees=w.root.children.filter(o=>o.userData.treeCards);assert.equal(trees.length,16);assert.ok(trees.every(t=>t.geometry===w.geo.leaf&&t.material.map===w.textures.foliage&&t.material.alphaTest>.3&&t.castShadow));
 assert.equal(w.waterSurfaces.length,1);assert.equal(w.waterFlows.length,1);const pool=w.waterSurfaces[0],flow=w.waterFlows[0],drops=flow.group.children.find(o=>o.isPoints);const beforeDrops=Array.from(drops.geometry.attributes.position.array);w.updatePlayers(players,8.7,1/60);assert.notDeepEqual(Array.from(drops.geometry.attributes.position.array),beforeDrops);assert.equal(pool.material.uniforms.clock.value,8.7);assert.equal(w.leafClock.value,8.7);assert.ok(flow.group.children.filter(o=>o.isMesh).every(o=>o.parent===flow.group),'animated flow cannot be detached by batching');
 const disposalCounts=[];flow.group.traverse(o=>{for(const [flag,key]of[['ownGeometry','geometry'],['ownMaterial','material']])if(o.userData[flag]){const count={value:0};disposalCounts.push(count);o[key].addEventListener('dispose',()=>count.value++);}});w.build(map,LEVELS[0],players,false);assert.ok(disposalCounts.every(c=>c.value===1));assert.ok(w.waterSurfaces[0].parent===w.root);console.log('PASS textured leaf-card trees, shadows, flowing fountain, moving drops/ripples and exact cleanup across level changes');
 
@@ -57,7 +57,7 @@ try{
   }
   for(const side of[-1,1]){
    const row=avenueTrees.filter(t=>Math.sign(t.x)===side);
-   assert.equal(row.length,5);assert.ok(Math.min(...row.map(t=>t.z))<=-half+5.01);assert.ok(Math.max(...row.map(t=>t.z))>=half-5.01);
+   assert.equal(row.length,8);assert.ok(Math.min(...row.map(t=>t.z))<=-half+5.01);assert.ok(Math.max(...row.map(t=>t.z))>=half-5.01);
   }
   if(['village','harbour'].includes(map.worldId)){
    for(const side of[-1,1]){

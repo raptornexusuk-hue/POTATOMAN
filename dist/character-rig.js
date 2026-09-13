@@ -20,7 +20,10 @@ function shapeSleeve(upper,lower,start,hinge,end){
  sleeveNormal.crossVectors(sleeveU,sleeveV);if(sleeveNormal.lengthSq()<1e-8)sleeveNormal.crossVectors(sleeveU,Math.abs(sleeveU.y)<.9?up:xAxis);sleeveNormal.normalize();
  sleeveTurn.crossVectors(sleeveNormal,sleeveU);sleeveCentre.copy(cornerIn).addScaledVector(sleeveTurn,arcRadius);
  for(let part=0;part<2;part++){const geometry=(part?lower:upper).geometry,{position,normal}=geometry.attributes;
-  for(let ring=0;ring<=10;ring++){const t=(part+ring/10)*.5;if(t<.4){sleevePoint.lerpVectors(start,cornerIn,t/.4);sleeveTangent.copy(sleeveU);}else if(t>.6){sleevePoint.lerpVectors(cornerOut,end,(t-.6)/.4);sleeveTangent.copy(sleeveV);}else{const theta=(t-.4)/.2*angle,c=Math.cos(theta),s=Math.sin(theta);sleevePoint.copy(sleeveCentre).addScaledVector(sleeveTurn,-c*arcRadius).addScaledVector(sleeveU,s*arcRadius);sleeveTangent.copy(sleeveU).multiplyScalar(c).addScaledVector(sleeveTurn,s);}sleeveSide.crossVectors(sleeveNormal,sleeveTangent).normalize();const radius=.076-t*.011;
+  for(let ring=0;ring<=10;ring++){const t=(part+ring/10)*.5;if(t<.4){sleevePoint.lerpVectors(start,cornerIn,t/.4);sleeveTangent.copy(sleeveU);}else if(t>.6){sleevePoint.lerpVectors(cornerOut,end,(t-.6)/.4);sleeveTangent.copy(sleeveV);}else{const theta=(t-.4)/.2*angle,c=Math.cos(theta),s=Math.sin(theta);sleevePoint.copy(sleeveCentre).addScaledVector(sleeveTurn,-c*arcRadius).addScaledVector(sleeveU,s*arcRadius);sleeveTangent.copy(sleeveU).multiplyScalar(c).addScaledVector(sleeveTurn,s);}sleeveSide.crossVectors(sleeveNormal,sleeveTangent).normalize();
+   // A rounder deltoid root (fully within the shoulder-blend exemption) tapers to a slimmer
+   // wrist, replacing the previous near-uniform pipe without adding any outward bulge past it.
+   const shoulderMass=.0135*Math.exp(-(t/.115)*(t/.115)),radius=.0735+shoulderMass-t*.0275;
    for(let j=0;j<=16;j++){const nx=sleeveNormal.x*ringCos[j]+sleeveSide.x*ringSin[j],ny=sleeveNormal.y*ringCos[j]+sleeveSide.y*ringSin[j],nz=sleeveNormal.z*ringCos[j]+sleeveSide.z*ringSin[j],index=ring*17+j;position.setXYZ(index,sleevePoint.x+nx*radius,sleevePoint.y+ny*radius,sleevePoint.z+nz*radius);normal.setXYZ(index,nx,ny,nz);}
   }position.needsUpdate=normal.needsUpdate=true;
  }
