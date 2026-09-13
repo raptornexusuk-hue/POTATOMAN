@@ -1,0 +1,32 @@
+import assert from 'node:assert/strict';
+import worker from '../server/index.js';
+import {openDatabase} from '../server/sqlite-adapter.mjs';
+const DB=await openDatabase(':memory:');
+const api=async(path,body={})=>{const response=await worker.fetch(new Request('https://game.test/api/'+path,{method:'POST',headers:{'content-type':'application/json','origin':'https://game.test'},body:JSON.stringify(body)}),{DB});return{status:response.status,...await response.json()};};
+const saved=await api('player/save',{name:'SPUD CHAMP',motto:'Clogs on, Game on'});assert.equal(saved.status,200);const playerToken=saved.playerToken;
+assert.equal((await api('player/get',{playerToken:'forged'})).status,401);
+const changed=await api('player/save',{playerToken,name:'THE KLOMPEN',motto:'Totally Mash'});assert.equal(changed.player.id,saved.player.id);
+const unplayed=await api('scores/start',{playerToken,level:0,duration:120,mode:'solo'});assert.equal((await api('scores/finish',{playerToken,run:unplayed.run,score:0,rounds:0,wins:0,knockouts:0,durations:[],times:[{level:9,milliseconds:1000}]})).status,400);
+const session=await api('scores/start',{playerToken,level:0,duration:120,mode:'online'});const payload={playerToken,run:session.run,score:21,rounds:10,wins:6,knockouts:8,complete:true,durations:Array(10).fill(120),times:[{level:1,milliseconds:35000}]};assert.equal((await api('scores/finish',payload)).status,400);
+await DB.prepare('UPDATE runs SET started=? WHERE id=?').bind(Date.now()-1500000,session.run).run();assert.equal((await api('scores/finish',payload)).saved,true);
+assert.equal((await api('scores/finish',{...payload,score:39,times:[{level:1,milliseconds:1000}]})).saved,true);
+let profile=await api('player/get',{playerToken});assert.equal(profile.stats.rounds,10);assert.equal(profile.stats.wins,6);assert.equal(profile.stats.bestCircuit,21);
+let board=await api('scores/leaderboard');assert.equal(board.rows[0].score,2100);assert.equal(board.rows[0].name,'THE KLOMPEN');assert.ok(!JSON.stringify(board).includes(playerToken));
+board=await api('scores/leaderboard',{level:1});assert.equal(board.rows[0].milliseconds,35000);assert.equal((await api('scores/leaderboard',{mode:'solo'})).rows.length,0);
+const partial=await api('scores/start',{playerToken,level:8,duration:120,mode:'solo'});await DB.prepare('UPDATE runs SET started=? WHERE id=?').bind(Date.now()-240000,partial.run).run();await api('scores/finish',{playerToken,run:partial.run,score:6,rounds:2,wins:2,knockouts:0,complete:true,durations:[120,120],times:[{level:8,milliseconds:51000}]});profile=await api('player/get',{playerToken});assert.equal(profile.stats.rounds,12);assert.equal(profile.stats.bestCircuit,21);assert.equal((await api('scores/leaderboard',{level:8})).rows[0].milliseconds,51000);
+console.log('PASS durable profile update, ownership, circuit qualification, idempotent score save, per-maze ranking and mode filters');// Every playthrough is eligible, including an unfinished first round.
+const second=await api('player/save',{name:"Zoë O’Neil",motto:'Test player'}),token2=second.playerToken,runId=crypto.randomUUID();assert.equal(second.player.name,"Zoë O’Neil");
+const start={playerToken:token2,run:runId,level:0,duration:120,mode:'solo'};
+assert.equal((await api('scores/start',start)).run,runId);assert.equal((await api('scores/start',start)).run,runId);
+assert.equal((await api('scores/start',{...start,playerToken})).status,409);
+const progress={playerToken:token2,run:runId,revision:1,score:0,points:110,playedMs:9000,rounds:0,wins:0,knockouts:1,times:[],final:false};
+assert.equal((await api('scores/save',progress)).saved,true);
+assert.equal((await api('scores/leaderboard',{mode:'solo'})).rows.find(r=>r.id===second.player.id).score,110);
+const finalProgress={...progress,revision:3,points:220,playedMs:15000,knockouts:2,final:true};assert.equal((await api('scores/save',finalProgress)).saved,true);
+assert.equal((await api('scores/save',progress)).revision,3);assert.equal((await api('scores/save',finalProgress)).revision,3);
+assert.equal((await api('scores/save',{...finalProgress,playerToken})).status,404);
+assert.equal((await api('scores/save',{...progress,revision:4})).status,400);
+const stats2=(await api('player/get',{playerToken:token2})).stats;assert.equal(stats2.bestScore,220);assert.equal(stats2.knockouts,2);assert.equal(stats2.rounds,0);
+console.log('PASS partial first-round scores, Unicode names, idempotent starts, duplicate/reversed saves and ownership');
+
+DB.close();
