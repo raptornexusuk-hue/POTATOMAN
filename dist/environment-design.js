@@ -107,9 +107,37 @@ export function dressWorld(w,map,level,night,r){
  }
  // Trees follow avenues and field boundaries, with room between trunks and walking routes.
  // A denser tree line reads as an actual avenue rather than a scattering of six trunks.
+ // Two receding rows of rooftops plus corner blocks sit behind whatever each family builds, so the
+ // horizon reads as a town the arena sits inside rather than one row of houses on an empty lawn.
+ // The setbacks start beyond every family structure (the furthest reaches half+18.6), and the rows
+ // stop short of each other's arms so no two backgrounds ever overlap.
+ const BLOCK_W=8.6,BLOCK_D=7.0,PITCH=11;
+ for(const setback of[27,39]){
+  const span=half+12,count=Math.max(3,Math.round(span*2/PITCH)+1);
+  for(const side of[-1,1])for(let i=0;i<count;i++){
+   const along=(i/(count-1)*2-1)*span,height=5+Math.floor(r()*4)*1.8;
+   w.distantBlock(along,side*(half+setback),BLOCK_W,height,BLOCK_D,side<0?0:Math.PI,r,night);
+   w.distantBlock(side*(half+setback),along,BLOCK_W,5+Math.floor(r()*4)*1.8,BLOCK_D,-side*Math.PI/2,r,night);
+  }
+ }
+ for(const sx of[-1,1])for(const sz of[-1,1])w.distantBlock(sx*(half+23),sz*(half+23),BLOCK_W,6+Math.floor(r()*3)*1.9,BLOCK_D,sz<0?0:Math.PI,r,night);
  const treesPerSide=8;
  for(let i=0;i<treesPerSide*2;i++){const side=i<treesPerSide?-1:1,offset=family==='estate'?6:family==='farm'?17:family==='quarry'?16:family==='orchard'?20:side===1&&eastCanal?10.4:12,local=i%treesPerSide,x=side*(half+offset),z=(local/(treesPerSide-1)*2-1)*(half-5);w.avenueTree(x,z,root,r);}
  for(const side of[-1,1])for(const z of[-half+2,half-2])w.lamp(side*(half-2),z,0,night);
+ // The pavement ring between the arena wall and the town was bare on every map. Street lamps and
+ // kerb bollards at walking spacing fill the middle distance the player spends most time looking
+ // across, and sit outside the playable grid so nothing new blocks a route.
+ const ringCount=Math.max(4,Math.round(half/4.5));
+ for(const side of[-1,1]){
+  // The east bank carries the canal on the dry maps, so that arm steps out past the water rather
+  // than planting lamp posts in it.
+  const bank=side===1&&eastCanal?9.6:1.9;
+  for(let i=0;i<ringCount;i++){
+   const t=(i/(ringCount-1)*2-1)*(half-3);
+   w.lamp(t,side*(half+1.9),0,night);w.lamp(side*(half+bank),t,0,night);
+   if(i%2){box(stone,t,.34,side*(half+3.3),.34,.68,.34);box(stone,side*(half+bank+1.4),.34,t,.34,.68,.34);}
+  }
+ }
  for(const prop of map.props??[]){if(prop.prop==='marketStall')w.stall(prop.x,prop.z,0,Math.round(prop.x));else if(prop.prop==='cargo'){box(wood,prop.x,.07,prop.z,2.35,.14,2.35);for(const side of[-1,1])for(const row of[-1,1])w.crate(prop.x+side*.58,prop.z+row*.58,.14,1.08);w.crate(prop.x,prop.z,1.22,.58);}else if(prop.prop==='hay'){const straw=w.mat(0xd9b365,'wood');box(straw,prop.x,.43,prop.z,2.3,.86,2.3);box(straw,prop.x,1.04,prop.z,1.6,.35,1.6);for(const side of[-1,1])box(w.mat(0x796845),prop.x+side*.7,.44,prop.z,.05,.89,2.33);}
   else if(prop.prop==='stoneBlock'){const cut=w.mat(0xd2d5cb,'stone');box(cut,prop.x,.55,prop.z,2.4,1.1,2.4);box(w.mat(0xbcc0b7,'stone'),prop.x,1.24,prop.z,1.9,.3,1.9);for(const side of[-1,1])box(w.mat(0x8d9189),prop.x+side*1.15,.55,prop.z,.08,1.05,2.3);}
   else if(prop.prop==='spoil'){const rubble=w.mat(0xc6c2b0,'stone');for(let i=0;i<5;i++){const a=i*2.399,chunk=w.mesh('rounded',rubble,root,prop.x+Math.cos(a)*.6,.22+(i%2)*.18,prop.z+Math.sin(a)*.6,.7,.5,.65);chunk.rotation.y=a;}box(rubble,prop.x,.12,prop.z,2.2,.24,2.2);}

@@ -26,7 +26,7 @@ const footReach=(phase,walk)=>{const cycle=((phase%TAU)+TAU)%TAU;return walk*STE
 export class World{
  constructor(canvas,renderer=null){
   if(renderer)this.renderer=renderer;else{try{this.renderer=new T.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});}catch{this.renderer=new T.WebGLRenderer({canvas,antialias:false,powerPreference:'default'});}}this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.autoUpdate=false;this.renderer.shadowMap.type=T.PCFSoftShadowMap;this.renderer.outputColorSpace=T.SRGBColorSpace;this.renderer.toneMapping=T.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.25;
-  this.scene=new T.Scene();this.scene.background=new T.Color(0x8db4c3);this.scene.fog=new T.Fog(0x8db4c3,45,125);this.cameras=[0,1].map(()=>new T.PerspectiveCamera(65,1,.08,180));this.cameraReady=[false,false];this.ray=new T.Raycaster();this.wallMeshes=[];this.materials=new Map();this.geo={box:new T.BoxGeometry(1,1,1),sphere:new T.SphereGeometry(1,24,16),foliage:new T.SphereGeometry(1,16,10),foliageLow:new T.SphereGeometry(1,8,6),eyelid:new T.SphereGeometry(1,24,10,0,Math.PI*2,0,Math.PI*.55),smallSphere:new T.SphereGeometry(1,10,8),potato:potatoGeometry(),rounded:roundedBox(),clog:clogGeometry(),cylinder:new T.CylinderGeometry(1,1,1,20),cone:new T.ConeGeometry(1,1,4),leaf:new T.PlaneGeometry(1,1),leafPlain:new T.CircleGeometry(.5,12)};
+  this.scene=new T.Scene();this.scene.background=new T.Color(0x8db4c3);this.scene.fog=new T.Fog(0x8db4c3,45,125);this.cameras=[0,1].map(()=>new T.PerspectiveCamera(65,1,.08,180));this.cameraReady=[false,false];this.ray=new T.Raycaster();this.wallMeshes=[];this.materials=new Map();this.geo={box:new T.BoxGeometry(1,1,1),sphere:new T.SphereGeometry(1,24,16),foliage:new T.SphereGeometry(1,16,10),foliageLow:new T.SphereGeometry(1,8,6),eyelid:new T.SphereGeometry(1,24,10,0,Math.PI*2,0,Math.PI*.55),hipRoof:new T.ConeGeometry(Math.SQRT1_2,1,4).rotateY(Math.PI/4),smallSphere:new T.SphereGeometry(1,10,8),potato:potatoGeometry(),rounded:roundedBox(),clog:clogGeometry(),cylinder:new T.CylinderGeometry(1,1,1,20),cone:new T.ConeGeometry(1,1,4),leaf:new T.PlaneGeometry(1,1),leafPlain:new T.CircleGeometry(.5,12)};
   this.scratch={hip:new T.Vector3(),ankle:new T.Vector3(),knee:new T.Vector3(),direction:new T.Vector3(),inverse:new T.Quaternion(),up:new T.Vector3(0,1,0),forward:new T.Vector3(0,0,1)};
   this.textures={skin:this.texture('skin'),brick:this.texture('brick'),stone:this.texture('stone'),wood:this.texture('wood'),hedge:this.texture('hedge')};this.effects=[];this.projectileMeshes=new Map();this.characters=[];this.qualityMode='high';this.ready=this.loadMaterials();this.resize();
  }
@@ -76,7 +76,7 @@ export class World{
   const dust=ambientDust(150,map.n*CELL*.42,night?3.6:5.5);root.add(dust);this.ambientParticles=dust;
   const ground=this.mesh(new T.PlaneGeometry(map.n*CELL,map.n*CELL),this.groundMaterial(map.n*CELL,night),root,0,-.005,0);ground.rotation.x=-Math.PI/2;ground.castShadow=false;ground.userData.ownGeometry=true;
   // Paved perimeter and non-playable surroundings.
-  this.mesh('box',this.mat(night?0x344352:0x7e9b84),root,0,-.52,0,map.n*CELL+60,.5,map.n*CELL+60);
+  this.mesh('box',this.mat(night?0x344352:0x7e9b84),root,0,-.52,0,map.n*CELL+120,.5,map.n*CELL+120);
   const half=map.n*CELL/2;
   for(const w of map.walls)if(w.prop==='bin')this.bin(w.x,w.z,0).scale.setScalar(1.5);
   for(const b of map.buildings??[]){const g=mapId(level)==='farm'?barn(this,b):this.building(b.x,b.z,b.w,b.h,r,night);if(mapId(level)!=='farm')g.scale.z=b.d/4;this.mesh('box',this.mat(0xd5cbbb,'stone'),root,b.x,.025,b.z,b.w+1.4,.05,b.d+1.4);}
@@ -142,6 +142,21 @@ export class World{
  batchStatic(){
   this.root.updateMatrixWorld(true);const groups=new Map();this.root.traverse(o=>{if(!o.isMesh||o.isInstancedMesh||o.material.isShaderMaterial)return;const key=o.geometry.uuid+':'+o.material.uuid+':'+o.castShadow+':'+o.receiveShadow+':'+Math.floor(o.matrixWorld.elements[12]/16)+':'+Math.floor(o.matrixWorld.elements[14]/16);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(o);});
   for(const meshes of groups.values()){if(meshes.length<2)continue;const first=meshes[0],batch=new T.InstancedMesh(first.geometry,first.material,meshes.length);batch.castShadow=first.castShadow;batch.receiveShadow=first.receiveShadow;batch.userData.ownGeometry=meshes.some(m=>m.userData.ownGeometry);meshes.forEach((m,i)=>{batch.setMatrixAt(i,m.matrixWorld);m.parent.remove(m);});this.root.add(batch);}
+ }
+ // Rooftops for the deep skyline: silhouette and colour only. Sixty metres out and through fog the
+ // window detail of a full building cannot be seen, so one of these costs four meshes instead of
+ // thirty and batches with its neighbours.
+ distantBlock(x,z,width,height,depth,yaw,r,night){
+  const g=new T.Group();g.position.set(x,0,z);g.rotation.y=yaw;this.root.add(g);
+  const palette=[0xb9a289,0xc8b393,0xa88e78,0xb0a892,0xc4ab8d],facade=this.mat(palette[Math.floor(r()*palette.length)],'brick',{roughness:.92});
+  this.mesh('rounded',facade,g,0,height/2,0,width,height,depth);
+  // One hipped pyramid rather than two pitched slabs: no gable is needed to close the ends, so the
+  // roof cannot read as two planes floating over a box the way an open gable does at this range.
+  const roofMat=this.mat(night?0x2b3742:0x3a4a55,'wood',{roughness:.85});
+  this.mesh(this.geo.hipRoof,roofMat,g,0,height+width*.145,0,width*1.02,width*.29,depth*1.02);
+  this.mesh('rounded',facade,g,width*.20,height+width*.24,0,.5,1.3,.5);
+  if(night)this.mesh('rounded',this.mat(0xf6c677,null,{emissive:0xffb35e,emissiveIntensity:.5,roughness:.4}),g,0,height*.55,depth/2+.04,width*.62,.9,.06);
+  g.userData.backdrop=true;return g;
  }
  leaves(){const key='oak-leaf-clusters';if(!this.materials.has(key))this.materials.set(key,leafMaterial(this.textures.foliage??null,this.leafClock));return this.materials.get(key);}
  tree(x,z,parent,r){return addTree(this,x,z,parent,r);}
