@@ -90,7 +90,7 @@ $('levelGrid').onclick=e=>{const b=e.target.closest('[data-level]');if(b){if(onl
 $('play').onclick=()=>online?openOnline():start(0);
 function localPlayer(){return players[online?.slot??0];}
 function isHuman(p){return online?online.roster.some(m=>m.slot===p.id):p.id<(duo?2:1);}
-function newPlayer(id){return {id,name:id===1&&!duo?'MASH':names[id],knockouts:0,kills:0,points:0,played:0,weaponLevel:0,roundWins:0,x:0,y:0,z:0,vy:0,grounded:true,crouching:false,courseDuckEntry:0,runBoost:0,fireBoost:0,jumpBoost:0,courseStep:0,vx:0,vz:0,yaw:0,pitch:DEFAULT_PITCH,panX:0,panY:0,cameraDistance:4.6,hp:100,score:0,total:0,best:Infinity,attempt:0,respawn:0,invuln:0,throwCD:0,catchCD:0,catchTime:0,dashCD:0,dashTime:0,dashX:0,dashZ:0,shotAnim:0,pendingThrow:0,charge:0,weapon:'throw',gun:false,mag:12,reload:0,runner:false,checks:[false,false],path:[],navTimer:0,goalKey:null,botDelay:0};}
+function newPlayer(id){return {id,name:id===1&&!duo?'MASH':names[id],knockouts:0,kills:0,points:0,played:0,weaponLevel:0,roundWins:0,x:0,y:0,z:0,vy:0,grounded:true,crouching:false,courseDuckEntry:0,runBoost:0,fireBoost:0,jumpBoost:0,courseStep:0,vx:0,vz:0,yaw:0,pitch:DEFAULT_PITCH,panX:0,panY:0,cameraDistance:4.6,hp:100,score:0,total:0,best:Infinity,attempt:0,respawn:0,invuln:0,throwCD:0,catchCD:0,catchTime:0,dashCD:0,dashTime:0,dashX:0,dashZ:0,shotAnim:0,pendingThrow:0,charge:0,weapon:'throw',gun:false,mag:12,reload:0,runner:false,checks:[false,false],path:[],navTimer:0,goalKey:null,via:null,viaUntil:0,viaCooldown:0,viaCooldown:0,botDelay:0};}
 async function start(index,practice=false){
  initAudio();musicPreviewUntil=0;
  if(starting||online&&(!online.isHost||online.roster.length!==3))return;if(!await playerAccount.requirePlayer(()=>start(index,practice)))return;if(starting)return;starting=true;playerAccount.finish();arenaFailed=false;initAudio();retryLevel=index;state='loading';paused=false;releaseMouse();clearInput();
@@ -106,7 +106,7 @@ function showStartError(message,index=levelIndex){arenaFailed=true;roundEpoch=''
 $('retryStart').onclick=()=>{if(online&&!online.isHost){arenaFailed=false;$('error').hidden=true;$('loading').hidden=false;state='loading';initAudio();if(pendingSnapshot&&!applyingSnapshot)drainSnapshots();return;}start(retryLevel);};
 $('errorMenu').onclick=()=>{$('error').hidden=true;menu();};
 
-function spawn(p,race=false){respawnLoadout(p);let pos;if(race){pos=map.start;}else if(bonus&&p.id===runnerId){pos=map.toWorld(Math.floor(map.n/2),map.n-3);}else{const cells=[[2,2],[map.n-3,map.n-3],[map.n-3,2],[2,map.n-3]];pos=map.toWorld(...cells[p.id]);}Object.assign(p,{x:pos.x,y:0,z:pos.z,vy:0,grounded:true,crouching:false,courseDuckEntry:0,runBoost:0,fireBoost:0,jumpBoost:0,courseStep:0,vx:0,vz:0,yaw:race?0:Math.atan2(-pos.x,pos.z),pitch:DEFAULT_PITCH,hp:p.runner?140:100,respawn:0,invuln:race?0:1.5,path:[],navTimer:0,goalKey:null,attempt:0,aiThink:0,aiFire:0,aiReady:time+aiSettings(settings.difficulty,levelIndex).reaction,aiAim:null,aiTarget:null,aiMoveGoal:null,aiMoveKey:null,aiMoveUntil:0,aiMoveCheck:0,aiMoveTarget:null,aiMoveAnchor:null,aiStoodSince:time,aiThreats:new Set()});world.cameraReady[p.id]=false;}
+function spawn(p,race=false){respawnLoadout(p);let pos;if(race){pos=map.start;}else if(bonus&&p.id===runnerId){pos=map.toWorld(Math.floor(map.n/2),map.n-3);}else{const cells=[[2,2],[map.n-3,map.n-3],[map.n-3,2],[2,map.n-3]];pos=map.toWorld(...cells[p.id]);}Object.assign(p,{x:pos.x,y:0,z:pos.z,vy:0,grounded:true,crouching:false,courseDuckEntry:0,runBoost:0,fireBoost:0,jumpBoost:0,courseStep:0,vx:0,vz:0,yaw:race?0:Math.atan2(-pos.x,pos.z),pitch:DEFAULT_PITCH,hp:p.runner?140:100,respawn:0,invuln:race?0:1.5,path:[],navTimer:0,goalKey:null,via:null,viaUntil:0,viaCooldown:0,attempt:0,aiThink:0,aiFire:0,aiReady:time+aiSettings(settings.difficulty,levelIndex).reaction,aiAim:null,aiTarget:null,aiMoveGoal:null,aiMoveKey:null,aiMoveUntil:0,aiMoveCheck:0,aiMoveTarget:null,aiMoveAnchor:null,aiStoodSince:time,aiThreats:new Set()});world.cameraReady[p.id]=false;}
 function loadRound(isBonus,hostDuration=null){
  if(!online||online.isHost)roundEpoch=crypto.randomUUID();remoteEdges.clear();processedInputs.clear();predictionHistory=[];guestPriorDodge=guestPriorJump=false;introRemaining=2.5;roundTick=0;resultData=null;$('resultDialog').close();$('pauseDialog').close();releaseMouse();
  audioEvents=[];audioEventId=0;guestAudioWatermark=0;gameAudio.stopEffects();bonus=isBonus;paused=false;state='playing';time=0;lastQuip=-99;killFeed=[];damageFlashUntil=0;acc=0;last=performance.now();activeDuration=bonus?BONUS_TIME:(hostDuration??settings.roundSeconds);remaining=activeDuration;lastUI=0;clearInput();$('caption').textContent='';runnerId=levelIndex%players.length;map=playableMap(currentLevel(),bonus,activeDuration);shots=[];targets=[];pickups=[];
@@ -217,10 +217,35 @@ function botCombatGoal(p,target,capture=false){
  p.aiMoveGoal={x:goal.x,z:goal.z};p.aiMoveTarget={x:target.x,z:target.z};p.aiMoveKey=key;p.aiMoveUntil=time+3.6+p.id*.25;
  return p.aiMoveGoal;
 }
+// Each bot holds a distinct offset from the shared route line, so a corridor carries them abreast
+// rather than nose to tail. A maze corridor is 3.2m wide against a .42m collider, so this is the
+// most lateral room there is to use.
+const LANES=[0,-.95,.95,-.45];
+// A braided maze usually offers more than one way round, so a racer held up behind a rival can
+// take one instead of queueing. The via-point is an open cell a few metres off, picked per bot,
+// and always one that is itself well closer to the exit — a detour that loses ground costs the
+// bot the round, and the two-minute limit leaves no room for wandering.
+function raceVia(p){
+ const toExit=Math.hypot(map.exit.x-p.x,map.exit.z-p.z);if(toExit<12)return null;
+ const cell=map.toCell(p.x,p.z),options=[];
+ for(let z=Math.max(1,cell.z-4);z<=Math.min(map.n-2,cell.z+4);z++)for(let x=Math.max(1,cell.x-4);x<=Math.min(map.n-2,cell.x+4);x++){
+  if(map.grid[z][x])continue;const q=map.toWorld(x,z),d=Math.hypot(q.x-p.x,q.z-p.z);
+  if(d<5||d>11||Math.hypot(map.exit.x-q.x,map.exit.z-q.z)>toExit-5)continue;
+  options.push(q);
+ }
+ return options.length?options[(p.id*7+Math.floor(time/6))%options.length]:null;
+}
+function raceGoal(p){
+ const toExit=Math.hypot(map.exit.x-p.x,map.exit.z-p.z);
+ if(p.via&&(time>p.viaUntil||Math.hypot(p.via.x-p.x,p.via.z-p.z)<2.2))p.via=null;
+ const held=!p.via&&time>p.viaCooldown&&players.some(q=>q.id!==p.id&&q.respawn<=0&&Math.hypot(q.x-p.x,q.z-p.z)<4.5&&Math.hypot(map.exit.x-q.x,map.exit.z-q.z)<toExit);
+ if(held){p.viaUntil=time+4;p.viaCooldown=time+7+p.id*1.5;p.via=raceVia(p);}
+ return p.via??map.exit;
+}
 function botInput(p,dt){const ai=aiSettings(settings.difficulty,levelIndex);p.aiThink-=dt;p.aiFire=Math.max(0,p.aiFire-dt);const mode=currentLevel().mode;const enemies=players.filter(q=>q.id!==p.id&&q.respawn<=0&&(!bonus||(p.runner?true:q.runner)));let goal,enemy=enemies.sort((a,b)=>Math.hypot(a.x-p.x,a.z-p.z)-Math.hypot(b.x-p.x,b.z-p.z))[0];
  if(bonus&&p.runner){const n=p.checks.findIndex(v=>!v);goal=n<0?map.exit:{x:world.checkpoints[n].position.x,z:world.checkpoints[n].position.z};}
  else if(bonus)goal=enemy;
- else if(mode==='race')goal=map.exit;
+ else if(mode==='race')goal=raceGoal(p);
  else if(mode==='assault')goal=map.course[p.courseStep]??map.exit;
  else if(mode==='capture')goal=zonePosition();
  else if(mode==='smash')goal=targets.filter(t=>t.hp>0).sort((a,b)=>Math.hypot(a.x-p.x,a.z-p.z)-Math.hypot(b.x-p.x,b.z-p.z))[0]??enemy;
@@ -228,12 +253,18 @@ function botInput(p,dt){const ai=aiSettings(settings.difficulty,levelIndex);p.ai
  const combat=bonus||!isTrial(currentLevel()),box=sharedWeapon(),seekingBox=combat&&!p.runner&&['throw','spud'].includes(p.weapon)&&box?.phase==='available';
  if(seekingBox)goal=box;
  else if(combat&&!p.runner&&goal)goal=botCombatGoal(p,goal,!bonus&&mode==='capture');
- if(mode==='assault'&&!bonus){const gate=goal.duck;const targetX=goal.x+(gate?goal.direction*1.8:0),dx=targetX-p.x,dz=goal.z-p.z,d=Math.hypot(dx,dz);return{x:p.botDelay>0?0:dx/Math.max(d,.001),z:p.botDelay>0?0:dz/Math.max(d,.001),crouch:!!gate&&d<5,jump:!gate&&p.botDelay<=0&&p.grounded&&(goal.h>(p.y??0)+.05&&d<3.15||map.platforms.some(w=>w.h>p.y+.05&&Math.hypot(w.x-p.x,w.z-p.z)<2.6)),fire:false,catch:false,dodge:false};}
- if(!goal)return{x:0,z:0,fire:false,dodge:false,catch:false};p.navTimer-=dt;if(p.navTimer<=0){const c=map.toCell(goal.x,goal.z),goalKey=c.x+','+c.z;if(p.goalKey!==goalKey||!p.path.length){p.path=route(map,p,goal,p.id+Math.floor(time/11)).slice(1);p.goalKey=goalKey;}p.navTimer=.6;}
+ if(mode==='assault'&&!bonus){const gate=goal.duck;const targetX=goal.x+(gate?goal.direction*1.8:0);let dx=targetX-p.x,dz=goal.z-p.z,d=Math.hypot(dx,dz);
+  // The course runners used to trace one identical straight line to one identical point. Each now
+  // holds its own lane on the approach, faded out over the last few metres so nobody is nudged off
+  // a platform or away from a gate mouth by it.
+  const lane=((p.id%3)-1)*2.9*Math.min(1,Math.max(0,(d-3.4)/4));
+  if(lane&&d>.001){const px=-dz/d,pz=dx/d;dx+=px*lane;dz+=pz*lane;d=Math.hypot(dx,dz);}
+  return{x:p.botDelay>0?0:dx/Math.max(d,.001),z:p.botDelay>0?0:dz/Math.max(d,.001),crouch:!!gate&&d<5,jump:!gate&&p.botDelay<=0&&p.grounded&&(goal.h>(p.y??0)+.05&&d<3.15||map.platforms.some(w=>w.h>p.y+.05&&Math.hypot(w.x-p.x,w.z-p.z)<2.6)),fire:false,catch:false,dodge:false};}
+ if(!goal)return{x:0,z:0,fire:false,dodge:false,catch:false};p.navTimer-=dt;if(p.navTimer<=0){const c=map.toCell(goal.x,goal.z),goalKey=c.x+','+c.z;if(p.goalKey!==goalKey||!p.path.length){p.path=route(map,p,goal,p.id*2+Math.floor((time+p.id*3.1)/9)).slice(1);p.goalKey=goalKey;}p.navTimer=.6;}
  while(p.path.length&&Math.hypot(p.path[0].x-p.x,p.path[0].z-p.z)<.4)p.path.shift();const waypoint=p.path[0]??goal;let dx=waypoint.x-p.x,dz=waypoint.z-p.z,l=Math.hypot(dx,dz);
  // Each bot holds its own lane alongside the shared route, so rivals arrive spread out
  // instead of filing along one identical line.
- const lane=((p.id%3)-1)*.5;if(lane&&l>1.2){const px=-dz/l,pz=dx/l;dx+=px*lane;dz+=pz*lane;l=Math.hypot(dx,dz);}
+ const lane=LANES[p.id%LANES.length];if(lane&&l>1.2){const px=-dz/l,pz=dx/l;dx+=px*lane;dz+=pz*lane;l=Math.hypot(dx,dz);}
  let moving=l>.3;
  let aim=(!bonus&&mode==='smash')?targets.filter(t=>t.hp>0).sort((a,b)=>Math.hypot(a.x-p.x,a.z-p.z)-Math.hypot(b.x-p.x,b.z-p.z))[0]:enemy,canShoot=aim&&Math.hypot(aim.x-p.x,aim.z-p.z)<21&&clearShot(p,aim,map.walls)&&(!bonus||!p.runner)&&!isTrial(currentLevel());
  if(bonus&&!p.runner&&aim)canShoot=Math.hypot(aim.x-p.x,aim.z-p.z)<26&&clearShot(p,aim,map.walls);

@@ -1,4 +1,38 @@
-## Update 0.17.0
+## Update 0.18.0
+
+Arms are shorter (bones .46/.48) and rest higher on the body, and the IK solver now clamps a
+target past the arm's reach onto it, so a distant fore-end grip bends the elbow open instead of
+silently stretching the sleeve. Arms and legs share one skin a few shades lighter than the
+torso, so limbs match each other and read against the body.
+
+Legs no longer skate. A sine foot path only matches ground speed at mid-stance, which is what
+the gliding was; the stance half now drives the foot back linearly and the stride rate is
+derived so that return exactly cancels the body's travel. Measured foot slip fell from about
+90% of body travel to under 2.5%, and the test asserts slip directly rather than cadence.
+
+Faces are rebuilt. Eyelids are shell caps sharing the eyeball's centre, so they sweep across the
+eye at a constant size rather than hooding it with a permanent fold. Brows sit above a flattened
+ridge, the nose gains a bridge and nostrils, the mouth gains a lower lip and gapes when hurt,
+and pupils dilate with delight and pinch under a wince.
+
+The spud gun is earned by a knockout rather than three landed hits. Thrown potatoes are lobbed:
+one THROW_DROP constant feeds the simulation, the aim solver and the crosshair convergence
+helper so they cannot drift apart. The crown counts any three round wins rather than three
+consecutive ones, and objective rounds track and show knockouts alongside the objective score.
+
+Every arena now sits inside a town: two receding rows of rooftops plus corner blocks behind
+whatever each world family builds, and street lamps and kerb bollards on the pavement ring. The
+distant blocks carry silhouette and colour only, costing four meshes each instead of thirty.
+
+Race mazes are braided — a share of dead ends is opened into loops — so more than one route
+exists and rivals can be overtaken instead of queued behind. Each bot holds its own lane, replans
+on its own clock, and a racer held up behind a rival threads a via-point around it. Course
+runners hold separate approach lanes that fade out near each platform. Measured across 45-second
+runs, the time bots spend within 2.5m of each other fell from 68–100% to 8–31% on the mazes and
+from 100% to 70% on the assault course, with shared ground on the course down from 100% to 25%.
+
+Audio recovers on any gesture once the browser suspends the context, and the HUD says when sound
+is blocked.
 
 Arms now use the body's textured potato skin, so limbs, torso and legs match instead of the
 arms reading as pale plastic. Shoulders, elbow poles and the resting pose are placed on the
@@ -52,7 +86,7 @@ The throw uses a side-of-head hand path and guided elbow bend, moving forward in
 
 Players alternate golden russet and lighter baked-potato skins. Arms and rounded hands now use warm skin colours with subtle surface relief. Yellow carved clogs and the shoulder camera are preserved.
 
-Every death now resets the player to throwing with zero weapon progress, including death with the earned spud gun and falling into water. Three new landed hits earn the gun again. Special guns still drop their remaining ammunition; hits from an already-dead thrower cannot restore weapon progression. Ammo exhaustion while alive still falls back to the base spud gun.
+Every death now resets the player to throwing with zero weapon progress, including death with the earned spud gun and falling into water. A fresh knockout earns the gun again. Special guns still drop their remaining ammunition; hits from an already-dead thrower cannot restore weapon progression. Ammo exhaustion while alive still falls back to the base spud gun.
 
 Refresh all clients before testing. The authoritative snapshot format remains protocol 10. See TESTING.md for verification and limitations.
 
@@ -100,9 +134,9 @@ See TESTING.md for automated checks, visual geometry inspection and device-testi
 
 Four authored worlds now organize the circuit: Gouda Old Town (market streets and shopfronts), Royal Butter Gardens (formal planting, fountain and estate), Moonlight Quays (warehouses, boats, cranes and protected bridges), and Golden Harvest Farm (red barns, fields, windmill and hay). Street furniture follows kerbs and building fronts; destruction targets form loading rows beside the barns. Bonus hunts use these world layouts too. The menu separates worlds from game modes. Every mixed circuit includes all ten rounds and four worlds, alternates combat/trials, and avoids the previous opening world using a saved preference. Standard-layout practice remains available.
 
-The shoulder camera retains its sight direction through zoom and cover changes. Own-body transparency has been removed: the entire local model is hidden only in a compressed or obstructed view and at point-blank rivals, then restored for other players and split-screen. Normal view retains the opaque character. Feet are broader and turned outward to expose the pointed yellow toes; leg proportions remain compatible with crouch gates. Hand throws animate the arm and release the held potato; gun models appear after progression. Capes belong only to Potatoman, and three consecutive outright main-round wins earn a crown. A tie or loss resets that streak.
+The shoulder camera retains its sight direction through zoom and cover changes. Own-body transparency has been removed: the entire local model is hidden only in a compressed or obstructed view and at point-blank rivals, then restored for other players and split-screen. Normal view retains the opaque character. Feet are broader and turned outward to expose the pointed yellow toes; leg proportions remain compatible with crouch gates. Hand throws animate the arm and release the held potato; gun models appear after progression. Capes belong only to Potatoman, and any three main-round wins earn a crown; wins accumulate across the circuit and a later loss cannot take them back.
 
-Each main round starts with hand-thrown potatoes. Three landed hits on players or marked destruction targets earn the base spud gun. A death while using the base gun retains it. Collecting the single special box raises the loadout tier; dying after that, including after spending its ammo, returns the player to throwing. Remaining special ammunition drops for another player. Weapon and crown state travel in online snapshots.
+Each main round starts with hand-thrown potatoes. A knockout earns the base spud gun. A death while using the base gun retains it. Collecting the single special box raises the loadout tier; dying after that, including after spending its ammo, returns the player to throwing. Remaining special ammunition drops for another player. Weapon and crown state travel in online snapshots.
 
 Online is exactly three human players, with no bots. The server rejects early starts and a fourth player. Missing input stops that human; it never enables AI. If someone leaves, the session saves and returns to the lobby flow for a new three-person room. Reload every client and create a fresh room: snapshot protocol is 8.
 
@@ -162,7 +196,7 @@ Voice snippets are occasional: 22–34 seconds between lines, no immediate repea
 
 Rendering uses spatial batches and cheaper distant foliage while preserving near detail and a sharper adaptive-resolution floor. Real hardware validation is still needed; see TESTING.md.
 
-# POTATOMAN — by The Klompens · testing build 0.17.0
+# POTATOMAN — by The Klompens · testing build 0.18.0
 
 **Clogs on, Game on. Totally Mash.** A third-person browser game with fourteen levels, potato combat, timed maze races, bonus hunts, local split-screen and friend rooms for exactly three devices.
 
@@ -212,7 +246,7 @@ The title, Totally Mash subtitle, byline and menu links use a clearer responsive
 
 ## Levels and rules
 
-Fourteen levels combine six distinct worlds with combat, capture, destruction, an assault course and increasingly long mazes. Maze shortest routes are 52, 68, 88 and 112 grid steps. All racers share a start and finish; fastest completed escape across repeated attempts wins. Compass cues and visited-cell trail marks aid navigation. Crate hits have damage feedback, capture zones show contest/relocation status, and knockouts add objective points only in battle modes.
+Fourteen levels combine six distinct worlds with combat, capture, destruction, an assault course and increasingly long mazes. Maze shortest routes are 52, 68, 88 and 112 grid steps. All racers share a start and finish; fastest completed escape across repeated attempts wins. Compass cues and visited-cell trail marks aid navigation. Crate hits have damage feedback, capture zones show contest/relocation status, knockouts add objective points only in battle modes, and every mode's scoreboard shows knockouts alongside the objective score.
 
 Main round winners receive three circuit points. Ties share victory. The rotating bonus runner moves faster, visits two checkpoints and escapes while hunters collect Masher guns. Runner escape awards one point and gives hunters 10% slower potato projectiles for the next main round's first 15 seconds. Hunter victory awards each hunter one point. Penalties never stack and have no effect in combat-free races.
 

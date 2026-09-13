@@ -30,6 +30,17 @@ export function makeMap(level,bonus=false){
   while(stack.length){const [x,z]=stack.at(-1),next=[[2,0],[-2,0],[0,2],[0,-2]].map(([a,b])=>[x+a,z+b]).filter(([a,b])=>a>0&&b>0&&a<n-1&&b<n-1&&grid[b][a]);
    if(!next.length){stack.pop();continue;}const [a,b]=next[Math.floor(r()*next.length)];grid[(z+b)/2][(x+a)/2]=0;grid[b][a]=0;stack.push([a,b]);
   }
+  // A perfect maze has exactly one route between any two cells, which is why every racer ran the
+  // same line nose to tail and no route variant could differ. Braiding a share of the dead ends
+  // opens loops, so alternative equal-length routes exist and rivals can be overtaken rather than
+  // queued behind. The share is small enough that the maze still reads as a maze.
+  for(let z=1;z<n-1;z++)for(let x=1;x<n-1;x++){
+   if(grid[z][x]||r()>.38)continue;
+   const open=[[1,0],[-1,0],[0,1],[0,-1]].filter(([a,b])=>grid[z+b]?.[x+a]===0);
+   if(open.length!==1)continue;
+   const shut=[[1,0],[-1,0],[0,1],[0,-1]].filter(([a,b])=>x+a>0&&z+b>0&&x+a<n-1&&z+b<n-1&&grid[z+b][x+a]===1&&grid[z+b*2]?.[x+a*2]===0);
+   if(shut.length){const [a,b]=shut[Math.floor(r()*shut.length)];grid[z+b][x+a]=0;}
+  }
   // Identical start and finish spaces for all racers.
   for(let z=n-3;z<n-1;z++)for(let x=1;x<4;x++)grid[z][x]=0;
  }else{
