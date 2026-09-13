@@ -23,7 +23,9 @@ function shapeSleeve(upper,lower,start,hinge,end){
   for(let ring=0;ring<=10;ring++){const t=(part+ring/10)*.5;if(t<.4){sleevePoint.lerpVectors(start,cornerIn,t/.4);sleeveTangent.copy(sleeveU);}else if(t>.6){sleevePoint.lerpVectors(cornerOut,end,(t-.6)/.4);sleeveTangent.copy(sleeveV);}else{const theta=(t-.4)/.2*angle,c=Math.cos(theta),s=Math.sin(theta);sleevePoint.copy(sleeveCentre).addScaledVector(sleeveTurn,-c*arcRadius).addScaledVector(sleeveU,s*arcRadius);sleeveTangent.copy(sleeveU).multiplyScalar(c).addScaledVector(sleeveTurn,s);}sleeveSide.crossVectors(sleeveNormal,sleeveTangent).normalize();
    // A rounder deltoid root (fully within the shoulder-blend exemption) tapers to a slimmer
    // wrist, replacing the previous near-uniform pipe without adding any outward bulge past it.
-   const shoulderMass=.0135*Math.exp(-(t/.115)*(t/.115)),radius=.0735+shoulderMass-t*.0275;
+   // A rounder deltoid root (fully within the shoulder-blend exemption) tapers to a slimmer
+   // wrist, replacing the previous near-uniform pipe without adding any outward bulge past it.
+   const shoulderMass=.014*Math.exp(-(t/.10)*(t/.10)),radius=.076+shoulderMass-t*.032;
    for(let j=0;j<=16;j++){const nx=sleeveNormal.x*ringCos[j]+sleeveSide.x*ringSin[j],ny=sleeveNormal.y*ringCos[j]+sleeveSide.y*ringSin[j],nz=sleeveNormal.z*ringCos[j]+sleeveSide.z*ringSin[j],index=ring*17+j;position.setXYZ(index,sleevePoint.x+nx*radius,sleevePoint.y+ny*radius,sleevePoint.z+nz*radius);normal.setXYZ(index,nx,ny,nz);}
   }position.needsUpdate=normal.needsUpdate=true;
  }
@@ -78,7 +80,7 @@ export function poseArms(m,p,stride,walk,crouch,canThrow=true){
   tuckReach(spud,.72,.06);m.heldSpud.position.copy(spud);m.heldSpud.visible=p.shotAnim<=0||elapsed<THROW_WINDUP;m.heldSpud.rotation.set(.2,-.2,.1);
  }else m.heldSpud.visible=false;
  m.gun.updateMatrix();
- for(let j=0;j<2;j++){const arm=m.arms[j],sign=j===0?-1:1,{hand}=arm.userData;bodyPoint(shoulder,sign*.535,1.30,.28);bodyPoint(pole,sign*1.20,.95,-.37);if(j===0&&m.gun.visible)bodyPoint(pole,...ARM_TUNING.lightPole);
+ for(let j=0;j<2;j++){const arm=m.arms[j],sign=j===0?-1:1,{hand}=arm.userData;bodyPoint(shoulder,sign*.535,1.30,.25);bodyPoint(pole,sign*1.20,.95,-.37);if(j===0&&m.gun.visible)bodyPoint(pole,...ARM_TUNING.lightPole);
   if(j===0&&tossing){bodyPoint(readyPole,-.92,1.17,-.14);bodyPoint(windPole,-.92,1.40,-.14);bodyPoint(releasePole,-.64,1.85,.40);bodyPoint(followPole,-.67,.90,.39);bodyPoint(recoverPole,-.98,1.40,.35);
    if(!p.shotAnim)pole.copy(readyPole);else if(elapsed<.068)pole.lerpVectors(readyPole,windPole,smooth(elapsed/.068));else if(elapsed<THROW_WINDUP)pole.lerpVectors(windPole,releasePole,smooth((elapsed-.068)/(THROW_WINDUP-.068)));else if(elapsed<.27)pole.lerpVectors(releasePole,followPole,smooth((elapsed-THROW_WINDUP)/(.27-THROW_WINDUP)));else if(elapsed<.37)pole.lerpVectors(followPole,recoverPole,smooth((elapsed-.27)/.10));else pole.lerpVectors(recoverPole,readyPole,smooth((elapsed-.37)/(THROW_DURATION-.37)));
   }hand.rotation.set(0,0,sign*.08);let curl=.22;
