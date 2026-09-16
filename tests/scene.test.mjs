@@ -55,10 +55,12 @@ try{
    assert.ok(!overlapXZ(backdrops[i].box,arena),level.name+' background enters playable arena');
    for(let j=i+1;j<backdrops.length;j++)assert.ok(!overlapXZ(backdrops[i].box,backdrops[j].box),level.name+' background buildings overlap');
   }
-  for(const side of[-1,1]){
+  // An indoor map has a roof over it: no avenue, no skyline, nothing outside to separate.
+  if(map.worldId!=='interior')for(const side of[-1,1]){
    const row=avenueTrees.filter(t=>Math.sign(t.x)===side);
    assert.equal(row.length,8);assert.ok(Math.min(...row.map(t=>t.z))<=-half+5.01);assert.ok(Math.max(...row.map(t=>t.z))>=half-5.01);
   }
+  if(map.worldId==='interior')assert.equal(avenueTrees.length,0,level.name+' plants trees inside a building');
   if(['village','harbour'].includes(map.worldId)){
    for(const side of[-1,1]){
     const street=backdrops.filter(b=>Math.sign(b.z)===side&&Math.abs(b.z)>half&&Math.abs(b.x)<half);

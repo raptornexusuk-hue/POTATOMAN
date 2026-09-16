@@ -4,12 +4,12 @@ import {LEVELS,roundLevel,circuitLevels,makeMap,route} from '../dist/core.js';
 import {lastPlaceLine,awardRoundWins} from '../dist/progression.js';
 import {preferredVoice,GameAudio} from '../dist/game-audio.js';
 
-assert.equal(MAPS.length,6);assert.equal(new Set(LEVELS.map(mapId)).size,6);
+assert.equal(MAPS.length,9);assert.equal(new Set(LEVELS.map(mapId)).size,9);
 for(const previous of MAPS.map(m=>m.id))for(let trial=0;trial<100;trial++){
  const seed=nextCircuitSeed(previous,trial*973,seed=>roundLevel(0,seed));
  assert.notEqual(mapId(roundLevel(0,seed)),previous);
  const circuit=circuitLevels(seed);assert.equal(new Set(circuit).size,LEVELS.length);assert.equal(circuit.at(-1),LEVELS.length-1);
- assert.equal(new Set(circuit.map(i=>mapId(LEVELS[i]))).size,6);
+ assert.equal(new Set(circuit.map(i=>mapId(LEVELS[i]))).size,9);
 }
 // Every authored combat level must stay navigable corner-to-centre with colliding props.
 for(const i of LEVELS.map((l,i)=>i).filter(i=>!['race','assault'].includes(LEVELS[i].mode))){
@@ -17,7 +17,7 @@ for(const i of LEVELS.map((l,i)=>i).filter(i=>!['race','assault'].includes(LEVEL
  for(const [x,z]of[[2,2],[map.n-3,2],[2,map.n-3],[map.n-3,map.n-3]])assert.ok(route(map,map.toWorld(x,z),goal).length>0);
  for(const prop of map.props){const cell=map.toCell(prop.x,prop.z);assert.equal(map.grid[cell.z][cell.x],1);assert.ok(map.walls.includes(prop));}
 }
-console.log('PASS six world families, all fourteen rounds, 600 non-repeating openings and authored combat route/collider consistency');
+console.log('PASS nine world families, all fourteen rounds, 600 non-repeating openings and authored combat route/collider consistency');
 
 const players=[{id:0,name:'MACCA',score:0,best:Infinity},{id:1,name:'JAMIE',score:8,best:40},{id:2,name:'SAM',score:4,best:70}];
 for(let i=0;i<10;i++){assert.ok(lastPlaceLine(players,false,i).includes('MACCA'));assert.ok(lastPlaceLine(players,true,i).includes('MACCA'));}

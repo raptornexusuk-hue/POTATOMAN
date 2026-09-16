@@ -16,6 +16,10 @@ const {testAPI:a}=await import('data:text/javascript;base64,'+Buffer.from(code).
 const {LEVELS}=await import('../dist/core.js');
 const {playerAccount}=await import('../dist/profiles.js');playerAccount.player={id:'test',name:'Test Player',motto:''};
 const dt=1/120;
+// Levels are addressed by mode, not by index, so adding maps to the circuit cannot silently
+// re-point a test at a different round.
+const levelOf=mode=>LEVELS.findIndex(l=>l.mode===mode);
+const {equipWeapon,WEAPONS}=await import('../dist/weapons.js');
 for(const i of LEVELS.map((_,idx)=>idx).filter(idx=>LEVELS[idx].mode==='race')){a.init(i);let count=0;while(a.snapshot().state==='playing'&&count++<14402)a.tick(dt);const s=a.snapshot();assert.equal(s.state,'results');assert.ok(Math.abs(s.time-120)<dt*1.1);for(const p of s.players.slice(1))assert.ok(Number.isFinite(p.best),`Level ${i+1}, bot ${p.id} failed to escape`);console.log(`PASS level ${i+1}: full 2-minute race, all AI rivals escaped`);}
 for(const i of[3]){a.init(i);const t=a.snapshot().targets;assert.equal(t.length,14);assert.equal(new Set(t.map(p=>p.x+','+p.z)).size,t.length);console.log(`PASS level ${i+1}: destruction targets do not overlap`);}
 a.init(0,true);let s=a.snapshot();const runner=s.players.find(p=>p.runner);assert.ok(s.players.filter(p=>!p.runner).every(p=>Math.hypot(p.x-runner.x,p.z-runner.z)>5));assert.equal(s.pickups.length,1);const bonusGun=s.pickups[0];assert.equal(bonusGun.weapon,'masher');assert.equal(bonusGun.phase,'available');Object.assign(s.players[1],{x:bonusGun.x,z:bonusGun.z});a.tick(dt);assert.equal(s.players.filter(p=>p.gun).length,1);assert.equal(bonusGun.phase,'held');console.log('PASS bonus: separate starts and one shared finite gun');
@@ -60,22 +64,21 @@ a.init(0);let sim=a.snapshot(),bot=sim.players[1];sim.map.walls=[];Object.assign
 console.log('PASS Chill bots delay acquisition, hold aim, fire less often and never catch; human cooldown stays responsive');
 
 // Movement and collection rules use the same simulation in every render path.
-a.setOnline(null);a.init(7);let courseTicks=0;while(a.snapshot().state==='playing'&&courseTicks++<14402)a.tick(dt);
+a.setOnline(null);a.init(levelOf('assault'));let courseTicks=0;while(a.snapshot().state==='playing'&&courseTicks++<14402)a.tick(dt);
 for(const p of a.snapshot().players.slice(1))assert.ok(Number.isFinite(p.best),`Assault bot ${p.id} failed at platform ${p.courseStep}, y=${p.y}`);
 console.log('PASS every Chill bot completes the full jumping assault course within two minutes');
 a.init(0);let powers=a.snapshot();assert.equal(powers.pickups.filter(p=>p.kind!=='weapon').length,4);const boost=powers.pickups.find(b=>b.kind==='run'),hero=powers.players[0];Object.assign(hero,{x:boost.x,z:boost.z});a.tick(dt);assert.ok(hero.runBoost>11);assert.equal(boost.collected,true);Object.assign(hero,{x:mapStartSafe(powers).x,z:mapStartSafe(powers).z});for(let i=0;i<2161;i++)a.tick(dt);assert.equal(boost.collected,false);assert.equal(hero.runBoost,0);
 function mapStartSafe(s){return s.map.toWorld(1,1);}
 hero.fireBoost=12;hero.throwCD=0;a.fire(hero);assert.equal(hero.throwCD,.62*.53);for(let i=0;i<40;i++)a.tick(dt);hero.fireBoost=0;hero.throwCD=0;a.fire(hero);assert.equal(hero.throwCD,.62);
 console.log('PASS shared pickups collect once, expire, respawn and change actual fire cadence');
-a.init(7);let course=a.snapshot();const racer=course.players[0];Object.assign(racer,course.map.exit);a.tick(dt);assert.equal(racer.score,0);assert.equal(racer.best,Infinity);
+a.init(levelOf('assault'));let course=a.snapshot();const racer=course.players[0];Object.assign(racer,course.map.exit);a.tick(dt);assert.equal(racer.score,0);assert.equal(racer.best,Infinity);
 console.log('PASS assault exit rejects skipped checkpoints');
 for(const seed of[3,717,90001]){a.init(LEVELS.length-1,false,seed);let t=0;while(a.snapshot().state==='playing'&&t++<14402)a.tick(dt);assert.ok(a.snapshot().players.slice(1).every(p=>Number.isFinite(p.best)),`Remixed finale ${seed} must be completable`);}
 console.log('PASS varied finale seeds stay completable at Chill difficulty and two-minute duration');
 // A guest with a different preferred round time must rebuild the host's exact maze.
 a.setOnline(host);a.setDuration(60);a.init(LEVELS.length-1,false,22);const shortRound=a.makeSnapshot(),hostMaze=JSON.stringify(a.snapshot().map.grid);a.setDuration(300);a.getSettings().remix=false;a.becomeGuest(guest);a.receiveRemoteSnapshot(shortRound);await new Promise(setImmediate);assert.equal(JSON.stringify(a.snapshot().map.grid),hostMaze);assert.equal(a.snapshot().remaining,60);a.setOnline(null);a.setDuration(120);a.getSettings().remix=true;
 console.log('PASS guests rebuild the identical remixed maze using host seed and active duration');
-const {equipWeapon}=await import('../dist/weapons.js');
-a.init(0);let combat=a.snapshot();combat.players.forEach(p=>p.botDelay=999);let pad=combat.pickups.find(p=>p.kind==='weapon'&&p.weapon==='rpg');assert.equal(combat.pickups.filter(p=>p.kind==='weapon').length,1);assert.equal(pad.collected,false);a.setIntro(2.5);const introTime=combat.remaining;for(let i=0;i<300;i++)a.tick(dt);assert.equal(a.snapshot().remaining,introTime);a.clearIntro();const gunner=combat.players[0];Object.assign(gunner,{x:pad.x,z:pad.z});a.tick(dt);assert.equal(gunner.weapon,'rpg');assert.equal(gunner.mag,3);
+a.init(0);let combat=a.snapshot();combat.players.forEach(p=>p.botDelay=999);let pad=combat.pickups.find(p=>p.kind==='weapon');const padKind=pad.weapon;assert.equal(combat.pickups.filter(p=>p.kind==='weapon').length,1);assert.equal(pad.collected,false);a.setIntro(2.5);const introTime=combat.remaining;for(let i=0;i<300;i++)a.tick(dt);assert.equal(a.snapshot().remaining,introTime);a.clearIntro();const gunner=combat.players[0];Object.assign(gunner,{x:pad.x,z:pad.z});a.tick(dt);assert.equal(gunner.weapon,padKind);assert.equal(gunner.mag,WEAPONS[padKind].ammo);
 combat.map.walls=[];Object.assign(gunner,{x:0,z:0,yaw:-Math.asin(.6/6),pitch:0,throwCD:0,invuln:0});const target=combat.players[1];Object.assign(target,{x:0,z:-6,hp:140,invuln:0});combat.players.slice(2).forEach(p=>Object.assign(p,{x:20,z:20}));a.fire(gunner);for(let i=0;i<60;i++)a.tick(dt);assert.ok(target.respawn>0);assert.equal(gunner.knockouts,1);equipWeapon(target,'scatter');target.respawn=.001;a.tick(dt);assert.equal(target.weapon,'throw');assert.equal(target.reload,0);assert.equal(target.gun,false);
 console.log('PASS one opening shared box, fair intro freeze, RPG direct-hit elimination and base-weapon respawn');
 

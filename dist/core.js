@@ -11,6 +11,9 @@ export const LEVELS=[
  {name:'King of the Crop',tag:'ALLOTMENTS • GOLDEN HOUR',mode:'capture',size:17,theme:'garden',seed:48,detail:'Cut through hedge courtyards to hold the golden crop circle. A contested zone earns no points.',skill:'Control space'},
  {name:'Harvest Havoc',tag:'FARMYARD • SUNSET',mode:'smash',size:17,theme:'fair',seed:53,detail:'Fight around barns and hay stacks. Break the marked harvest crates before your opponents do.',skill:'Aim under pressure'},
  {name:'A-maize-ing Escape',tag:'FARMLAND • AFTERNOON',mode:'race',size:19,theme:'corn',seed:71,detail:'Longer paths and more dead ends. Keep your bearings.',skill:'Route memory'},
+ {name:'Shipment',tag:'CONTAINER YARD • OVERCAST',mode:'battle',size:11,theme:'shipment',seed:64,detail:'A yard the size of a tennis court, walled in by containers. Everyone is always in range of everyone.',skill:'Snap aim · never stand still'},
+ {name:'Butterscotch Bay',tag:'BEACH • MIDDAY',mode:'battle',size:17,theme:'beach',seed:77,detail:'Fight across open sand between timber groynes and beach huts. The tide takes anyone who backs up too far.',skill:'Use what little cover there is'},
+ {name:'Dune Dash',tag:'DUNES • AFTERNOON',mode:'race',size:21,theme:'dunes',seed:88,detail:'Marram-grass ridges hide the turns. Fastest complete escape wins.',skill:'Commit to a line'},
  {name:'Canal Carnage',tag:'CANALSIDE • DUSK',mode:'battle',size:19,theme:'canal',seed:82,detail:'Cross three bridges between moonlit quays. Use the warehouses for cover and stay out of the water.',skill:'Lead moving targets'},
  {name:'Quayside Domination',tag:'HARBOUR • NIGHT',mode:'capture',size:21,theme:'depot',seed:96,detail:'Fight between containers for a moving control zone.',skill:'Rotate and intercept'},
  {name:'The Butter Run',tag:'HARBOUR ASSAULT COURSE • SUNSET',mode:'assault',size:21,theme:'course',seed:114,detail:'Jump onto each numbered platform, duck through the three low gates, then reach the exit. Fastest completed run wins.',skill:'Jump · land · keep momentum'},
@@ -19,6 +22,9 @@ export const LEVELS=[
  {name:'Cider Run',tag:'ORCHARD • MORNING',mode:'race',size:25,theme:'grove',seed:152,detail:'Race the mown lanes between fruit rows. Fastest complete escape wins.',skill:'Read the rows'},
  {name:'Stone Cold Smash',tag:'CUTTING FLOOR • AFTERNOON',mode:'smash',size:19,theme:'pit',seed:181,detail:'Break the marked blocks stacked around the cutting floor before your rivals do.',skill:'Pick your target'},
  {name:'Orchard Ambush',tag:'CIDER ORCHARD • GOLDEN HOUR',mode:'capture',size:21,theme:'orchard',seed:194,detail:'Hold the pressing yard while rivals close in through the fruit rows.',skill:'Hold and rotate'},
+ {name:'The Chip Factory',tag:'INDOORS • NIGHT SHIFT',mode:'battle',size:17,theme:'factory',seed:203,detail:'Inside the works. Partition walls, doorways and fryer vats turn every fight into a room fight.',skill:'Clear corners'},
+ {name:'Cannery Row',tag:'PACKING FLOOR • NIGHT SHIFT',mode:'capture',size:19,theme:'cannery',seed:211,detail:'Hold the packing floor in the middle of the shed while rivals push through the side doors.',skill:'Hold a room'},
+ {name:'Gantry Grab',tag:'CONTAINER YARD • DUSK',mode:'smash',size:17,theme:'gantry',seed:219,detail:'Break the marked crates stacked between container rows before your rivals reach them.',skill:'Move between lanes'},
  {name:'The Final Mash',tag:'FORTRESS GARDEN • STORM',mode:'race',size:27,theme:'fort',seed:143,detail:'The longest maze and the quickest rivals. One final escape.',skill:'Bring it all together'}
 ];
 export const MODES={battle:'TOTALLY MASH',race:'MAZE RACE',assault:'BUTTER RUN · TIME TRIAL',capture:'KING OF THE CROP',smash:'BANGERS & SMASH'};
@@ -64,8 +70,45 @@ export function makeMap(level,bonus=false){
  const buildings=[],waterCells=[],props=[],family=mapId(level);
  if(bonus||!isTrial(level)){
   for(let z=1;z<n-1;z++)for(let x=1;x<n-1;x++)grid[z][x]=0;
-  const mid=Math.floor(n/2),addProp=(cx,cz,type,h=1.3,size=2.5)=>{grid[cz][cx]=1;props.push({...toWorld(cx,cz),w:size,d:size,h,prop:type});};
-  if(family==='estate'){
+  const mid=Math.floor(n/2),addProp=(cx,cz,type,h=1.3,size=2.5,depth=size,extra={})=>{grid[cz][cx]=1;props.push({...toWorld(cx,cz),w:size,d:depth,h,prop:type,...extra});};
+  // Quarter-turn about the centre. Anything placed through this is symmetric under 90 degrees, so
+  // no spawn corner is closer to the middle — or better covered — than any other.
+  const spin=(cx,cz,place)=>{let x=cx,z=cz;for(let k=0;k<4;k++){place(x,z,k);const nx=z,nz=n-1-x;x=nx;z=nz;}};
+  if(family==='shipyard'){
+   // Shipment: a yard you can cross in four seconds, packed tight enough that every sightline is
+   // short and nowhere is safe for long. Double-stacked rows are the only cover a mortar must arc.
+   spin(mid-1,2,(x,z)=>{addProp(x,z,'container',5.2,3.0,2.3,{stacked:true,turned:Math.abs(z-mid)<Math.abs(x-mid)});addProp(x===mid-1?x+1:x,z,'container',5.2,3.0,2.3,{stacked:true,turned:Math.abs(z-mid)<Math.abs(x-mid)});});
+   spin(2,mid+1,(x,z)=>addProp(x,z,'container',2.6,3.0,2.3,{turned:Math.abs(z-mid)>=Math.abs(x-mid)}));
+   spin(mid-1,mid-1,(x,z)=>addProp(x,z,'container',2.6,3.0,2.3,{turned:(x+z)%2===0}));
+   for(const [x,z]of[[mid,2],[2,mid],[mid,n-3],[n-3,mid]])addProp(x,z,'cargo',1.8,2.4);
+  }
+  else if(family==='coast'){
+   // Open sand broken only by timber groynes running down to the water, with painted huts along
+   // the promenade. The sea itself is a hazard: back up too far and the tide takes you.
+   // Groynes as a pinwheel of three-cell breakwaters: each quarter turn puts one on a different
+   // side, which keeps the map 90-degree symmetric so no spawn corner is closer to the middle.
+   spin(3,mid-3,(x,z,k)=>{const alongZ=k%2===0;
+    for(let i=0;i<3;i++){const gx=alongZ?x:x+i-1,gz=alongZ?z+i-1:z;
+     if(gx>1&&gz>1&&gx<n-2&&gz<n-2)addProp(gx,gz,'groyne',1.15,alongZ?.7:CELL*.94,alongZ?CELL*.94:.7);}});
+   for(const [x,z]of[[mid-3,mid],[mid+3,mid],[mid,mid-3],[mid,mid+3]])addProp(x,z,'beachHut',2.5,2.6);
+   for(const [x,z]of[[mid-2,mid-2],[mid+2,mid+2],[mid-2,mid+2],[mid+2,mid-2]])addProp(x,z,'rock',1.35,2.2,2,{});
+   for(let x=3;x<n-3;x++){grid[1][x]=2;waterCells.push(toWorld(x,1));}
+  }
+  else if(family==='interior'){
+   // A floor plan rather than scattered cover: full-height partitions split the shed into rooms
+   // and every partition is punched with doorways, so fights happen in rooms and in the gaps
+   // between them. The ceiling overhead is drawn by the world, not by the grid.
+   const lines=[];for(let i=4;i<n-4;i+=4)lines.push(i);
+   for(const line of lines)for(let i=2;i<n-2;i++){grid[i][line]=1;grid[line][i]=1;}
+   // The central aisle is three cells wide, so a partition that happens to land on the middle of
+   // the shed opens a crossroads instead of sealing the centre into a one-cell pocket.
+   for(const line of lines)for(const gap of[3,mid-1,mid,mid+1,n-4]){grid[gap][line]=0;grid[line][gap]=0;}
+   // The middle cell stays clear: it is where the contested weapon box lands on every map.
+   for(const [x,z]of[[mid-2,mid-2],[mid+2,mid+2],[mid+2,mid-2],[mid-2,mid+2]])if(grid[z][x]===0)addProp(x,z,'vat',2.1,2.6);
+   for(const [x,z]of[[2,mid],[n-3,mid],[mid,2],[mid,n-3]])if(grid[z][x]===0)addProp(x,z,'pallet',1.15,2.6);
+   for(const [x,z]of[[2,2],[n-3,n-3],[n-3,2],[2,n-3]].map(([a,b])=>[a+ (a<mid?2:-2),b])) if(grid[z]?.[x]===0)addProp(x,z,'conveyor',1.1,2.7,1.5);
+  }
+  else if(family==='estate'){
    for(const [cx,cz]of[[4,4],[n-5,4],[4,n-5],[n-5,n-5]])for(let j=-1;j<=1;j++){grid[cz-1][cx+j]=1;grid[cz+1][cx+j]=1;grid[cz][cx-1]=1;grid[cz][cx+1]=1;}
    for(const [x,z]of[[4,5],[n-5,3],[3,n-5],[n-4,n-5]])grid[z][x]=0;
   }else{
@@ -82,9 +125,17 @@ export function makeMap(level,bonus=false){
    if(family==='orchard'){for(const x of[mid-3,mid+3])for(const z of[mid-1,mid+1])addProp(x,z,'cider',1.35,2.3);for(const x of[4,n-5])for(const z of[6,n-7])addProp(x,z,'crateStack',1.5,2.2);}
   }
  }
- if(bonus){for(const [cx,cz] of [[3,3],[n-4,n-4],[Math.floor(n/2),n-3]])for(const[dx,dz]of[[0,0],[1,0],[-1,0],[0,1],[0,-1]])grid[cz+dz][cx+dx]=0;}
+ if(bonus){const cleared=new Set();
+  for(const [cx,cz] of [[3,3],[n-4,n-4],[Math.floor(n/2),n-3]])for(const[dx,dz]of[[0,0],[1,0],[-1,0],[0,1],[0,-1]]){grid[cz+dz][cx+dx]=0;const at=toWorld(cx+dx,cz+dz);cleared.add(at.x+','+at.z);}
+  // Clearing a checkpoint cell has to take the prop standing on it as well, or a hunt map keeps a
+  // container parked exactly where the runner has to reach.
+  for(let i=props.length-1;i>=0;i--)if(cleared.has(props[i].x+','+props[i].z))props.splice(i,1);
+ }
  const fountain=!bonus&&level.theme==='garden'?{...toWorld(Math.floor(n/2),3),w:2.5,d:2.5,h:1.35,prop:'fountain'}:null;if(fountain)grid[3][Math.floor(n/2)]=1;
- const walls=[...buildings,...props];let cover=0;for(let z=0;z<n;z++)for(let x=0;x<n;x++)if(grid[z][x]===1){const p=toWorld(x,z);if(props.some(w=>w.x===p.x&&w.z===p.z))continue;if(fountain&&p.x===fountain.x&&p.z===fountain.z){walls.push(fountain);continue;}if(buildings.some(b=>Math.abs(p.x-b.x)<b.w/2&&Math.abs(p.z-b.z)<b.d/2))continue;const interior=x>1&&x<n-2&&z>1&&z<n-2,w={...p,w:CELL,d:CELL,h:2.65};if(interior&&!isTrial(level)&&!bonus&&!['garden','market','canal'].includes(level.theme)){w.h=1.65;if(cover++%3===0)Object.assign(w,{prop:'bin',w:1.1,d:1.1,h:1.45});}else if(interior&&family==='estate')w.h=1.8;walls.push(w);}
+ const walls=[...buildings,...props];let cover=0;for(let z=0;z<n;z++)for(let x=0;x<n;x++)if(grid[z][x]===1){const p=toWorld(x,z);if(props.some(w=>w.x===p.x&&w.z===p.z))continue;if(fountain&&p.x===fountain.x&&p.z===fountain.z){walls.push(fountain);continue;}if(buildings.some(b=>Math.abs(p.x-b.x)<b.w/2&&Math.abs(p.z-b.z)<b.d/2))continue;const interior=x>1&&x<n-2&&z>1&&z<n-2,w={...p,w:CELL,d:CELL,h:2.65};
+  // The seaward edge of a beach is a low sea wall, not a boundary you cannot see over. It still
+  // stops bodies; it just does not wall the bay off from its own sea.
+  if(family==='coast'&&z===0)w.h=.42;if(interior&&!isTrial(level)&&!bonus&&!['garden','market','canal','factory','cannery','shipment','gantry','beach'].includes(level.theme)){w.h=1.65;if(cover++%3===0)Object.assign(w,{prop:'bin',w:1.1,d:1.1,h:1.45});}else if(interior&&family==='estate')w.h=1.8;walls.push(w);}
  // The visible bridge handrails block bodies, while shots can pass underneath.
  const bridgeRails=[];if(waterCells.length){const mid=Math.floor(n/2);for(const cell of[3,mid,n-4])for(const side of[-1,1])bridgeRails.push({x:toWorld(cell,mid).x+side*1.42,z:0,w:.07,d:9.7,base:1.03,h:.08,prop:'bridgeRail'});walls.push(...bridgeRails);}
  // Harvest targets belong to loading rows beside the barns, with open routes between them.
@@ -170,8 +221,11 @@ export function circuitLevels(seed=0){
 export function roundLevel(index,seed=0){const id=circuitLevels(seed)[index];return{...LEVELS[id],id,seed:LEVELS[id].seed+(seed?((seed+index*997)%100000):0)};}
 export function playableMap(level,bonus=false,duration=120){
  let map=makeMap(level,bonus);if(bonus||level.mode!=='race'||!level.remix)return map;
- // A relaxed runner must have time to finish, including turns. Add loops to long DFS paths.
- const limit=Math.max(30,Math.min(145,Math.floor(duration*3.5/CELL)));
+ // A relaxed runner must have time to finish, including turns. The slowest rivals travel
+ // 6 * .62 m/s and lose roughly a quarter of the round to cornering, jostling and the hesitation
+ // the easiest difficulty runs with, so the reachable route length follows from their actual
+ // speed rather than from a hand-picked number that quietly stopped being reachable.
+ const limit=Math.max(30,Math.min(145,Math.floor(duration*6*.62*.75/CELL)));
  const random=rng(level.seed+783);let count=0;
  while(route(map,map.start,map.exit).length>limit&&count++<1000){const x=1+Math.floor(random()*(map.n-2)),z=1+Math.floor(random()*(map.n-2));if(!map.grid[z][x])continue;if((map.grid[z][x-1]===0&&map.grid[z][x+1]===0)||(map.grid[z-1][x]===0&&map.grid[z+1][x]===0)){map.grid[z][x]=0;const w=map.toWorld(x,z);map.walls=map.walls.filter(a=>a.x!==w.x||a.z!==w.z);}}
  return map;

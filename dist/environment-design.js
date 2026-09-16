@@ -61,6 +61,61 @@ export function dressWorld(w,map,level,night,r){
   for(const side of[-1,1]){box(stone,0,.015,side*(half+1.5),half*2,.06,2.8);for(const [i,x]of slots(Math.min(7,Math.max(4,Math.floor((half*2-13)/11)+1)),6.5).entries())backdrop(x,side*(half+6),9,7+(i%2)*2,7.2);for(const z of[-half*.62,half*.62])backdrop(side*(half+(side===1&&eastCanal?15:6)),z,9,6.8,6.4,-side*Math.PI/2);}
   for(const side of[-1,1]){const x=side*(half+(side===1&&eastCanal?11:3)),z=side*half*.18;box(iron,x,4.8,z,.5,9.6,.5);const boom=box(iron,x-side*3.4,8.8,z,7.2,.35,.45);boom.rotation.z=side*.2;box(iron,x-side*6.2,5.6,z,.055,5.5,.055);w.mesh('sphere',w.mat(0xa38654,'wood'),root,x-side*6.2,3,z,.7,.65,.7);for(let i=0;i<3;i++)w.crate(side*(half+1),side*(half*.43+i*1.2),0,1.1);}
   if(map.waterCells.length)w.canalBridges(map);else w.addCanalBackdrop?.(map,true);
+ }else if(family==='shipyard'){
+  // A working freight yard: stacked container walls on every side, a straddle gantry over the
+  // top and hard standing marked out in yellow. The stacks are the horizon here, not houses.
+  w.scene.fog.color.set(0xa9b0b4);
+  const shades=[0xc4562f,0x2f6f8c,0xd9a33a,0x4f7a4a,0x9a4457,0x6d6f74];
+  for(const side of[-1,1]){
+   box(w.mat(0x6f7378,'stone'),0,.015,side*(half+2),half*2,.06,3.2);
+   for(let row=0;row<3;row++)for(let i=0;i<Math.ceil(half/3.2);i++){
+    const x=(i/(Math.ceil(half/3.2)-1||1)*2-1)*(half-2),y=1.3+row*2.58;
+    if(r()<.18)continue;
+    const bin=box(w.mat(shades[Math.floor(r()*shades.length)],null,{metalness:.32,roughness:.64}),x,y,side*(half+6.5),6,2.5,2.4);bin.userData.backdrop=row===0;
+    box(w.mat(0x2b3237),x,y,side*(half+6.5),6.1,.16,2.5);
+   }
+   for(let row=0;row<3;row++)for(let i=0;i<Math.ceil(half/3.2);i++){
+    const z=(i/(Math.ceil(half/3.2)-1||1)*2-1)*(half-2),y=1.3+row*2.58;
+    if(r()<.22)continue;
+    box(w.mat(shades[Math.floor(r()*shades.length)],null,{metalness:.32,roughness:.64}),side*(half+6.5),y,z,2.4,2.5,6);
+   }
+  }
+  // A straddle gantry stepping over the yard, well above head height.
+  for(const side of[-1,1]){box(iron,side*(half+2.6),5.4,0,.55,10.8,.55);box(iron,side*(half+2.6),5.4,half*.6,.45,10.8,.45);box(iron,side*(half+2.6),5.4,-half*.6,.45,10.8,.45);}
+  for(const z of[0,half*.6,-half*.6])box(iron,0,10.9,z,(half+3)*2,.7,.9);
+  for(const x of[-half*.4,half*.4])box(iron,x,10.2,0,.5,.9,half*1.3);
+  plaque('KLOMPENS FREIGHT',0,7.4,-half-3.2,9);
+ }else if(family==='coast'){
+  // Sand, a promenade wall, painted huts along it and the sea running out to the horizon.
+  w.scene.fog.color.set(0xd8d2b6);
+  const seaMat=w.mat(0x3f86a4,null,{roughness:.22,metalness:.25}),dune=w.mat(0xdcc089,'stone');
+  box(seaMat,0,-.06,-half-46,half*2+140,.3,90);
+  for(let i=0;i<7;i++)box(w.mat(0xe8f1f2,null,{roughness:.4}),(i/6*2-1)*(half+20),.10,-half-4-i%3*2.6,half*.5,.12,1.1);
+  for(const side of[-1,1]){
+   box(w.mat(0xcfc3a4,'stone'),side*(half+2.4),.5,0,1.6,1,half*2+6);
+   for(let i=0;i<6;i++){const z=(i/5*2-1)*(half-3);
+    const hut=box(w.mat([0xe36a5c,0x59a7c4,0xe8c15a,0x7fb36b,0xd68ec0][i%5],'wood'),side*(half+6.5),1.3,z,3.4,2.6,3);hut.userData.backdrop=true;
+    w.mesh(w.geo.hipRoof,w.mat(0x3f4750,'wood'),root,side*(half+6.5),2.9,z,3.9,1,3.4);
+    box(w.mat(0x2f3a42,'wood'),side*(half+6.5)-side*1.72,1.15,z,.06,1.9,1);
+   }
+  }
+  box(dune,0,.7,half+7,half*2+20,1.4,5);
+  for(let i=0;i<26;i++){const x=(i/25*2-1)*(half+8),tuft=w.mesh('sphere',w.mat(0x9fae62),root,x,1.42,half+7+(r()-.5)*3,.5,.7,.5);tuft.scale.y=.7+r()*.8;}
+  plaque('BUTTERSCOTCH BAY',0,3.2,half+4.2,8,Math.PI);
+ }else if(family==='interior'){
+  // Nothing outside matters indoors. The dressing here is what is bolted to the shed: dock doors,
+  // pipe runs, floor markings and racking along the walls.
+  w.scene.fog.color.set(0x2d3439);
+  const paint=w.mat(0xd8c24a,null,{roughness:.7}),pipe=w.mat(0x7c848a,null,{metalness:.55,roughness:.42});
+  for(const side of[-1,1]){
+   for(const at of[-half*.5,half*.5]){box(w.mat(0x44525c,null,{metalness:.3,roughness:.6}),side*(half+1.9),1.9,at,.3,3.8,4.6);
+    for(let i=0;i<5;i++)box(w.mat(0x59676f),side*(half+1.75),.6+i*.74,at,.06,.5,4.4);}
+   for(let i=0;i<4;i++)box(pipe,side*(half+1.5),6.2+i*.42,0,.26,.26,half*2);
+   for(let i=0;i<5;i++){const z=(i/4*2-1)*(half-3);box(w.mat(0x8b939a,null,{metalness:.4,roughness:.5}),side*(half+1.2),1.5,z,.9,3,2.4);
+    for(const y of[1.1,2.2])box(w.mat(0xb99a5e,'wood'),side*(half+1.2),y,z,1,.12,2.2);}
+  }
+  for(let i=-2;i<=2;i++){box(paint,i*half*.42,.02,0,.22,.04,half*2-2);box(paint,0,.02,i*half*.42,half*2-2,.04,.22);}
+  plaque('THE CHIP FACTORY · PACKING FLOOR',0,4.6,-half-1.6,10);
  }else if(family==='quarry'){
   // Stepped chalk terraces ring the cutting floor, with a gantry and spoil heaps behind them.
   w.scene.fog.color.set(0xc4cdd2);
@@ -111,16 +166,24 @@ export function dressWorld(w,map,level,night,r){
  // horizon reads as a town the arena sits inside rather than one row of houses on an empty lawn.
  // The setbacks start beyond every family structure (the furthest reaches half+18.6), and the rows
  // stop short of each other's arms so no two backgrounds ever overlap.
- const BLOCK_W=8.6,BLOCK_D=7.0,PITCH=11;
+ const outdoors=family!=='interior';
+ // The horizon belongs to the world: a freight yard is ringed by low sheds rather than houses,
+ // and the bay has open water on its seaward side where a street would make no sense.
+ const shed=family==='shipyard',seaward=(x,z)=>family==='coast'&&z<-half;
+ const BLOCK_W=shed?13:8.6,BLOCK_D=shed?9:7.0,PITCH=shed?15.5:11;
+ if(outdoors){
  for(const setback of[27,39]){
   const span=half+12,count=Math.max(3,Math.round(span*2/PITCH)+1);
   for(const side of[-1,1])for(let i=0;i<count;i++){
-   const along=(i/(count-1)*2-1)*span,height=5+Math.floor(r()*4)*1.8;
-   w.distantBlock(along,side*(half+setback),BLOCK_W,height,BLOCK_D,side<0?0:Math.PI,r,night);
-   w.distantBlock(side*(half+setback),along,BLOCK_W,5+Math.floor(r()*4)*1.8,BLOCK_D,-side*Math.PI/2,r,night);
+   const along=(i/(count-1)*2-1)*span,height=shed?4+Math.floor(r()*3)*1.1:5+Math.floor(r()*4)*1.8;
+   if(!seaward(along,side*(half+setback)))w.distantBlock(along,side*(half+setback),BLOCK_W,height,BLOCK_D,side<0?0:Math.PI,r,night,shed);
+   if(!seaward(side*(half+setback),along))w.distantBlock(side*(half+setback),along,BLOCK_W,shed?4+Math.floor(r()*3)*1.1:5+Math.floor(r()*4)*1.8,BLOCK_D,-side*Math.PI/2,r,night,shed);
   }
  }
- for(const sx of[-1,1])for(const sz of[-1,1])w.distantBlock(sx*(half+23),sz*(half+23),BLOCK_W,6+Math.floor(r()*3)*1.9,BLOCK_D,sz<0?0:Math.PI,r,night);
+ // The corner blocks stand clear of both arms, so the wider warehouse sheds need more setback
+ // than the houses do.
+ const cornerAt=half+(shed?28:23);
+ for(const sx of[-1,1])for(const sz of[-1,1])if(!seaward(sx*cornerAt,sz*cornerAt))w.distantBlock(sx*cornerAt,sz*cornerAt,BLOCK_W,shed?4.5:6+Math.floor(r()*3)*1.9,BLOCK_D,sz<0?0:Math.PI,r,night,shed);
  const treesPerSide=8;
  for(let i=0;i<treesPerSide*2;i++){const side=i<treesPerSide?-1:1,offset=family==='estate'?6:family==='farm'?17:family==='quarry'?16:family==='orchard'?20:side===1&&eastCanal?10.4:12,local=i%treesPerSide,x=side*(half+offset),z=(local/(treesPerSide-1)*2-1)*(half-5);w.avenueTree(x,z,root,r);}
  for(const side of[-1,1])for(const z of[-half+2,half-2])w.lamp(side*(half-2),z,0,night);
@@ -138,9 +201,68 @@ export function dressWorld(w,map,level,night,r){
    if(i%2){box(stone,t,.34,side*(half+3.3),.34,.68,.34);box(stone,side*(half+bank+1.4),.34,t,.34,.68,.34);}
   }
  }
+ }
  for(const prop of map.props??[]){if(prop.prop==='marketStall')w.stall(prop.x,prop.z,0,Math.round(prop.x));else if(prop.prop==='cargo'){box(wood,prop.x,.07,prop.z,2.35,.14,2.35);for(const side of[-1,1])for(const row of[-1,1])w.crate(prop.x+side*.58,prop.z+row*.58,.14,1.08);w.crate(prop.x,prop.z,1.22,.58);}else if(prop.prop==='hay'){const straw=w.mat(0xd9b365,'wood');box(straw,prop.x,.43,prop.z,2.3,.86,2.3);box(straw,prop.x,1.04,prop.z,1.6,.35,1.6);for(const side of[-1,1])box(w.mat(0x796845),prop.x+side*.7,.44,prop.z,.05,.89,2.33);}
   else if(prop.prop==='stoneBlock'){const cut=w.mat(0xd2d5cb,'stone');box(cut,prop.x,.55,prop.z,2.4,1.1,2.4);box(w.mat(0xbcc0b7,'stone'),prop.x,1.24,prop.z,1.9,.3,1.9);for(const side of[-1,1])box(w.mat(0x8d9189),prop.x+side*1.15,.55,prop.z,.08,1.05,2.3);}
   else if(prop.prop==='spoil'){const rubble=w.mat(0xc6c2b0,'stone');for(let i=0;i<5;i++){const a=i*2.399,chunk=w.mesh('rounded',rubble,root,prop.x+Math.cos(a)*.6,.22+(i%2)*.18,prop.z+Math.sin(a)*.6,.7,.5,.65);chunk.rotation.y=a;}box(rubble,prop.x,.12,prop.z,2.2,.24,2.2);}
+  else if(prop.prop==='container'){
+   // A corrugated box: ribbed sides, a painted door end and, on the stacked rows, a second one
+   // sitting on top with its ribs offset so the pair does not read as one tall slab.
+   const shade=[0xc4562f,0x2f6f8c,0xd9a33a,0x4f7a4a,0x9a4457][Math.floor(r()*5)],steelBox=w.mat(shade,null,{metalness:.35,roughness:.62}),trim=w.mat(0x2b3237,null,{metalness:.5,roughness:.5});
+   const long=prop.turned?prop.d:prop.w,tall=prop.stacked?2:1;
+   for(let level=0;level<tall;level++){
+    const y=level*2.58+1.28;
+    box(steelBox,prop.x,y,prop.z,prop.w-.06,2.5,prop.d-.06);
+    for(let i=0;i<9;i++){const t=(i/8-.5)*(long-.5);
+     if(prop.turned)box(trim,prop.x-prop.w/2+.02,y,prop.z+t,.05,2.3,.08),box(trim,prop.x+prop.w/2-.02,y,prop.z+t,.05,2.3,.08);
+     else box(trim,prop.x+t,y,prop.z-prop.d/2+.02,.08,2.3,.05),box(trim,prop.x+t,y,prop.z+prop.d/2-.02,.08,2.3,.05);
+    }
+    for(const corner of[-1,1])for(const end of[-1,1])box(trim,prop.x+(prop.turned?corner*prop.w/2:end*prop.w/2),y,prop.z+(prop.turned?end*prop.d/2:corner*prop.d/2),.14,2.46,.14);
+    box(w.mat(0xe6e0d2),prop.x+(prop.turned?0:prop.w*.36),y+.35,prop.z+(prop.turned?prop.d*.36:0),prop.turned?.9:.05,.34,prop.turned?.05:.9);
+   }
+  }
+  else if(prop.prop==='groyne'){
+   // A timber breakwater: posts sunk into the sand with weathered boards bolted across them.
+   const timber=w.mat(0x6d5843,'wood',{roughness:.94}),along=prop.w>prop.d;
+   for(let i=0;i<4;i++){const t=(i/3-.5)*(along?prop.w:prop.d)*.86;
+    box(timber,prop.x+(along?t:0),.62,prop.z+(along?0:t),.3,1.24,.3);}
+   for(const y of[.45,.9])box(timber,prop.x,y,prop.z,along?prop.w:.22,.22,along?.22:prop.d);
+   for(let i=0;i<5;i++){const a=r()*6.28,d=.6+r()*.7;w.mesh('sphere',w.mat(0x9b8f6f),root,prop.x+Math.cos(a)*d,.06,prop.z+Math.sin(a)*d,.22,.09,.22);}
+  }
+  else if(prop.prop==='beachHut'){
+   // Painted seaside huts, one colour per hut, with a pitched felt roof and a stable door.
+   const paint=w.mat([0xe36a5c,0x59a7c4,0xe8c15a,0x7fb36b,0xd68ec0][Math.floor(r()*5)],'wood',{roughness:.8});
+   box(paint,prop.x,1.1,prop.z,prop.w-.2,2.2,prop.d-.2);
+   w.mesh(w.geo.hipRoof,w.mat(0x3f4750,'wood'),root,prop.x,2.55,prop.z,prop.w+.25,.85,prop.d+.25);
+   box(w.mat(0x33414b,'wood'),prop.x,.95,prop.z+prop.d/2-.06,.8,1.9,.08);
+   box(w.mat(0xf1ead7),prop.x,1.86,prop.z+prop.d/2-.03,.46,.3,.05);
+  }
+  else if(prop.prop==='rock'){
+   const stoneMat=w.mat(0x8d8b80,'stone',{roughness:.95});
+   for(let i=0;i<4;i++){const a=i*1.9,lump=w.mesh('rounded',stoneMat,root,prop.x+Math.cos(a)*prop.w*.22,.22+(i%2)*.34,prop.z+Math.sin(a)*prop.d*.22,prop.w*(.5+(i%2)*.18),.7+(i%3)*.4,prop.d*(.5+(i%3)*.14));lump.rotation.set(r()*.3,a,r()*.3);}
+  }
+  else if(prop.prop==='vat'){
+   // A fryer vat: a steel drum on a plinth with a rolled rim, a gantry rail and a feed pipe.
+   const steel=w.mat(0x8d969c,null,{metalness:.7,roughness:.35});
+   w.mesh('cylinder',steel,root,prop.x,1.02,prop.z,prop.w*.42,2.04,prop.d*.42);
+   const rim=w.mesh(new T.TorusGeometry(prop.w*.43,.08,8,24),w.mat(0x5d666c,null,{metalness:.6,roughness:.4}),root,prop.x,2.06,prop.z);rim.rotation.x=Math.PI/2;rim.userData.ownGeometry=true;
+   w.mesh('cylinder',w.mat(0xe0b452,null,{roughness:.28,metalness:.15}),root,prop.x,2.0,prop.z,prop.w*.38,.06,prop.d*.38);
+   box(w.mat(0x424a51),prop.x,.12,prop.z,prop.w,.24,prop.d);
+   for(const side of[-1,1])box(steel,prop.x+side*prop.w*.5,1.5,prop.z,.12,.12,prop.d);
+  }
+  else if(prop.prop==='pallet'){
+   const timber=w.mat(0xb08a56,'wood',{roughness:.9});
+   for(let level=0;level<3;level++){box(timber,prop.x,.18+level*.36,prop.z,prop.w-.3,.12,prop.d-.3);
+    for(const side of[-1,1])box(timber,prop.x+side*(prop.w-.3)*.36,.30+level*.36,prop.z,.18,.22,prop.d-.4);}
+   box(w.mat(0xdad2bd),prop.x,1.16,prop.z,prop.w-.5,.3,prop.d-.5);
+  }
+  else if(prop.prop==='conveyor'){
+   const frame=w.mat(0x5e666d,null,{metalness:.5,roughness:.5}),belt=w.mat(0x2d3338,null,{roughness:.9});
+   box(belt,prop.x,.92,prop.z,prop.w-.2,.12,prop.d-.1);
+   for(const side of[-1,1])box(frame,prop.x+side*(prop.w-.2)*.5,.5,prop.z,.1,1,prop.d-.1);
+   for(let i=0;i<4;i++)box(frame,prop.x-prop.w*.35+i*prop.w*.23,.44,prop.z,.09,.88,.09);
+   for(let i=0;i<3;i++)w.mesh('sphere',w.mat(0xd8b978,'skin'),root,prop.x-prop.w*.22+i*prop.w*.22,1.06,prop.z,.17,.19,.17);
+  }
   else if(prop.prop==='cider'){const oak=w.mat(0x7a4f2c,'wood');for(const [dx,dz]of[[-.55,-.55],[.55,-.55],[-.55,.55],[.55,.55]]){const barrel=w.mesh('cylinder',oak,root,prop.x+dx,.45,prop.z+dz,.4,.9,.4);}box(w.mat(0x93643b,'wood'),prop.x,.95,prop.z,2.1,.12,2.1);w.crate(prop.x,prop.z,1.02,.7);}
   else if(prop.prop==='crateStack'){for(let i=0;i<3;i++)w.crate(prop.x+(i%2?.25:-.2),prop.z+(i===2?.3:-.15),i*.72,.78);box(w.mat(0x5c6a55),prop.x,.05,prop.z,2.2,.10,2.2);}}
  // Flush drainage grates sit by the kerb at repeatable street junctions.

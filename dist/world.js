@@ -21,6 +21,7 @@ const STEP_REACH=.30,STRIDE_RATE=Math.PI/(2*STEP_REACH),TAU=Math.PI*2;
 // eye at a constant size the way a lid actually moves. Open, it is tipped back out of sight behind
 // the brow; the sweep below carries it down across the front.
 const LID_OPEN=-1.18;
+const indoorGlow=half=>Math.min(3.4,1.6+half*.045);
 // bulk/length are scales on the shared launcher mesh; kit names an optional attachment group.
 const GUN_SHAPES={spud:{bulk:1,length:.72},repeater:{bulk:1,length:.74,kit:'mag'},scatter:{bulk:1.06,length:.82},
  masher:{bulk:.92,length:.70},rpg:{bulk:1.2,length:.91,kit:'warhead'},peeler:{bulk:.88,length:.92,kit:'scope'},
@@ -43,7 +44,7 @@ export class World{
   }))]);
  }
  async loadPBR(loader,timeoutMs){await Promise.all([['paving','cobblestone_floor_08','2k'],['oak','oak_veneer_02','1k']].map(async([key,name,size])=>{const loaded=await Promise.all(['diff','nor_gl','rough'].map(type=>new Promise(resolve=>{let done=false;const finish=t=>{if(done){t?.dispose();return;}done=true;clearTimeout(timer);resolve(t);};const timer=setTimeout(()=>finish(null),timeoutMs);try{loader.loadAsync('assets/'+name+'_'+type+'_'+size+'.jpg').then(finish,()=>finish(null));}catch{finish(null);}})));if(loaded.some(t=>!t)){loaded.forEach(t=>t?.dispose());this.materialFallbacks.push(key);return;}loaded.forEach((t,i)=>{t.wrapS=t.wrapT=T.RepeatWrapping;t.colorSpace=i===0?T.SRGBColorSpace:T.NoColorSpace;t.anisotropy=Math.min(8,this.renderer.capabilities.getMaxAnisotropy());});this.pbr[key]=loaded;}));}
- groundMaterial(size,night){if(!this.pbr?.paving)return this.mat(0xf0eee0,'stone');const key='ground:'+size+':'+night;if(!this.materials.has(key)){const maps=this.pbr.paving.map(t=>{const clone=t.clone();clone.repeat.set(size/2,size/2);return clone;});this.groundMaps??=[];this.groundMaps.push(...maps);this.materials.set(key,new T.MeshStandardMaterial({color:night?0xa7b8c1:0xe8e7db,map:maps[0],normalMap:maps[1],normalScale:new T.Vector2(.7,.7),roughnessMap:maps[2],roughness:night?.65:.95}));}return this.materials.get(key);}
+ groundMaterial(size,night,tint=null){if(!this.pbr?.paving)return this.mat(tint??0xf0eee0,'stone');const key='ground:'+size+':'+night+':'+tint;if(!this.materials.has(key)){const maps=this.pbr.paving.map(t=>{const clone=t.clone();clone.repeat.set(size/2,size/2);return clone;});this.groundMaps??=[];this.groundMaps.push(...maps);this.materials.set(key,new T.MeshStandardMaterial({color:tint??(night?0xa7b8c1:0xe8e7db),map:maps[0],normalMap:maps[1],normalScale:new T.Vector2(.7,.7),roughnessMap:maps[2],roughness:night?.65:.95}));}return this.materials.get(key);}
 
  mat(c,texture=null,opts={}){const key=c+':'+texture+':'+JSON.stringify(opts);if(!this.materials.has(key)){const projected=['stone','brick','hedge'].includes(texture);const m=new T.MeshStandardMaterial({color:c,roughness:.8,...(texture?{map:this.textures[texture],bumpMap:this.textures[texture],bumpScale:projected?.13:.028}:{}),...opts});if(texture==='wood'&&this.pbr?.oak){m.map=this.pbr.oak[0];m.normalMap=this.pbr.oak[1];m.normalScale.set(.32,.32);m.roughnessMap=this.pbr.oak[2];m.bumpMap=null;}if(projected)applyWorldUV(m,texture==='brick'?.58:texture==='stone'?.40:.85);this.materials.set(key,m);}return this.materials.get(key);}
  mesh(geo,mat,parent,x=0,y=0,z=0,sx=1,sy=1,sz=1){const m=new T.Mesh(geo==='sphere'&&Math.max(sx,sy,sz)<.2?this.geo.smallSphere:this.geo[geo]??geo,mat);m.position.set(x,y,z);m.scale.set(sx,sy,sz);m.castShadow=true;m.receiveShadow=true;parent.add(m);return m;}
@@ -71,20 +72,27 @@ export class World{
   this.characters.forEach(m=>m.label.dispose());
   if(this.root){this.scene.remove(this.root);this.root.traverse(o=>{if(o.isInstancedMesh)o.dispose();if(o.isLight&&o.shadow)o.shadow.dispose();if(o.userData.ownGeometry)o.geometry.dispose();if(o.userData.ownMaterial)o.material.dispose();if(o.userData.ownTexture)o.userData.ownTexture.dispose();});}
   this.root=new T.Group();this.scene.add(this.root);this.map=map;this.level=level;this.isBonus=bonus;this.solids=[...map.walls,...map.platforms];this.wallMeshes=[];this.effects=[];this.projectileMeshes.clear();this.characters=[];this.cameraReady=[false,false];this.water=null;this.waterSurfaces=[];this.waterFlows=[];this.ambientParticles=null;this.leafClock??={value:0};
-  const night=['canal','depot','shop','night','fort'].includes(level.theme),hedge=['hedge','garden','corn','fort','orchard','grove'].includes(level.theme),stoneWorld=['quarry','pit'].includes(level.theme),r=rng(level.seed),root=this.root;
+  const night=['canal','depot','shop','night','fort','factory','cannery'].includes(level.theme),hedge=['hedge','garden','corn','fort','orchard','grove'].includes(level.theme),stoneWorld=['quarry','pit'].includes(level.theme),r=rng(level.seed),root=this.root;
+  // Three surfaces the older worlds never needed: a lit shed with a roof over it, open sand, and
+  // a freight yard's asphalt. `indoor` in particular changes what the sky and the horizon mean.
+  const indoor=['factory','cannery'].includes(level.theme),sand=['beach','dunes'].includes(level.theme),yard=['shipment','gantry'].includes(level.theme);
+  this.indoor=indoor;
   this.environment(night);this.scene.background.set(night?0x182d45:0x87b8c9);this.scene.fog.color.copy(this.scene.background);this.renderer.toneMappingExposure=night?1.2:1.03;
-  root.add(makeSky(night,level.theme==='fort'));root.add(new T.HemisphereLight(night?0xadc3fa:0xc1e2fa,0x71614c,night?.7:.75));
+  if(!indoor)root.add(makeSky(night,level.theme==='fort'));
+  root.add(new T.HemisphereLight(indoor?0xe4ecf2:night?0xadc3fa:0xc1e2fa,indoor?0x6b7278:0x71614c,indoor?1.15:night?.7:.75));
   const sun=this.sun=new T.DirectionalLight(night?0xbed6ff:0xffdfab,night?2.1:3.2);sun.position.set(-25,50,20);sun.castShadow=true;sun.shadow.mapSize.set(this.qualityMode==='cinematic'?2048:this.qualityMode==='high'?1536:768,this.qualityMode==='cinematic'?2048:this.qualityMode==='high'?1536:768);const d=map.n*CELL*.55;Object.assign(sun.shadow.camera,{left:-d,right:d,top:d,bottom:-d,near:1,far:120});sun.shadow.bias=-.0004;sun.shadow.normalBias=.04;root.add(sun);
   // Soft opposite-side fill keeps the shadowed side of characters/buildings readable without a second shadow pass.
   const fill=new T.DirectionalLight(night?0x3d5a86:0xcfe3ec,night?.26:.34);fill.position.set(22,16,-18);root.add(fill);
   const dust=ambientDust(150,map.n*CELL*.42,night?3.6:5.5);root.add(dust);this.ambientParticles=dust;
-  const ground=this.mesh(new T.PlaneGeometry(map.n*CELL,map.n*CELL),this.groundMaterial(map.n*CELL,night),root,0,-.005,0);ground.rotation.x=-Math.PI/2;ground.castShadow=false;ground.userData.ownGeometry=true;
+  const groundTint=indoor?0xb4bbc1:sand?0xead3a0:yard?0x8d9095:null;
+  const ground=this.mesh(new T.PlaneGeometry(map.n*CELL,map.n*CELL),indoor?this.mat(groundTint,null,{roughness:.92}):this.groundMaterial(map.n*CELL,night,groundTint),root,0,-.005,0);ground.rotation.x=-Math.PI/2;ground.castShadow=false;ground.userData.ownGeometry=true;
   // Paved perimeter and non-playable surroundings.
-  this.mesh('box',this.mat(night?0x344352:0x7e9b84),root,0,-.52,0,map.n*CELL+120,.5,map.n*CELL+120);
+  this.mesh('box',this.mat(indoor?0x7d848b:sand?0xd9bf8c:night?0x344352:0x7e9b84),root,0,-.52,0,map.n*CELL+120,.5,map.n*CELL+120);
   const half=map.n*CELL/2;
+  if(indoor)this.shedShell(map,half);
   for(const w of map.walls)if(w.prop==='bin')this.bin(w.x,w.z,0).scale.setScalar(1.5);
   for(const b of map.buildings??[]){const g=mapId(level)==='farm'?barn(this,b):this.building(b.x,b.z,b.w,b.h,r,night);if(mapId(level)!=='farm')g.scale.z=b.d/4;this.mesh('box',this.mat(0xd5cbbb,'stone'),root,b.x,.025,b.z,b.w+1.4,.05,b.d+1.4);}
-  const wallMat=this.mat(hedge?(level.theme==='corn'?0xb7ac4f:['orchard','grove'].includes(level.theme)?0x59813f:0x496b45):stoneWorld?0xd6d8ce:(['depot','shop'].includes(level.theme)?0x93a4a5:0xf0dbbc),hedge?'hedge':stoneWorld?'stone':'brick');
+  const wallMat=this.mat(hedge?(level.theme==='corn'?0xb7ac4f:['orchard','grove'].includes(level.theme)?0x59813f:0x496b45):stoneWorld?0xd6d8ce:indoor?0xd5dade:sand?0xe0c48f:yard?0x7f8a90:(['depot','shop'].includes(level.theme)?0x93a4a5:0xf0dbbc),hedge?'hedge':stoneWorld||indoor||sand||yard?'stone':'brick');
   const im=new T.InstancedMesh(this.geo.rounded,wallMat,map.walls.length),dummy=new T.Object3D();im.castShadow=im.receiveShadow=true;
   map.walls.forEach((w,i)=>{dummy.position.set(w.x,w.h/2,w.z);dummy.scale.set((w.prop||w.architecture)?0:w.w,(w.prop||w.architecture)?0:w.h,(w.prop||w.architecture)?0:w.d);dummy.updateMatrix();im.setMatrixAt(i,dummy.matrix);});root.add(im);this.wallMeshes.push(im);
   if(hedge){const foliage=new T.InstancedMesh(this.textures.foliage?this.geo.leaf:this.geo.leafPlain,this.leaves(),map.walls.length*10);map.walls.forEach((w,i)=>{for(let j=0;j<10;j++){const angle=j*2.399;dummy.position.set(w.x+Math.cos(angle)*w.w*.47,w.h-.15+(j%3)*.10,w.z+Math.sin(angle)*w.d*.47);dummy.rotation.set((j%3-1)*.6,angle,Math.sin(angle)*.5);dummy.scale.setScalar(w.prop||w.architecture?0:1.15);dummy.updateMatrix();foliage.setMatrixAt(i*10+j,dummy.matrix);foliage.setColorAt(i*10+j,new T.Color(level.theme==='corn'?0xd0c78a:j%2?0xced39c:0xabc195));}});foliage.castShadow=false;foliage.receiveShadow=true;root.add(foliage);dummy.rotation.set(0,0,0);}
@@ -112,7 +120,13 @@ export class World{
   return g;
  }
  dressEnvironment(map,level,night,r){
-  if(map.waterCells?.length){this.water=waterSurface(0,.045,0,(map.n-2)*CELL,3*CELL,night);this.waterSurfaces.push(this.water);this.root.add(this.water);}
+  if(map.waterCells?.length){
+   // The surface follows wherever the water cells actually are, rather than assuming every map's
+   // water is a canal across the middle. The harbour still gets its canal; the beach gets a tide
+   // line along its own edge.
+   const xs=map.waterCells.map(c=>c.x),zs=map.waterCells.map(c=>c.z);
+   const minX=Math.min(...xs)-CELL/2,maxX=Math.max(...xs)+CELL/2,minZ=Math.min(...zs)-CELL/2,maxZ=Math.max(...zs)+CELL/2;
+   this.water=waterSurface((minX+maxX)/2,.045,(minZ+maxZ)/2,maxX-minX,maxZ-minZ,night);this.waterSurfaces.push(this.water);this.root.add(this.water);}
   dressWorld(this,map,level,night,r);
  }
  addCanalBackdrop(map,night){const half=map.n*CELL/2;this.water=waterSurface(half+5,-.08,0,7,map.n*CELL+20,night);this.waterSurfaces.push(this.water);this.root.add(this.water);for(const side of[-1,1])this.mesh('rounded',this.mat(0x777c72,'stone'),this.root,half+5+side*3.6,.2,0,.35,.6,map.n*CELL+20);}
@@ -150,17 +164,40 @@ export class World{
  // Rooftops for the deep skyline: silhouette and colour only. Sixty metres out and through fog the
  // window detail of a full building cannot be seen, so one of these costs four meshes instead of
  // thirty and batches with its neighbours.
- distantBlock(x,z,width,height,depth,yaw,r,night){
+ distantBlock(x,z,width,height,depth,yaw,r,night,flat=false){
   const g=new T.Group();g.position.set(x,0,z);g.rotation.y=yaw;this.root.add(g);
   const palette=[0xb9a289,0xc8b393,0xa88e78,0xb0a892,0xc4ab8d],facade=this.mat(palette[Math.floor(r()*palette.length)],'brick',{roughness:.92});
   this.mesh('rounded',facade,g,0,height/2,0,width,height,depth);
   // One hipped pyramid rather than two pitched slabs: no gable is needed to close the ends, so the
   // roof cannot read as two planes floating over a box the way an open gable does at this range.
   const roofMat=this.mat(night?0x2b3742:0x3a4a55,'wood',{roughness:.85});
-  this.mesh(this.geo.hipRoof,roofMat,g,0,height+width*.145,0,width*1.02,width*.29,depth*1.02);
-  this.mesh('rounded',facade,g,width*.20,height+width*.24,0,.5,1.3,.5);
+  // A warehouse has a shallow deck, not a pitched roof, so a freight yard's horizon reads as
+  // industrial rather than as a row of houses that happen to be low.
+  if(flat){this.mesh('rounded',roofMat,g,0,height+.22,0,width+.5,.44,depth+.5);this.mesh('rounded',roofMat,g,0,height+.7,-depth*.3,width*.6,.5,.9);}
+  else{this.mesh(this.geo.hipRoof,roofMat,g,0,height+width*.145,0,width*1.02,width*.29,depth*1.02);
+   this.mesh('rounded',facade,g,width*.20,height+width*.24,0,.5,1.3,.5);}
   if(night)this.mesh('rounded',this.mat(0xf6c677,null,{emissive:0xffb35e,emissiveIntensity:.5,roughness:.4}),g,0,height*.55,depth/2+.04,width*.62,.9,.06);
   g.userData.backdrop=true;return g;
+ }
+ // An indoor map needs a building around it, not a horizon: four tall walls, a roof deck and the
+ // strip lights that make the space read as lit from above rather than by an invisible sun.
+ shedShell(map,half){
+  const root=this.root,steel=this.mat(0x7b838c,null,{metalness:.35,roughness:.62}),panel=this.mat(0xc6ccd1,'stone',{roughness:.82}),deck=this.mat(0x9aa2aa,null,{roughness:.85});
+  const reach=half+2.2,top=7.4;
+  for(const side of[-1,1]){
+   this.mesh('box',panel,root,side*reach,top/2,0,.5,top,reach*2+1,);
+   this.mesh('box',panel,root,0,top/2,side*reach,reach*2+1,top,.5);
+   for(let i=-2;i<=2;i++){this.mesh('box',steel,root,side*(reach-.35),top*.55,i*reach*.38,.2,top*.9,.34);this.mesh('box',steel,root,i*reach*.38,top*.55,side*(reach-.35),.34,top*.9,.2);}
+  }
+  const roof=this.mesh('box',deck,root,0,top+.3,0,reach*2+1,.6,reach*2+1);roof.receiveShadow=false;roof.castShadow=false;
+  const truss=this.mat(0x59616a,null,{metalness:.45,roughness:.5});
+  for(let i=-3;i<=3;i++){this.mesh('box',truss,root,0,top-.25,i*reach*.28,reach*2,.22,.22);
+   const lamp=this.mesh('box',this.mat(0xfff0cf,null,{emissive:0xffe6b0,emissiveIntensity:1.5,roughness:.4}),root,0,top-.5,i*reach*.28,reach*1.7,.10,.34);lamp.castShadow=false;}
+  // Lamps down every bay, not one bulb in the middle: an indoor map has no sun, so the light has
+  // to come from the fittings that are visibly there.
+  for(const [lx,lz]of[[0,0],[-half*.55,-half*.55],[half*.55,-half*.55],[-half*.55,half*.55],[half*.55,half*.55]]){
+   const glow=new T.PointLight(0xffeccd,indoorGlow(half),half*2.6,1.5);glow.position.set(lx,top-1.3,lz);root.add(glow);}
+  root.add(new T.AmbientLight(0xdfe6ec,.42));
  }
  leaves(){const key='oak-leaf-clusters';if(!this.materials.has(key))this.materials.set(key,leafMaterial(this.textures.foliage??null,this.leafClock));return this.materials.get(key);}
  tree(x,z,parent,r){return addTree(this,x,z,parent,r);}
