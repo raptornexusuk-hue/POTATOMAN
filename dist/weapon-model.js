@@ -51,5 +51,39 @@ export function makeSpudGun(w,parent){
   geometry.computeBoundingSphere();const batch=new T.Mesh(geometry,material);batch.castShadow=parts[0].castShadow;batch.receiveShadow=parts[0].receiveShadow;batch.userData.ownGeometry=true;gun.add(batch);
   parts.forEach(part=>{gun.remove(part);if(part.userData.ownGeometry)part.geometry.dispose();});baked.forEach(geo=>geo.dispose());
  }
- gun.userData.barrel=barrel;gun.visible=false;return gun;
+ // Per-weapon attachments are added after the bake so they stay toggleable, and every one of them
+ // sits behind the muzzle: the barrel tip is the gun's local origin and the projectile origin, so
+ // nothing may reach past z=0 or the visible muzzle would stop matching where rounds actually leave.
+ const kit={},attach=name=>{const group=new T.Group();group.visible=false;gun.add(group);kit[name]=group;return group;};
+ const fit=(group,geo,mat,x,y,z,sx=1,sy=1,sz=1)=>{const part=w.mesh(geo,mat,group,x,y,z,sx,sy,sz);if(typeof geo!=='string')part.userData.ownGeometry=true;return part;};
+ {// THE PEELER: a cheek-rest stock and a scope sitting over the receiver.
+  const g=attach('scope');
+  fit(g,'rounded',steel,0,.20,-.52,.072,.072,.44);
+  for(const z of[-.70,-.34])fit(g,'rounded',steel,0,.125,z,.030,.11,.030);
+  const lens=fit(g,new T.CircleGeometry(.052,20),w.mat(0x9fd8ea,null,{metalness:.7,roughness:.12}),0,.20,-.295);lens.rotation.y=Math.PI;
+  // A cheek rest, not a full stock: anything further back rides inside the potato's chest.
+  fit(g,'rounded',walnut,0,.085,-.80,.085,.085,.26);
+ }
+ {// CHIP FRYER and SPUD MORTAR: a flared mouth that widens toward, but never past, the muzzle.
+  const g=attach('funnel');
+  for(let i=0;i<4;i++)fit(g,new T.TorusGeometry(.11+i*.035,.016,8,24),steel,0,0,-.20+i*.055);
+  for(const side of[-1,1])fit(g,'rounded',brass,side*.16,0,-.30,.02,.14,.16);
+ }
+ {// STICKY SPUD: a fat revolver drum where a barrel shroud would be.
+  const g=attach('drum');
+  const cylinder=fit(g,'cylinder',steel,0,.01,-.36,.18,.22,.18);cylinder.rotation.x=Math.PI/2;
+  for(let i=0;i<6;i++){const a=i*Math.PI/3;fit(g,'cylinder',rubber,Math.cos(a)*.10,.01+Math.sin(a)*.10,-.36,.04,.24,.04).rotation.x=Math.PI/2;}
+ }
+ {// SPUD RPG: a bulbous warhead sitting just behind the launch tube's mouth.
+  const g=attach('warhead');
+  fit(g,'sphere',w.mat(0xd2563d,null,{roughness:.55}),0,0,-.22,.12,.12,.18);
+  fit(g,'cylinder',steel,0,0,-.40,.075,.26,.075).rotation.x=Math.PI/2;
+  for(const side of[-1,1])fit(g,'rounded',w.mat(0xe8e2d2),side*.09,0,-.50,.012,.13,.13);
+ }
+ {// CHIPPER AUTO: a deep drum magazine slung under the receiver.
+  const g=attach('mag');
+  const pan=fit(g,'cylinder',steel,0,-.20,-.50,.16,.11,.16);pan.rotation.z=Math.PI/2;
+  fit(g,'rounded',brass,0,-.09,-.50,.09,.13,.12);
+ }
+ gun.userData.kit=kit;gun.userData.barrel=barrel;gun.visible=false;return gun;
 }

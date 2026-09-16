@@ -2,8 +2,8 @@ import {earnedKill,loseLoadout,respawnLoadout,awardRoundWins,lastPlaceLine} from
 import {MAPS,mapInfo,mapId,nextCircuitSeed} from './map-catalogue.js';
 import {bodyHeight,eyeHeight,updateStance} from './stance.js';
 import {cameraPose,aimPoint,shotVelocity,cylinderContact,weaponAim,cameraHeight,CAMERA_SHOULDER,DEFAULT_PITCH,MIN_PITCH,MAX_PITCH} from './aiming.js';
-import {createWeaponPickup,claimWeapon,useWeaponRound,dropWeapon} from './weapon-pickup.js';
-import {THROW_DURATION,THROW_WINDUP,WEAPONS,equipWeapon,weaponConfig} from './weapons.js';
+import {createWeaponPickup,claimWeapon,useWeaponRound,dropWeapon,rearmWeapon} from './weapon-pickup.js';
+import {THROW_DURATION,THROW_WINDUP,WEAPONS,equipWeapon,weaponConfig,dropFactor} from './weapons.js';
 import {SOUND_TYPES} from './spatial-audio.js';
 import {GameAudio,permittedVoice} from './game-audio.js';
 import {AI_LEVELS,aiSettings} from './difficulty.js';
@@ -134,7 +134,7 @@ function spawnWeaponPads(){const item=createWeaponPickup(map,currentLevel().seed
 function sharedWeapon(){return pickups.find(p=>p.kind==='weapon');}
 function syncWeaponItem(item){if(!item)return;item.mesh.visible=item.phase==='available';item.mesh.position?.set(item.x,0,item.z);world.relabelWeaponDrop?.(item.mesh,item.weapon,item.ammo);}
 function dropHeldWeapon(p){const item=sharedWeapon();if(dropWeapon(item,p,map)){syncWeaponItem(item);sound('weaponDrop',item);}}
-function updateSharedWeapon(){const item=sharedWeapon();if(!item)return;const p=claimWeapon(item,players,currentLevel().seed+levelIndex,bonus);if(p){syncWeaponItem(item);sound('weaponPickup',p);if(p.id===(online?.slot??0))quip(WEAPONS[item.weapon].name+' · '+p.mag+' SHOTS',true,'');}}
+function updateSharedWeapon(dt=0){const item=sharedWeapon();if(!item)return;if(rearmWeapon(item,dt,currentLevel().seed+levelIndex,bonus)){syncWeaponItem(item);sound('weaponDrop',item);if(!bonus)quip(WEAPONS[item.weapon].name+' IN THE BOX',false);}const p=claimWeapon(item,players,currentLevel().seed+levelIndex,bonus);if(p){syncWeaponItem(item);sound('weaponPickup',p);if(p.id===(online?.slot??0))quip(WEAPONS[item.weapon].name+' · '+p.mag+' SHOTS',true,'');}}
 function updatePowerups(dt){for(const item of pickups){if(item.kind==='weapon')continue;if(item.collected){item.respawn=Math.max(0,item.respawn-dt);if(item.respawn<=0){item.collected=false;item.mesh.visible=true;}continue;}item.mesh.rotation&&(item.mesh.rotation.y=time*.65);for(const p of players){if(p.respawn>0||p.y>1.4||Math.hypot(p.x-item.x,p.z-item.z)>1.0)continue;applyPowerup(p,item.kind);item.collected=true;item.respawn=18;item.mesh.visible=false;sound('boost_'+item.kind,p);if(p.id===(online?.slot??0))quip(POWERUPS[item.kind].label+'!',true,item.kind==='run'?'Buttery':item.kind==='fire'?'Potato Bomb':'Chipper');break;}}}
 function pause(){if(state!=='playing'||paused)return;releaseMouse();$('pauseMessage').textContent=online&&!online.isHost?'Your controls are paused. The online match continues.':'The clock and all players are paused.';paused=true;clearInput();gameAudio.stopVoice();syncAudio();dialog('pauseDialog');}
 function resume(){if(state!=='playing')return;$('pauseDialog').close();paused=false;clearInput();acc=0;last=performance.now();$('world').focus({preventScroll:true});initAudio();syncAudio();}
@@ -188,11 +188,15 @@ function launchShot(p){const w=weaponConfig(p);if(w.ammo){p.mag--;useWeaponRound
  const speed=w.speed*((!bonus&&time<15&&penalty.has(p.id)&&!w.gun)?.9:1),solids=[...map.walls,...map.platforms],{velocity,obstruction}=weaponAim(p,players.filter(q=>!bonus||q.runner),solids,!bonus&&currentLevel().mode==='smash'?targets:[],speed);
  p.visualShotSpeed=speed;
  if(p.weapon!=='throw')world.flash?.(velocity.x,velocity.y,velocity.z,w.color);
- for(let pellet=0;pellet<w.pellets;pellet++){const angle=(pellet-(w.pellets-1)/2)*w.spread,c=Math.cos(angle),s=Math.sin(angle);shots.push({id:++shotId,owner:p.id,...velocity,...(obstruction??{}),vx:velocity.vx*c-velocity.vz*s,vz:velocity.vx*s+velocity.vz*c,age:0,gun:w.gun,weapon:p.weapon,damage:w.damage});}
+ // Spread is a cone, not a fan: an odd pellet count keeps one round dead centre, and each pellet
+ // carries its own copy of the weapon's ballistics so the simulation never has to look the
+ // weapon up again mid-flight.
+ for(let pellet=0;pellet<w.pellets;pellet++){const angle=(pellet-(w.pellets-1)/2)*w.spread+(w.pellets>3?(rng(shotId+pellet*31)()-.5)*w.spread*.9:0),c=Math.cos(angle),sn=Math.sin(angle);
+  shots.push({id:++shotId,owner:p.id,...velocity,...(obstruction??{}),vx:velocity.vx*c-velocity.vz*sn,vz:velocity.vx*sn+velocity.vz*c,age:0,gun:w.gun,weapon:p.weapon,damage:w.damage,drop:dropFactor(w),life:w.life??(w.blast?3:2),blast:w.blast??0,blastDamage:w.blastDamage??0,pierce:w.pierce??0,color:w.color});}
  sound('shot_'+p.weapon,p);
  if(w.ammo&&!p.mag){const cd=p.throwCD;equipWeapon(p,'spud');p.throwCD=cd;}
 }
-function explode(s,direct=null){world.burst(s.x,s.z,0xff9f36,24);world.shockwave?.(s.x,s.z,0xffb35e,4.8);sound('explosion',s);for(const p of players){if(p===direct||p.respawn>0||(bonus&&!p.runner))continue;const d=Math.hypot(p.x-s.x,p.z-s.z);if(d<4.5&&clearShot(s,p,map.walls))hit(p,{...s,gun:true,damage:Math.round(80*(1-d/4.5))});}if(!bonus&&currentLevel().mode==='smash')for(const t of targets){if(t.hp>0&&Math.hypot(t.x-s.x,t.z-s.z)<4.5&&clearShot(s,t,map.walls)){t.hp=0;t.mesh.visible=t.ring.visible=false;t.respawn=6;players[s.owner].score++;players[s.owner].points+=50;world.shockwave?.(t.x,t.z,0xffd36b,2.4);}}}
+function explode(s,direct=null){const radius=s.blast||4.5,power=s.blastDamage||80;world.burst(s.x,s.z,s.color??0xff9f36,Math.round(14+radius*2.6));world.shockwave?.(s.x,s.z,0xffb35e,radius);sound('explosion',s);for(const p of players){if(p===direct||p.respawn>0||(bonus&&!p.runner))continue;const d=Math.hypot(p.x-s.x,p.z-s.z);if(d<radius&&clearShot(s,p,map.walls))hit(p,{...s,gun:true,damage:Math.round(power*(1-d/radius))});}if(!bonus&&currentLevel().mode==='smash')for(const t of targets){if(t.hp>0&&Math.hypot(t.x-s.x,t.z-s.z)<radius&&clearShot(s,t,map.walls)){t.hp=0;t.mesh.visible=t.ring.visible=false;t.respawn=6;players[s.owner].score++;players[s.owner].points+=50;world.shockwave?.(t.x,t.z,0xffd36b,2.4);}}}
 function resetView(p){resetCamera(p);if(p.id===(online?.slot??0)||duo&&p.id<2){settings.zoom=4.6;cameraValues();persist();}}
 function actions(p,input,index){if(updateStance(p,input.crouch,[...map.walls,...map.platforms]))sound('crouch',p);if(input.resetCamera&&!prior[index]?.resetCamera)resetView(p);if(input.jump&&!prior[index]?.jump&&jump(p))sound('jump',p);if(p.respawn>0)return;const race=!bonus&&isTrial(currentLevel());if(input.dodge&&!prior[index]?.dodge&&p.dashCD<=0){let dx=input.x,dz=input.z,l=Math.hypot(dx,dz);if(l<.1){dx=Math.sin(p.yaw);dz=-Math.cos(p.yaw);l=1;}p.dashX=dx/l;p.dashZ=dz/l;p.dashTime=.16;p.dashCD=p.runner?2.6:2;sound('dash',p);}
  if(!race){if(input.fire&&!p.runner)fire(p);if(input.catch&&!prior[index]?.catch&&p.catchCD<=0&&!p.runner){p.catchTime=levelIndex<3?.26:.21;p.catchCD=.8;}}
@@ -266,8 +270,11 @@ function botInput(p,dt){const ai=aiSettings(settings.difficulty,levelIndex);p.ai
  // instead of filing along one identical line.
  const lane=LANES[p.id%LANES.length];if(lane&&l>1.2){const px=-dz/l,pz=dx/l;dx+=px*lane;dz+=pz*lane;l=Math.hypot(dx,dz);}
  let moving=l>.3;
- let aim=(!bonus&&mode==='smash')?targets.filter(t=>t.hp>0).sort((a,b)=>Math.hypot(a.x-p.x,a.z-p.z)-Math.hypot(b.x-p.x,b.z-p.z))[0]:enemy,canShoot=aim&&Math.hypot(aim.x-p.x,aim.z-p.z)<21&&clearShot(p,aim,map.walls)&&(!bonus||!p.runner)&&!isTrial(currentLevel());
- if(bonus&&!p.runner&&aim)canShoot=Math.hypot(aim.x-p.x,aim.z-p.z)<26&&clearShot(p,aim,map.walls);
+ // Engagement range follows the weapon, so a bot holding a burn-out sprayer closes the distance
+ // and one holding the rifle opens it instead of every bot fighting at the same 21 metres.
+ const reach=weaponConfig(p).life?6.5:p.weapon==='peeler'?34:p.weapon==='mortar'?26:21;
+ let aim=(!bonus&&mode==='smash')?targets.filter(t=>t.hp>0).sort((a,b)=>Math.hypot(a.x-p.x,a.z-p.z)-Math.hypot(b.x-p.x,b.z-p.z))[0]:enemy,canShoot=aim&&Math.hypot(aim.x-p.x,aim.z-p.z)<reach&&clearShot(p,aim,map.walls)&&(!bonus||!p.runner)&&!isTrial(currentLevel());
+ if(bonus&&!p.runner&&aim)canShoot=Math.hypot(aim.x-p.x,aim.z-p.z)<Math.max(26,reach)&&clearShot(p,aim,map.walls);
  if(bonus&&p.runner)canShoot=false;
  // Keep bodies separate while taking up firing/zone positions, including exact overlaps.
  if(combat&&!p.runner&&!seekingBox){let sx=0,sz=0;for(const q of players){if(q.id===p.id||q.respawn>0)continue;const distance=Math.hypot(p.x-q.x,p.z-q.z);if(distance<1.25){const a=(p.id-q.id)*2.4;sx+=(distance>.01?(p.x-q.x)/distance:Math.cos(a))*(1.25-distance);sz+=(distance>.01?(p.z-q.z)/distance:Math.sin(a))*(1.25-distance);}}if(Math.hypot(sx,sz)>.05){
@@ -306,21 +313,26 @@ function tick(dt){readInputs(dt);if(paused&&(!online||online.isHost))return;if(o
  }
  if(state!=='playing')return;
  if(!bonus)updatePowerups(dt);
- updateSharedWeapon();
+ updateSharedWeapon(dt);
  if(!bonus&&mode==='capture'){const pos=zonePosition();world.zone.position.set(pos.x,.03,pos.z);const inside=players.filter(p=>p.respawn<=0&&Math.hypot(p.x-pos.x,p.z-pos.z)<3);if(inside.length===1){inside[0].score+=dt;inside[0].points+=dt*5;}}
- for(let i=shots.length-1;i>=0;i--){const s=shots[i],ax=s.x,ay=s.y,az=s.z;s.age+=dt;s.x+=s.vx*dt;s.z+=s.vz*dt;s.y+=s.vy*dt-(s.gun?0:THROW_DROP*dt*dt);if(!s.gun)s.vy-=2*THROW_DROP*dt;
- let gone=s.age>(s.weapon==='rpg'?3:2)||s.y<.1;let direct=null;
+ for(let i=shots.length-1;i>=0;i--){const s=shots[i],ax=s.x,ay=s.y,az=s.z,g=s.drop*THROW_DROP;s.age+=dt;s.x+=s.vx*dt;s.z+=s.vz*dt;s.y+=s.vy*dt-g*dt*dt;if(g)s.vy-=2*g*dt;
+ // A fused round detonates on its own clock; a burn-out round simply expires. Both read as
+ // `life` running out, and only a round carrying a blast does anything when it does.
+ const expired=s.age>s.life;let gone=expired||s.y<.1;let direct=null;
  if(!gone){let contact={t:Infinity,type:null,value:null};
   for(const w of [...map.walls,...map.platforms]){const t=boxContact3D(ax,ay,az,s.x,s.y,s.z,w,s.gun&&s.weapon!=='rpg'?.025:.18);if(t<contact.t)contact={t,type:'wall',value:w};}
   for(const p of players){if(p.id===s.owner||p.respawn>0||(bonus&&!p.runner))continue;const t=cylinderContact({x:ax,y:ay,z:az},s,p,s.gun?.03:.15);if(t<contact.t)contact={t,type:'player',value:p};}
   if(!bonus&&mode==='smash')for(const t of targets){if(t.hp<=0)continue;const at=circleContact(ax,az,s.x,s.z,t.x,t.z,.65);if(at<contact.t)contact={t:at,type:'target',value:t};}
   if(Number.isFinite(contact.t)){s.x=ax+(s.x-ax)*contact.t;s.y=ay+(s.y-ay)*contact.t;s.z=az+(s.z-az)*contact.t;gone=true;
-   if(contact.type==='player'){direct=contact.value;hit(contact.value,s);}
+   // A piercing round spends one charge on the body it passed through and carries on from the
+   // far side of it, so a single well-led shot can line two rivals up.
+   if(contact.type==='player'&&s.pierce>0){s.pierce--;hit(contact.value,s);gone=false;s.x+=s.vx*.06;s.z+=s.vz*.06;s.y+=s.vy*.06;}
+   else if(contact.type==='player'){direct=contact.value;hit(contact.value,s);}
    else if(contact.type==='target'){const t=contact.value;t.hp-=s.damage;t.mesh.scale?.setScalar(t.hp>0?.9:1);world.burst(t.x,t.z);if(t.hp<=0){players[s.owner].score++;players[s.owner].points+=50;t.mesh.visible=t.ring.visible=false;t.respawn=6;sound('hit',t);world.shockwave?.(t.x,t.z,0xffd36b,2.4);}}
    else{world.burst(s.x,s.z,0xc9af82,4);sound('impact',s);}
   }
  }
- if(gone){if(s.weapon==='rpg')explode(s,direct);shots.splice(i,1);}if(state!=='playing')return;
+ if(gone){if(s.blast)explode(s,direct);shots.splice(i,1);}if(state!=='playing')return;
  }
  for(const t of targets)if(t.hp<=0){t.respawn-=dt;if(t.respawn<=0){t.hp=80;t.mesh.scale?.setScalar(1);t.mesh.visible=t.ring.visible=true;}}
  if(time>captionUntil)$('caption').textContent='';

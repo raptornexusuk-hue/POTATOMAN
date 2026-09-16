@@ -14,6 +14,8 @@ const p={id:0,name:'AUDIT',hp:100,x:0,y:0,z:0,yaw:0,pitch:-.08,respawn:0,crouchi
 const initial={...p},m=w.characters[0],body=m.bob.children[0];
 const all=[];
 const n=number=>+number.toFixed(5),vec=v=>v.toArray().slice(0,3).map(n);
+// Hidden per-weapon attachments are geometry nobody can see, so only the visible kit is measured.
+const shown=object=>{for(let o=object;o;o=o.parent)if(!o.visible)return false;return true;};
 function triList(mesh){const g=mesh.geometry,arr=g.attributes.position,ix=g.index,triangles=[];for(let i=0;i<(ix?.count??arr.count);i+=3){const vs=[0,1,2].map(j=>new T.Vector3().fromBufferAttribute(arr,ix?ix.getX(i+j):i+j).applyMatrix4(mesh.matrixWorld));const tri=new T.Triangle(...vs);triangles.push({tri,box:new T.Box3().setFromPoints(vs),center:tri.getMidpoint(new T.Vector3())});}return triangles;}
 function bvh(tris){const box=new T.Box3();for(const t of tris)box.union(t.box);if(tris.length<=10)return{box,tris};const s=box.getSize(new T.Vector3()),axis=s.x>s.y&&s.x>s.z?'x':s.y>s.z?'y':'z';tris.sort((a,b)=>a.center[axis]-b.center[axis]);const mid=Math.floor(tris.length/2);return{box,left:bvh(tris.slice(0,mid)),right:bvh(tris.slice(mid))};}
 const rayDir=new T.Vector3(.717,.373,.589).normalize();
@@ -25,14 +27,15 @@ function meshPoints(mesh){const arr=mesh.geometry.attributes.position,keys=new S
 function metric(tree,meshes){let points=0,penetrating=0,deepPenetrating=0,maxDepth=0,deepest=null;for(const mesh of meshes){for(const v of meshPoints(mesh)){points++;if(inside(tree,v)){penetrating++;const near=closest(tree,v);if(near.distance>.0200001)deepPenetrating++;if(near.distance>maxDepth){maxDepth=near.distance;deepest=v;}}}}return{points,penetrating,deepPenetrating,maxDepth:n(maxDepth),deepest:deepest?vec(deepest):null};}
 function pose(opts,withTree=true){Object.assign(p,initial,opts);m.crouchBlend=opts.crouchBlend??(p.crouching?1:0);m.walk=opts.walk??0;m.stride=opts.stride??0;m.gaitX=opts.gaitX??0;m.gaitZ=opts.gaitZ??1;m.lastX=p.x;m.lastZ=p.z;w.updatePlayers([p],0,0);w.root.updateMatrixWorld(true);return withTree?bvh(triList(body)):null;}
 
+const GUNS=['spud','repeater','scatter','masher','rpg','peeler','fryer','sticky','mortar'];
 const cases=[];
 for(const crouching of[false,true]){
  for(const elapsed of[0,.035,.068,.095,.12,.20,.27,.37,.46])cases.push({weapon:'throw',crouching,shotAnim:elapsed===.46?0:.46-elapsed});
- for(const weapon of['spud','repeater','scatter','masher','rpg'])for(const pitch of[MIN_PITCH,0,MAX_PITCH])cases.push({weapon,crouching,pitch});
+ for(const weapon of GUNS)for(const pitch of[MIN_PITCH,0,MAX_PITCH])cases.push({weapon,crouching,pitch});
  for(const runner of[false,true])for(const grounded of[true,false])cases.push({runner,crouching,grounded,dashTime:.08,walk:1,stride:.7});
 }
 // Reachable crouch frames while dashing and aiming down previously buried a glove fingertip.
-for(const weapon of['spud','repeater','masher'])for(const crouchBlend of[.35,.65,.82330555,1])cases.push({weapon,pitch:MIN_PITCH,crouching:true,crouchBlend,dashTime:.08,grounded:true,walk:1.35,stride:0,shotAnim:.09});
+for(const weapon of GUNS)for(const crouchBlend of[.35,.65,.82330555,1])cases.push({weapon,pitch:MIN_PITCH,crouching:true,crouchBlend,dashTime:.08,grounded:true,walk:1.35,stride:0,shotAnim:.09});
 // Boosted recovery combined with crouch/dash must not crumple the arm surface.
 for(const shotDuration of[.46,.3286])for(const crouchBlend of[0,.5,1])for(const dashTime of[0,.08])for(const clock of[.01,.05,.085,.12,.15,.18,.22,.26,.30,.32])cases.push({weapon:'throw',shotDuration,shotAnim:shotDuration-clock,crouching:crouchBlend>0,crouchBlend,dashTime,grounded:true,walk:1.35,stride:.7});
 // Walk direction and opposite stride extremes expose attachment failures missed by idle poses.
@@ -49,7 +52,7 @@ for(const opts of cases){const tree=pose(opts),scale=p.runner?1.18:1;
    if(inside(tree,point)){const depth=closest(tree,point).distance/scale;maxDepth=Math.max(maxDepth,depth);assert.ok(depth<=.020001,`torso clipping ${depth.toFixed(4)}m in ${part===a.upper?'upper':part===a.lower?'forearm':'hand'} at ${JSON.stringify(opts)}`);}
   }
  }
- if(m.gun.visible){const parts=[];m.gun.traverse(o=>{if(o.isMesh)parts.push(o);});const collision=metric(tree,parts);assert.ok(collision.maxDepth/scale<=.02,`weapon mesh must remain outside torso: ${collision.maxDepth}m at ${JSON.stringify(opts)}`);}
+ if(m.gun.visible){const parts=[];m.gun.traverse(o=>{if(o.isMesh&&shown(o))parts.push(o);});const collision=metric(tree,parts);assert.ok(collision.maxDepth/scale<=.02,`weapon mesh must remain outside torso: ${collision.maxDepth}m at ${JSON.stringify(opts)}`);}
  if(m.heldSpud.visible){const clearance=metric(tree,[m.heldSpud]);assert.ok(clearance.maxDepth/scale<=.02,'held potato must stay outside torso');}
 }
 console.log(`PASS ${cases.length} actual torso/arm/hand/spud mesh poses: no deep penetration or disconnected shoulders`);
@@ -57,7 +60,7 @@ const joint=()=>m.arms.map(a=>({elbow:a.userData.joint.position.clone(),wrist:a.
 for(const crouching of[false,true])for(const dashTime of[0,.08]){
  let previous;
  for(let i=0;i<=920;i++){pose({weapon:'throw',crouching,dashTime,walk:1,stride:.7,shotAnim:i===920?0:.46-i*.0005},false);const now=joint();if(previous)for(let j=0;j<2;j++)assert.ok(now[j].elbow.distanceTo(previous[j].elbow)<.035,`throw elbow discontinuity at ${JSON.stringify({i,crouching,dashTime,j,distance:now[j].elbow.distanceTo(previous[j].elbow)})}`);previous=now;}
- for(const weapon of['spud','scatter','rpg']){previous=null;for(let i=0;i<=310;i++){pose({weapon,crouching,dashTime,pitch:MIN_PITCH+i*.005},false);const now=joint();if(previous)for(let j=0;j<2;j++)assert.ok(now[j].elbow.distanceTo(previous[j].elbow)<.025,'aiming cannot snap elbows between solutions');previous=now;}}
+ for(const weapon of GUNS){previous=null;for(let i=0;i<=310;i++){pose({weapon,crouching,dashTime,pitch:MIN_PITCH+i*.005},false);const now=joint();if(previous)for(let j=0;j<2;j++)assert.ok(now[j].elbow.distanceTo(previous[j].elbow)<.025,'aiming cannot snap elbows between solutions');previous=now;}}
 }
 console.log('PASS continuous elbows through full throw cycles and gun pitch sweeps, standing/crouched/dashing');
 pose({weapon:'throw',shotAnim:.46-.12});const release=muzzlePosition(p),point=m.heldSpud.getWorldPosition(new T.Vector3());assert.ok(point.distanceTo(new T.Vector3(release.x,release.y,release.z))<1e-7);

@@ -1,6 +1,6 @@
 import {boxContact3D,THROW_DROP} from './core.js';
 import {bodyHeight,bodyScale,muzzleHeight} from './stance.js';
-import {weaponConfig} from './weapons.js';
+import {weaponConfig,dropFactor} from './weapons.js';
 const GUN_TUNING={lightRight:.60,lightLift:.10,heavyRight:.42,heavyForward:.90,heavyLift:0};
 export const MIN_PITCH=-.85,MAX_PITCH=.70,DEFAULT_PITCH=-.08,CAMERA_SHOULDER=.98;
 export const cameraHeight=p=>(p.crouching?1.17:1.55)*bodyScale(p);
@@ -35,18 +35,21 @@ export function aimPoint(p,view,players,solids,targets=[],range=28){const camera
  if(dir.y<0){const ground=(.05-a.y)/(b.y-a.y);if(ground>=0)at=Math.min(at,ground);}
  return{x:mix(a.x,b.x,at),y:mix(a.y,b.y,at),z:mix(a.z,b.z,at)};
 }
-export function shotVelocity(p,target,speed,gun=false,muzzle=muzzlePosition(p)){const d=Math.max(.05,Math.hypot(target.x-muzzle.x,target.z-muzzle.z)),t=d/speed;return{...muzzle,vx:(target.x-muzzle.x)/d*speed,vz:(target.z-muzzle.z)/d*speed,vy:(target.y-muzzle.y)/t+(gun?0:THROW_DROP*t)};}
+// `drop` is a multiplier on THROW_DROP, not a flag: 0 for flat rounds, 1 for a thrown spud, more
+// for a mortar. The launch solver has to use the same number the simulation does or the crosshair
+// stops meaning anything.
+export function shotVelocity(p,target,speed,drop=1,muzzle=muzzlePosition(p)){const d=Math.max(.05,Math.hypot(target.x-muzzle.x,target.z-muzzle.z)),t=d/speed;return{...muzzle,vx:(target.x-muzzle.x)/d*speed,vz:(target.z-muzzle.z)/d*speed,vy:(target.y-muzzle.y)/t+drop*THROW_DROP*t};}
 
 export function weaponAim(p,players,solids,targets=[],speed=weaponConfig(p).speed){const w=weaponConfig(p),view=cameraPose(p,{zoom:p.cameraDistance},solids),target=aimPoint(p,view,players,solids,targets,w.gun?60:28),scale=bodyScale(p),origin={x:p.x,y:(p.y??0)+muzzleHeight(p),z:p.z};let muzzle=muzzlePosition(p),velocity,nearTarget=false;
  if(p.weapon!=='throw'){
   // Aim around a shoulder grip, rather than swinging the stock around a fixed muzzle.
-  const twoHanded=p.weapon==='scatter'||p.weapon==='rpg',gripRight=twoHanded?GUN_TUNING.heavyRight:GUN_TUNING.lightRight,gripForward=twoHanded?GUN_TUNING.heavyForward:.64,grip={x:p.x+Math.cos(p.yaw)*gripRight*scale+Math.sin(p.yaw)*gripForward*scale,y:origin.y+(twoHanded?GUN_TUNING.heavyLift:GUN_TUNING.lightLift),z:p.z+Math.sin(p.yaw)*gripRight*scale-Math.cos(p.yaw)*gripForward*scale},length=(p.weapon==='rpg'?.69:p.weapon==='scatter'?.62:.55)*scale;
+  const twoHanded=['scatter','rpg','mortar','fryer'].includes(p.weapon),gripRight=twoHanded?GUN_TUNING.heavyRight:GUN_TUNING.lightRight,gripForward=twoHanded?GUN_TUNING.heavyForward:.64,grip={x:p.x+Math.cos(p.yaw)*gripRight*scale+Math.sin(p.yaw)*gripForward*scale,y:origin.y+(twoHanded?GUN_TUNING.heavyLift:GUN_TUNING.lightLift),z:p.z+Math.sin(p.yaw)*gripRight*scale-Math.cos(p.yaw)*gripForward*scale},length=(p.weapon==='rpg'?.69:p.weapon==='peeler'?.78:p.weapon==='scatter'?.62:.55)*scale;
   nearTarget=Math.hypot(target.x-grip.x,target.y-grip.y,target.z-grip.z)<length+.12;
-  velocity=shotVelocity(p,target,speed,w.gun,grip);
-  for(let i=0;i<5;i++){const norm=Math.hypot(velocity.vx,velocity.vy,velocity.vz);muzzle={x:grip.x+velocity.vx/norm*length,y:grip.y+velocity.vy/norm*length,z:grip.z+velocity.vz/norm*length};if(!nearTarget)velocity=shotVelocity(p,target,speed,w.gun,muzzle);}
+  velocity=shotVelocity(p,target,speed,dropFactor(w),grip);
+  for(let i=0;i<5;i++){const norm=Math.hypot(velocity.vx,velocity.vy,velocity.vz);muzzle={x:grip.x+velocity.vx/norm*length,y:grip.y+velocity.vy/norm*length,z:grip.z+velocity.vz/norm*length};if(!nearTarget)velocity=shotVelocity(p,target,speed,dropFactor(w),muzzle);}
   velocity={...velocity,...muzzle};
- }else velocity=shotVelocity(p,target,speed,w.gun,muzzle);
+ }else velocity=shotVelocity(p,target,speed,dropFactor(w),muzzle);
  // A barrel crossing cover impacts at that cover. It never retracts into the avatar.
- let contact=Infinity;for(const wall of solids)contact=Math.min(contact,boxContact3D(origin.x,origin.y,origin.z,muzzle.x,muzzle.y,muzzle.z,wall,w.gun&&p.weapon!=='rpg'?.025:.18));
+ let contact=Infinity;for(const wall of solids)contact=Math.min(contact,boxContact3D(origin.x,origin.y,origin.z,muzzle.x,muzzle.y,muzzle.z,wall,w.gun&&!w.blast?.025:.18));
  const obstruction=Number.isFinite(contact)?{x:mix(origin.x,muzzle.x,contact),y:mix(origin.y,muzzle.y,contact),z:mix(origin.z,muzzle.z,contact)}:nearTarget?target:null;
  return{target,velocity,obstruction};}

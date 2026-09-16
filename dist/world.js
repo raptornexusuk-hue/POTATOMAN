@@ -21,6 +21,10 @@ const STEP_REACH=.30,STRIDE_RATE=Math.PI/(2*STEP_REACH),TAU=Math.PI*2;
 // eye at a constant size the way a lid actually moves. Open, it is tipped back out of sight behind
 // the brow; the sweep below carries it down across the front.
 const LID_OPEN=-1.18;
+// bulk/length are scales on the shared launcher mesh; kit names an optional attachment group.
+const GUN_SHAPES={spud:{bulk:1,length:.72},repeater:{bulk:1,length:.74,kit:'mag'},scatter:{bulk:1.06,length:.82},
+ masher:{bulk:.92,length:.70},rpg:{bulk:1.2,length:.91,kit:'warhead'},peeler:{bulk:.88,length:.92,kit:'scope'},
+ fryer:{bulk:1.16,length:.60,kit:'funnel'},sticky:{bulk:1.1,length:.56,kit:'drum'},mortar:{bulk:1.26,length:.74,kit:'funnel'}};
 const footReach=(phase,walk)=>{const cycle=((phase%TAU)+TAU)%TAU;return walk*STEP_REACH*(cycle<Math.PI?-Math.cos(cycle):1-2*(cycle-Math.PI)/Math.PI);};
 
 export class World{
@@ -294,7 +298,11 @@ export class World{
   direction.set(0,1.09*m.bob.scale.y,0).applyEuler(m.bob.rotation);m.bob.position.x=-direction.x;m.bob.position.z=-direction.z;m.bob.position.y+=1.09*m.bob.scale.y-direction.y;
 
   m.legs.forEach((leg,j)=>{const phase=stride+j*Math.PI,air=p.grounded===false,up=air?.16+(.06*j):Math.max(0,Math.sin(phase))*.135*walk,step=footReach(phase,walk),x=step*(m.gaitX??0),z=step*(m.gaitZ??1);hip.set(0,.78-crouch*.19,0);ankle.set(x,.315+up,z);knee.set(x*.5,(hip.y+ankle.y)*.5,(hip.z+ankle.z)*.5+.11+crouch*.21);const {thigh,shin,foot}=leg.userData;leg.userData.knee.position.copy(knee);for(let segment=0;segment<2;segment++){const mesh=segment?shin:thigh,a=segment?knee:hip,b=segment?ankle:knee,width=segment?.125:.135;mesh.position.copy(a).add(b).multiplyScalar(.5);direction.copy(b).sub(a);const length=direction.length();mesh.quaternion.setFromUnitVectors(upAxis,direction.normalize());mesh.scale.set(width,length*.58,width*1.06);}foot.position.set(x,.09+up,z);foot.rotation.x=air?-.20:Math.max(0,Math.sin(phase))*.05*walk;});
-  m.gun.visible=p.weapon!=='throw'&&!p.runner&&(!isTrial(this.level)||this.isBonus);m.gun.scale.set(p.weapon==='rpg'?1.2:1,p.weapon==='rpg'?1.2:1,p.weapon==='rpg'?.91:p.weapon==='scatter'?.82:.72);
+  m.gun.visible=p.weapon!=='throw'&&!p.runner&&(!isTrial(this.level)||this.isBonus);
+  // Each weapon gets its own bulk, length and attachment, so what a rival is carrying is readable
+  // across the arena. Length scales the whole launcher, which keeps the muzzle on the gun's origin.
+  const shape=GUN_SHAPES[p.weapon]??GUN_SHAPES.spud;m.gun.scale.set(shape.bulk,shape.bulk,shape.length);
+  for(const [name,group]of Object.entries(m.gun.userData.kit??{}))group.visible=shape.kit===name;
   if(m.gun.visible){const {velocity}=weaponAim(p,aimPlayers,this.solids,this.level.mode==='smash'&&!this.isBonus?(this.aimTargets??[]):[],p.shotAnim>0?p.visualShotSpeed:undefined),scale=p.runner?1.18:1;inverse.copy(m.g.quaternion).invert();direction.set(velocity.vx,velocity.vy,velocity.vz).normalize().applyQuaternion(inverse);m.gun.position.set(velocity.x-p.x,velocity.y-(p.y??0),velocity.z-p.z).applyQuaternion(inverse).divideScalar(scale);m.gun.quaternion.setFromUnitVectors(forward,direction);m.gun.scale.z*=1-throwSwing*.025;}
 
   poseArms(m,p,stride,walk,crouch,!isTrial(this.level)||this.isBonus);

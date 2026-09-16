@@ -11,13 +11,13 @@ World.prototype.loadMaterials=async function(){};
 const w=new World({},renderer);await w.ready;
 const player=id=>({id,name:'TEST',hp:100,x:0,y:0,z:0,yaw:0,pitch:-.08,respawn:0,crouching:false,runner:false,dashTime:0,shotAnim:0,catchTime:0,reload:0,gun:false,weapon:'spud',panX:0,panY:0,cameraDistance:4.6,grounded:true});
 const players=[player(0),{...player(1),z:-8}],p=players[0];w.build(makeMap(LEVELS[0]),LEVELS[0],players,false);w.solids=[];
-for(const crouching of[false,true])for(const yaw of[0,1.3,-2.7])for(const pitch of[MIN_PITCH,-.08,MAX_PITCH])for(const weapon of['spud','scatter','rpg']){
+for(const crouching of[false,true])for(const yaw of[0,1.3,-2.7])for(const pitch of[MIN_PITCH,-.08,MAX_PITCH])for(const weapon of['spud','scatter','rpg','peeler','fryer','sticky','mortar','repeater','masher']){
  Object.assign(p,{crouching,yaw,pitch,weapon,shotAnim:.08,dashTime:.1});w.updatePlayers(players,3,1/60);w.root.updateMatrixWorld(true);
  const m=w.characters[0],barrel=m.gun.userData.barrel,tip=barrel.localToWorld(new T.Vector3(0,.5,0)),v=weaponAim(p,players,[]).velocity;
  assert.ok(tip.distanceTo(new T.Vector3(v.x,v.y,v.z))<1e-6,'visible barrel tip must equal actual projectile origin');
  const barrelAxis=tip.clone().sub(barrel.localToWorld(new T.Vector3(0,-.5,0))).normalize();assert.ok(barrelAxis.distanceTo(new T.Vector3(v.vx,v.vy,v.vz).normalize())<1e-6,'barrel direction must follow actual launch velocity');
 }
-console.log('PASS actual barrel geometry matches projectile origin/direction for 54 stance, pitch, yaw and weapon combinations, including recoil');
+console.log('PASS actual barrel geometry matches projectile origin/direction for every weapon across 162 stance, pitch and yaw combinations, including recoil');
 Object.assign(p,player(0));
 for(const crouching of[false,true])for(const distance of[1,2,4,11]){
  Object.assign(players[1],player(1),{z:-distance,crouching});
