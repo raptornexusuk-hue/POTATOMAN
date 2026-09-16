@@ -80,10 +80,11 @@ export function dressWorld(w,map,level,night,r){
     box(w.mat(shades[Math.floor(r()*shades.length)],null,{metalness:.32,roughness:.64}),side*(half+6.5),y,z,2.4,2.5,6);
    }
   }
-  // A straddle gantry stepping over the yard, well above head height.
-  for(const side of[-1,1]){box(iron,side*(half+2.6),5.4,0,.55,10.8,.55);box(iron,side*(half+2.6),5.4,half*.6,.45,10.8,.45);box(iron,side*(half+2.6),5.4,-half*.6,.45,10.8,.45);}
-  for(const z of[0,half*.6,-half*.6])box(iron,0,10.9,z,(half+3)*2,.7,.9);
-  for(const x of[-half*.4,half*.4])box(iron,x,10.2,0,.5,.9,half*1.3);
+  // A straddle gantry stepping over the yard, well above head height — but not on the climb map,
+  // where the tower rises past it and its own crane is the gantry.
+  if(level.mode!=='climb')for(const side of[-1,1]){box(iron,side*(half+2.6),5.4,0,.55,10.8,.55);box(iron,side*(half+2.6),5.4,half*.6,.45,10.8,.45);box(iron,side*(half+2.6),5.4,-half*.6,.45,10.8,.45);}
+  if(level.mode!=='climb'){for(const z of[0,half*.6,-half*.6])box(iron,0,10.9,z,(half+3)*2,.7,.9);
+   for(const x of[-half*.4,half*.4])box(iron,x,10.2,0,.5,.9,half*1.3);}
   plaque('KLOMPENS FREIGHT',0,7.4,-half-3.2,9);
  }else if(family==='coast'){
   // Sand, a promenade wall, painted huts along it and the sea running out to the horizon.
@@ -115,7 +116,7 @@ export function dressWorld(w,map,level,night,r){
     for(const y of[1.1,2.2])box(w.mat(0xb99a5e,'wood'),side*(half+1.2),y,z,1,.12,2.2);}
   }
   for(let i=-2;i<=2;i++){box(paint,i*half*.42,.02,0,.22,.04,half*2-2);box(paint,0,.02,i*half*.42,half*2-2,.04,.22);}
-  plaque('THE CHIP FACTORY · PACKING FLOOR',0,4.6,-half-1.6,10);
+  plaque(level.name.toUpperCase(),0,4.6,-half-1.6,10);
  }else if(family==='quarry'){
   // Stepped chalk terraces ring the cutting floor, with a gantry and spoil heaps behind them.
   w.scene.fog.color.set(0xc4cdd2);
