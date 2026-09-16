@@ -1,6 +1,6 @@
 {
   "name": "potatoman-total-mash",
-  "version": "0.18.0",
+  "version": "0.19.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,7 +8,8 @@
     "build": "node scripts/build.mjs",
     "db:generate": "drizzle-kit generate",
     "start": "node server/node.mjs",
-    "dev": "vite"
+    "dev": "vite",
+    "build:web": "node scripts/build-static.mjs"
   },
   "devDependencies": {
     "drizzle-kit": "0.31.10",

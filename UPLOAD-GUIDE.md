@@ -2,13 +2,28 @@
 
 The domain name points visitors to your web host. What you upload depends on what that host can run.
 
-## Standard file upload: solo and local play
+## Option A — plain web hosting (IONOS webspace): the whole game, solo and local
 
-For a basic static website, upload the **contents of `dist/`** from this source ZIP to the domain's public web folder (often `public_html/`). Keep `index.html`, the JavaScript files, `style.css` and `assets/` together. Open the domain through HTTPS.
+Run `npm run build:web`, then upload the **contents of `build/web/`** to the web root for your
+domain (on IONOS that is usually the folder the domain is assigned to, often `/` or
+`public_html/`). Keep `index.html`, the `.js` files, `style.css` and the `assets/` folder together,
+with `assets/` as a subfolder. Enable SSL for the domain and open it over HTTPS.
 
-This runs solo games and local split-screen. Online rooms, durable player profiles and shared leaderboards need the server below; they will not work with static files alone. Do not upload the entire source ZIP into the public web folder.
+This gives you the complete game: every world, every mode, solo against bots and local two-player
+split-screen on one device. There is no build step to run on the server and no Node runtime
+needed — the browser loads the game as ES modules straight from the files you uploaded.
 
-## Complete game: multiplayer, profiles and leaderboards
+What plain hosting cannot do is run the small API the game uses for **online rooms** and for
+**shared high scores across devices**. The game detects that on its own the first time it tries:
+it asks for your name as usual, keeps that player and your best scores in the browser on that
+device, says so plainly, and carries on. Nothing is blocked and nothing errors.
+
+`build/web/.htaccess` is included for Apache-based hosting like IONOS webspace. It sets the media
+types for `.js` and `.mp3`, enables compression, caches images and audio for a day and revalidates
+the code on every load, so a re-upload reaches visitors immediately. Delete it if your host is not
+Apache.
+
+## Option B — Node hosting: adds online rooms and shared leaderboards
 
 Your host needs a Node.js application service supporting **Node 22.13 or newer**, an HTTPS domain and a **persistent writable disk**. Ordinary PHP-only or static-only hosting cannot run this server.
 
@@ -22,18 +37,17 @@ Your host needs a Node.js application service supporting **Node 22.13 or newer**
 
 Where a host asks for an installation command, `npm ci` is compatible with the supplied lockfile, but the Node runtime itself does not require the development dependencies. A host offering only a file manager/FTP upload, with no Node application or persistent storage, needs a different deployment route.
 
-## Existing hosted game
+## IONOS specifically
 
-The ChatGPT Sites version already runs its server and database. It currently has private access; an online room invite does not grant access to the website itself. Attaching a custom domain and changing who can visit are separate hosting settings.
+- **IONOS Web Hosting / webspace** runs Option A. Upload `build/web/` contents via SFTP or the
+  Webspace Explorer, point the domain at that folder and switch SSL on. This is the route to use
+  unless you specifically need online rooms.
+- **IONOS Deploy Now** serves static sites and PHP. It does not provide a Node runtime for the
+  server in Option B; selecting a Node build template does not add one. Use it for Option A only.
+- **Online rooms and shared leaderboards need Option B**, which means a plan that runs a Node 22.13+
+  process and keeps a writable disk between deploys — an IONOS VPS or Cloud Server, or another Node
+  application host. A webspace-only plan cannot run it, whatever the control panel offers.
 
-Exact control-panel steps depend on your hosting provider and plan. Check that they support the Node runtime and persistent storage above before uploading the complete application.
+Check which plan you have before uploading: if the panel offers only FTP/file management and PHP
+settings, it is Option A.
 
-## IONOS and potatoman.co.uk
-
-The supplied `my.ionos.co.uk/connect-domain/...` link is an account domain-connection page. It does not identify the hosting plan, and account details were not accessible here.
-
-- If you have IONOS Web Hosting with webspace, upload `dist/` contents into the folder assigned to `potatoman.co.uk`, retaining the `assets/` subfolder. Use SFTP or Webspace Explorer, connect the domain to that folder and enable SSL. This gives you solo/local play with the current package.
-- IONOS Deploy Now supports static sites and PHP applications but does not provide a Node.js runtime for this game's included server. Selecting a Node build template does not add server runtime support.
-- The complete current game needs hosting that runs the Node server and preserves its SQLite database, such as a suitably configured VPS or another Node application host. The exact IONOS package needs confirming before providing control-panel/server setup steps.
-
-IONOS references: [Webspace management](https://www.ionos.co.uk/help/hosting/managing-webspace/), [Deploy Now runtime support](https://docs.ionos.space/docs/faq/#does-ionos-deploy-now-support-nodejs).

@@ -30,3 +30,36 @@ const stats2=(await api('player/get',{playerToken:token2})).stats;assert.equal(s
 console.log('PASS partial first-round scores, Unicode names, idempotent starts, duplicate/reversed saves and ownership');
 
 DB.close();
+
+// Plain file hosting has no /api. The game must still get a named player and keep scores, because
+// that is exactly what an IONOS webspace upload looks like from the browser.
+const store=new Map();
+globalThis.localStorage={getItem:k=>store.has(k)?store.get(k):null,setItem:(k,v)=>store.set(k,String(v)),removeItem:k=>store.delete(k)};
+const nodes=new Map();
+globalThis.document={getElementById:id=>{if(!nodes.has(id))nodes.set(id,{value:'',textContent:'',innerHTML:'',disabled:false,open:false,focus(){},showModal(){this.open=true;},close(){this.open=false;},addEventListener(){},onclick:null});return nodes.get(id);},addEventListener(){}};
+globalThis.addEventListener=()=>{};globalThis.setInterval=()=>({unref(){}});
+globalThis.fetch=async()=>new Response('<!doctype html>',{status:404,headers:{'content-type':'text/html'}});
+const {playerAccount}=await import('../dist/profiles.js');
+playerAccount.queue={put(){},flush:async()=>{},items:{}};
+await playerAccount.refresh().catch(e=>{if(e)playerAccount.goOffline();});
+assert.equal(playerAccount.offline,true,'a file host must be detected as having no game server');
+
+let started=false;
+assert.equal(await playerAccount.requirePlayer(()=>{started=true;}),false,'a first-time visitor is still asked to name themselves');
+document.getElementById('playerName').value='MACCA';
+assert.equal(await playerAccount.save(),true,'naming yourself must succeed without a server');
+assert.equal(started,true,'and must carry straight on into the round that was waiting');
+assert.equal(playerAccount.player.name,'MACCA');
+assert.ok(document.getElementById('profileStatus').textContent.includes('device'),'and must say where the player was kept');
+
+playerAccount.begin(0,120,'solo','circuit-1');
+playerAccount.updateTotal(31,7,900,64);
+playerAccount.record({epoch:'e1',level:1,won:true,total:31,best:34.5,knockouts:7});
+await playerAccount.finish();
+const kept=JSON.parse(localStorage.getItem('potatoman.scores.local'));
+assert.equal(kept.best,31);assert.equal(kept.wins,1);assert.equal(kept.knockouts,7);assert.equal(kept.times[1],34500);
+document.getElementById('leaderboardKind').value='circuit';document.getElementById('leaderboardMode').value='all';
+await playerAccount.leaderboard();
+assert.ok(document.getElementById('leaderboardRows').innerHTML.includes('MACCA'));
+assert.ok(document.getElementById('leaderboardStatus').textContent.includes('this device'));
+console.log('PASS a host with no game server still names a player, starts the round and keeps scores on the device');

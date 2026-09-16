@@ -1,4 +1,37 @@
-## Update 0.18.0
+## Update 0.19.0
+
+Ten weapons, nine worlds, twenty-one rounds, and the whole game now runs from plain web hosting.
+
+**Weapons.** Four new ones with behaviour the original six did not have: THE PEELER, a flat
+precision rifle whose round carries on through the first body it hits; the CHIP FRYER, a cone of
+scalding oil that burns out after four tenths of a second so it only exists at knife range; the
+STICKY SPUD, a lobbed bomb on a fuse that runs whether or not it connects; and the SPUD MORTAR,
+whose arc drops shells over cover nothing else reaches past. The projectile system gained the
+concepts these need — `drop` as a multiplier on gravity, `life` as a fuse, `blast` and `pierce` —
+rather than special-casing weapon names, and the shared weapon box now cycles the whole special
+roster through a round instead of offering the same launcher every time.
+
+**Worlds.** SHIPMENT is a container yard you can cross in four seconds, placed by quarter-turn so
+no spawn corner is closer to the middle than another. BUTTERSCOTCH BAY and DUNE DASH put open sand
+between timber groynes with the tide as a real hazard. THE CHIP FACTORY and CANNERY ROW are indoor
+maps: partition walls, doorways, a roof deck on trusses and strip lights down every bay, with no
+horizon at all. GANTRY GRAB adds a smash round between container rows.
+
+**GET HIGHER.** A vertical ascent up a crane tower: twenty-six floating platforms spiralling
+twenty-two metres, fastest climb wins, no weapons. The gap and rise are derived from the jump the
+game actually has rather than picked by eye, and every fifth platform is a broad ledge so a missed
+jump usually costs a few steps rather than the whole climb.
+
+**The Potatoman hunt** is now an extraction round. The two objectives are crates the seed moves
+every round; securing one takes a moment standing over it, which is the only time the runner is
+predictable; taking one lights him up for six seconds and buys a burst of speed; and the hunters
+get a run of speed for the closing stretch.
+
+**Hosting.** `npm run build:web` produces a folder to upload to ordinary web hosting. A host with
+no game server — an IONOS webspace upload, say — is detected at load: the game still asks for your
+name, keeps that player and your best scores in the browser, says so plainly, and plays every
+world and mode solo or in local split-screen. Online rooms and shared leaderboards still need the
+Node server. See UPLOAD-GUIDE.md.
 
 Arms are shorter (bones .46/.48) and rest higher on the body, and the IK solver now clamps a
 target past the arm's reach onto it, so a distant fore-end grip bends the elbow open instead of
@@ -196,7 +229,7 @@ Voice snippets are occasional: 22–34 seconds between lines, no immediate repea
 
 Rendering uses spatial batches and cheaper distant foliage while preserving near detail and a sharper adaptive-resolution floor. Real hardware validation is still needed; see TESTING.md.
 
-# POTATOMAN — by The Klompens · testing build 0.18.0
+# POTATOMAN — by The Klompens · testing build 0.19.0
 
 **Clogs on, Game on. Totally Mash.** A third-person browser game with fourteen levels, potato combat, timed maze races, bonus hunts, local split-screen and friend rooms for exactly three devices.
 
@@ -246,7 +279,7 @@ The title, Totally Mash subtitle, byline and menu links use a clearer responsive
 
 ## Levels and rules
 
-Fourteen levels combine six distinct worlds with combat, capture, destruction, an assault course and increasingly long mazes. Maze shortest routes are 52, 68, 88 and 112 grid steps. All racers share a start and finish; fastest completed escape across repeated attempts wins. Compass cues and visited-cell trail marks aid navigation. Crate hits have damage feedback, capture zones show contest/relocation status, knockouts add objective points only in battle modes, and every mode's scoreboard shows knockouts alongside the objective score.
+Twenty-one levels combine nine distinct worlds with combat, capture, destruction, an assault course and increasingly long mazes. Maze shortest routes are 52, 68, 88 and 112 grid steps. All racers share a start and finish; fastest completed escape across repeated attempts wins. Compass cues and visited-cell trail marks aid navigation. Crate hits have damage feedback, capture zones show contest/relocation status, knockouts add objective points only in battle modes, and every mode's scoreboard shows knockouts alongside the objective score.
 
 Main round winners receive three circuit points. Ties share victory. The rotating bonus runner moves faster, visits two checkpoints and escapes while hunters collect Masher guns. Runner escape awards one point and gives hunters 10% slower potato projectiles for the next main round's first 15 seconds. Hunter victory awards each hunter one point. Penalties never stack and have no effect in combat-free races.
 
