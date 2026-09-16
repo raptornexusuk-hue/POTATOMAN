@@ -97,7 +97,7 @@ export class World{
   map.walls.forEach((w,i)=>{dummy.position.set(w.x,w.h/2,w.z);dummy.scale.set((w.prop||w.architecture)?0:w.w,(w.prop||w.architecture)?0:w.h,(w.prop||w.architecture)?0:w.d);dummy.updateMatrix();im.setMatrixAt(i,dummy.matrix);});root.add(im);this.wallMeshes.push(im);
   if(hedge){const foliage=new T.InstancedMesh(this.textures.foliage?this.geo.leaf:this.geo.leafPlain,this.leaves(),map.walls.length*10);map.walls.forEach((w,i)=>{for(let j=0;j<10;j++){const angle=j*2.399;dummy.position.set(w.x+Math.cos(angle)*w.w*.47,w.h-.15+(j%3)*.10,w.z+Math.sin(angle)*w.d*.47);dummy.rotation.set((j%3-1)*.6,angle,Math.sin(angle)*.5);dummy.scale.setScalar(w.prop||w.architecture?0:1.15);dummy.updateMatrix();foliage.setMatrixAt(i*10+j,dummy.matrix);foliage.setColorAt(i*10+j,new T.Color(level.theme==='corn'?0xd0c78a:j%2?0xced39c:0xabc195));}});foliage.castShadow=false;foliage.receiveShadow=true;root.add(foliage);dummy.rotation.set(0,0,0);}
   else{const tops=new T.InstancedMesh(this.geo.box,this.mat(0xd8cbb0,'stone'),map.walls.length);map.walls.forEach((w,i)=>{dummy.position.set(w.x,w.h+.05,w.z);dummy.scale.set((w.prop||w.architecture)?0:w.w+.08,(w.prop||w.architecture)?0:.15,(w.prop||w.architecture)?0:w.d+.08);dummy.updateMatrix();tops.setMatrixAt(i,dummy.matrix);});tops.castShadow=true;root.add(tops);}
-  this.dressEnvironment(map,level,night,r);if(level.mode==='assault'&&!bonus)this.assaultCourse(map);
+  this.dressEnvironment(map,level,night,r);if(level.mode==='assault'&&!bonus)this.assaultCourse(map);if(level.mode==='climb'&&!bonus)this.climbTower(map);
   this.trailCells=new Set();this.trail=null;if(!bonus&&level.mode==='race'){this.trail=new T.InstancedMesh(this.geo.cylinder,this.mat(0xe7cc8d,null,{emissive:0xaa883f,emissiveIntensity:.25}),map.n*map.n);this.trail.count=0;this.root.add(this.trail);}
   this.goal=this.marker(map.exit.x,map.exit.z,0x79edba,'exit');this.goal.visible=bonus||isTrial(level);
   this.zone=this.marker(0,0,0xffcf50,'zone');this.zone.visible=!bonus&&level.mode==='capture';
@@ -219,6 +219,22 @@ export class World{
   const canvas=document.createElement('canvas');canvas.width=256;canvas.height=128;const ctx=canvas.getContext('2d');ctx.fillStyle='#101920';ctx.fillRect(0,0,256,128);ctx.fillStyle='#'+boost.color.toString(16);ctx.textAlign='center';ctx.font='bold 64px Arial';ctx.fillText(icon,128,68);ctx.font='bold 21px Arial';ctx.fillText(boost.caption,128,104);
   const texture=new T.CanvasTexture(canvas),material=new T.SpriteMaterial({map:texture,depthTest:true,transparent:true,toneMapped:false});const sprite=new T.Sprite(material);sprite.position.y=1.95;sprite.scale.set(1.85,.925,1);g.add(sprite);sprite.userData.ownMaterial=true;sprite.userData.ownTexture=texture;
   return g;
+ }
+ // A spiral of stacked crates up a crane tower. Each pillar is banded so its top edge reads from
+ // below, the catching ledges are a different colour, and the top one carries the finish marker.
+ climbTower(map){
+  const root=this.root,crate=this.mat(0xb07b42,'wood',{roughness:.85}),ledge=this.mat(0x3f7f8c,null,{roughness:.6}),edge=this.mat(0xffd36b,null,{roughness:.5}),steelMat=this.mat(0x5d666d,null,{metalness:.55,roughness:.42});
+  for(const c of map.course){
+   const w=c.wide?4.2:2.4,body=this.mesh('rounded',c.wide?ledge:crate,root,c.x,c.h-.225,c.z,w,.45,w);body.receiveShadow=true;
+   this.mesh('rounded',edge,root,c.x,c.h+.02,c.z,w+.06,.06,w+.06);
+   for(const side of[-1,1]){this.mesh('rounded',steelMat,root,c.x+side*(w/2-.12),c.h-.46,c.z,.14,.5,w*.8);this.mesh('rounded',steelMat,root,c.x,c.h-.46,c.z+side*(w/2-.12),w*.8,.5,.14);}
+   const label=this.marker(c.x,c.z,c.index===map.course.length-1?0x79edba:c.wide?0x7fd8e8:0xffd36b,'checkpoint');label.position.y=c.h+.05;
+  }
+  // The crane that the tower hangs off, so the climb reads as a place rather than floating boxes.
+  const top=map.course.at(-1).h;
+  for(const side of[-1,1])this.mesh('rounded',steelMat,root,side*9.5,top*.6,-9.5,.6,top*1.2,.6);
+  this.mesh('rounded',steelMat,root,0,top+2.4,-9.5,20.4,.7,.8);
+  this.mesh('rounded',steelMat,root,0,top+2.0,0,.5,.5,19.4);
  }
  assaultCourse(map){
   for(const h of map.platforms.filter(p=>p.duckRoof||p.duckPost)){this.mesh('rounded',this.mat(h.duckRoof?0xdc8c3c:0x39474d,h.duckRoof?'wood':null),this.root,h.x,(h.base??0)+h.h/2,h.z,h.w,h.h,h.d);if(h.duckRoof)for(const side of[-1,1])for(let i=0;i<6;i++)this.mesh('box',this.mat(i%2?0x26383e:0xf9d979),this.root,h.x+side*(h.w/2+.01),h.base+h.h/2,h.z+(i-2.5)*.51,.025,.21,.32);}

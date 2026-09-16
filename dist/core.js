@@ -17,6 +17,7 @@ export const LEVELS=[
  {name:'Canal Carnage',tag:'CANALSIDE • DUSK',mode:'battle',size:19,theme:'canal',seed:82,detail:'Cross three bridges between moonlit quays. Use the warehouses for cover and stay out of the water.',skill:'Lead moving targets'},
  {name:'Quayside Domination',tag:'HARBOUR • NIGHT',mode:'capture',size:21,theme:'depot',seed:96,detail:'Fight between containers for a moving control zone.',skill:'Rotate and intercept'},
  {name:'The Butter Run',tag:'HARBOUR ASSAULT COURSE • SUNSET',mode:'assault',size:21,theme:'course',seed:114,detail:'Jump onto each numbered platform, duck through the three low gates, then reach the exit. Fastest completed run wins.',skill:'Jump · land · keep momentum'},
+ {name:'Get Higher',tag:'CRANE TOWER • DUSK',mode:'climb',size:15,theme:'gantry',seed:166,detail:'Twenty-six stacked platforms spiralling up a crane tower. Miss a jump and the wide ledges catch you — for a while. Fastest climb to the top wins.',skill:'Read the gap before you jump'},
  {name:'The Midnight Maze',tag:'OLD TOWN • NIGHT',mode:'race',size:23,theme:'night',seed:129,detail:'Twisting brick alleys and longer routes. Fastest complete escape wins.',skill:'Navigate under pressure'},
  {name:'Quarry Quarrel',tag:'CHALK QUARRY • OVERCAST',mode:'battle',size:19,theme:'quarry',seed:157,detail:'Fight across the cutting floor. Stone blocks give cover; the gantry lane is the fast flank.',skill:'Use hard cover'},
  {name:'Cider Run',tag:'ORCHARD • MORNING',mode:'race',size:25,theme:'grove',seed:152,detail:'Race the mown lanes between fruit rows. Fastest complete escape wins.',skill:'Read the rows'},
@@ -27,7 +28,7 @@ export const LEVELS=[
  {name:'Gantry Grab',tag:'CONTAINER YARD • DUSK',mode:'smash',size:17,theme:'gantry',seed:219,detail:'Break the marked crates stacked between container rows before your rivals reach them.',skill:'Move between lanes'},
  {name:'The Final Mash',tag:'FORTRESS GARDEN • STORM',mode:'race',size:27,theme:'fort',seed:143,detail:'The longest maze and the quickest rivals. One final escape.',skill:'Bring it all together'}
 ];
-export const MODES={battle:'TOTALLY MASH',race:'MAZE RACE',assault:'BUTTER RUN · TIME TRIAL',capture:'KING OF THE CROP',smash:'BANGERS & SMASH'};
+export const MODES={battle:'TOTALLY MASH',race:'MAZE RACE',assault:'BUTTER RUN · TIME TRIAL',climb:'GET HIGHER · ASCENT',capture:'KING OF THE CROP',smash:'BANGERS & SMASH'};
 export function rng(seed){return()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
 export function makeMap(level,bonus=false){
  const n=bonus?17:level.size,r=rng(level.seed+(bonus?907:0)),grid=Array.from({length:n},()=>Array(n).fill(1));
@@ -53,7 +54,7 @@ export function makeMap(level,bonus=false){
   for(let z=1;z<n-1;z++)for(let x=1;x<n-1;x++)grid[z][x]=0;
   const put=(x,z)=>{if(x>1&&z>1&&x<n-2&&z<n-2)grid[z][x]=1;},m=Math.floor(n/2);
   if(bonus){for(let z=3;z<n-3;z+=3)for(let x=3;x<n-3;x+=3)if(r()<.7){put(x,z);if(r()<.5)put(x+1,z);}}
-  else if(level.mode==='assault'){}
+  else if(level.mode==='assault'||level.mode==='climb'){}
   else if(level.theme==='market'){for(const [x,z]of[[4,4],[n-5,4],[4,n-5],[n-5,n-5]]){put(x,z);put(x+1,z);put(x,z+1);}}
   else if(level.theme==='garden'){for(let z=3;z<n-3;z+=3)for(let x=3;x<n-3;x+=4){put(x,z);put(x+1,z);}}
   else if(level.theme==='canal'){for(const z of[m-3,m+3])for(let x=3;x<n-3;x++)if(![4,m,n-5].includes(x))put(x,z);for(const x of[4,n-5]){put(x,m-1);put(x,m+1);}}
@@ -141,6 +142,26 @@ export function makeMap(level,bonus=false){
  // Harvest targets belong to loading rows beside the barns, with open routes between them.
  const targetSpots=!bonus&&level.mode==='smash'?[[4,3],[5,3],[n-6,3],[n-5,3],[4,n-4],[5,n-4],[n-6,n-4],[n-5,n-4],[3,4],[3,5],[n-4,4],[n-4,5],[3,n-6],[n-4,n-6]].filter(([x,z])=>grid[z]?.[x]===0).map(([x,z])=>toWorld(x,z)):[];
  const map={n,grid,walls,buildings,props,targetSpots,worldId:family,waterCells,bridgeRails,toWorld,toCell,start:toWorld(1,n-2),exit:toWorld(n-2,1),platforms:[],course:[]};
+ if(level.mode==='climb'&&!bonus){
+  // A spiral of stacked pillars. The rise and the gap are chosen against the actual jump: a
+  // standing jump peaks at 1.38m and stays above 0.85m from 0.77m to 3.45m of travel, so a 2.4m
+  // gap with a 0.85m step sits in the middle of that window rather than at the edge of it.
+  // The helix widens as it rises. A fixed-radius spiral comes back over itself after one turn,
+  // which would put a later step in the same place on the floor plan as an earlier one; growing
+  // the radius by more than a platform's width per turn keeps every step its own piece of sky.
+  const steps=26,rise=.85;let angle=0,radius=4.4;map.course=[];
+  for(let i=0;i<steps;i++){
+   map.course.push({x:Math.cos(angle)*radius,z:Math.sin(angle)*radius,h:.9+i*rise,index:i,wide:i%5===4||i===steps-1});
+   angle+=2*Math.asin(Math.min(.9,1.2/radius));radius+=.22;
+  }
+  // Slabs, not columns: a floating platform can sit above an earlier one without the climber
+  // being blocked by a tower of solid geometry on the way to it. Every fifth one is broad, so a
+  // missed jump usually costs a few steps rather than the whole climb.
+  map.platforms=map.course.map(c=>({x:c.x,z:c.z,w:c.wide?4.2:2.4,d:c.wide?4.2:2.4,base:Math.max(0,c.h-.45),h:c.h>.45?.45:c.h,platform:true}));
+  const top=map.course.at(-1);
+  map.start={x:4.4,z:-2.45};
+  map.exit={x:top.x,z:top.z};map.exitHeight=top.h;
+ }
  if(level.mode==='assault'&&!bonus){
   const flip=level.seed%2?1:-1,span=(n-5)*CELL*.5;
   map.start={x:-span*flip,z:span};
@@ -190,7 +211,7 @@ export function boxContact3D(ax,ay,az,bx,by,bz,w,pad=0){let lo=0,hi=1;for(let ax
 export function launchVerticalSpeed(speed,pitch,drop=1){const flight=10.42/speed;return(pitch*7-.02)/flight+drop*THROW_DROP*flight;}
 
 export const POWERUPS={run:{label:'BUTTER BOOTS',caption:'RUN FASTER',color:0x60edbd,field:'runBoost',seconds:12},fire:{label:'HOT SPUD',caption:'SHOOT FASTER',color:0xff9861,field:'fireBoost',seconds:12},jump:{label:'SPRING CLOGS',caption:'JUMP HIGHER',color:0xb89bff,field:'jumpBoost',seconds:14}};
-export function isTrial(level){return level.mode==='race'||level.mode==='assault';}
+export function isTrial(level){return level.mode==='race'||level.mode==='assault'||level.mode==='climb';}
 export function jump(p){if(p.respawn>0||!p.grounded||p.crouching)return false;p.vy=p.jumpBoost>0?10.4:7.8;p.grounded=false;return true;}
 export function movePlayer(p,input,dt,map,speed=6){
  const solids=map.platforms?.length?[...map.walls,...map.platforms]:map.walls;
