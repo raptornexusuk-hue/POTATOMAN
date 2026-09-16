@@ -1,6 +1,6 @@
 import {mapId} from './map-catalogue.js';
 import {bodyHeight,updateStance,STANDING_HEIGHT} from './stance.js';
-export const STEP=1/120, CELL=3.2, ROUND_TIME=120, BONUS_TIME=40;
+export const STEP=1/120, CELL=3.2, ROUND_TIME=120, BONUS_TIME=55;
 // Half the gravity applied to a thrown potato. A hand-thrown spud is lobbed, not fired: this is
 // what gives it a visible arc to lead with, and every launch solver below derives from it, so the
 // crosshair keeps converging on the same point the potato actually reaches.
@@ -68,7 +68,7 @@ export function makeMap(level,bonus=false){
  if(level.mode!=='race'||bonus)for(const [cx,cz]of[[2,2],[n-3,n-3],[n-3,2],[2,n-3]])for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++)grid[cz+dz][cx+dx]=0;
  const toWorld=(x,z)=>({x:(x-(n-1)/2)*CELL,z:(z-(n-1)/2)*CELL});
  const toCell=(x,z)=>({x:Math.max(0,Math.min(n-1,Math.round(x/CELL+(n-1)/2))),z:Math.max(0,Math.min(n-1,Math.round(z/CELL+(n-1)/2)))});
- const buildings=[],waterCells=[],props=[],family=mapId(level);
+ const buildings=[],waterCells=[],props=[],family=mapId(level),map0={};
  if(bonus||!isTrial(level)){
   for(let z=1;z<n-1;z++)for(let x=1;x<n-1;x++)grid[z][x]=0;
   const mid=Math.floor(n/2),addProp=(cx,cz,type,h=1.3,size=2.5,depth=size,extra={})=>{grid[cz][cx]=1;props.push({...toWorld(cx,cz),w:size,d:depth,h,prop:type,...extra});};
@@ -126,8 +126,14 @@ export function makeMap(level,bonus=false){
    if(family==='orchard'){for(const x of[mid-3,mid+3])for(const z of[mid-1,mid+1])addProp(x,z,'cider',1.35,2.3);for(const x of[4,n-5])for(const z of[6,n-7])addProp(x,z,'crateStack',1.5,2.2);}
   }
  }
- if(bonus){const cleared=new Set();
-  for(const [cx,cz] of [[3,3],[n-4,n-4],[Math.floor(n/2),n-3]])for(const[dx,dz]of[[0,0],[1,0],[-1,0],[0,1],[0,-1]]){grid[cz+dz][cx+dx]=0;const at=toWorld(cx+dx,cz+dz);cleared.add(at.x+','+at.z);}
+ if(bonus){const cleared=new Set(),mid=Math.floor(n/2);
+  // The two objectives moved every round instead of sitting in the same two corners of every map.
+  // Each pair is a genuine traverse of the arena, so the runner is always crossing open ground
+  // between them rather than cutting one corner.
+  const pairs=[[[3,3],[n-4,n-4]],[[n-4,3],[3,n-4]],[[3,mid],[n-4,mid]],[[mid,3],[3,n-4]],[[n-4,mid],[mid,3]]];
+  const pick=pairs[level.seed%pairs.length];
+  map0.objectiveCells=pick;
+  for(const [cx,cz] of [...pick,[mid,n-3]])for(const[dx,dz]of[[0,0],[1,0],[-1,0],[0,1],[0,-1]]){grid[cz+dz][cx+dx]=0;const at=toWorld(cx+dx,cz+dz);cleared.add(at.x+','+at.z);}
   // Clearing a checkpoint cell has to take the prop standing on it as well, or a hunt map keeps a
   // container parked exactly where the runner has to reach.
   for(let i=props.length-1;i>=0;i--)if(cleared.has(props[i].x+','+props[i].z))props.splice(i,1);
@@ -138,10 +144,12 @@ export function makeMap(level,bonus=false){
   // stops bodies; it just does not wall the bay off from its own sea.
   if(family==='coast'&&z===0)w.h=.42;if(interior&&!isTrial(level)&&!bonus&&!['garden','market','canal','factory','cannery','shipment','gantry','beach'].includes(level.theme)){w.h=1.65;if(cover++%3===0)Object.assign(w,{prop:'bin',w:1.1,d:1.1,h:1.45});}else if(interior&&family==='estate')w.h=1.8;walls.push(w);}
  // The visible bridge handrails block bodies, while shots can pass underneath.
- const bridgeRails=[];if(waterCells.length){const mid=Math.floor(n/2);for(const cell of[3,mid,n-4])for(const side of[-1,1])bridgeRails.push({x:toWorld(cell,mid).x+side*1.42,z:0,w:.07,d:9.7,base:1.03,h:.08,prop:'bridgeRail'});walls.push(...bridgeRails);}
+ // Handrails belong to the harbour's three bridges. Any map with water at all used to get them,
+ // which put invisible rails across the beach where there is no bridge to hold.
+ const bridgeRails=[];if(waterCells.length&&family==='harbour'){const mid=Math.floor(n/2);for(const cell of[3,mid,n-4])for(const side of[-1,1])bridgeRails.push({x:toWorld(cell,mid).x+side*1.42,z:0,w:.07,d:9.7,base:1.03,h:.08,prop:'bridgeRail'});walls.push(...bridgeRails);}
  // Harvest targets belong to loading rows beside the barns, with open routes between them.
  const targetSpots=!bonus&&level.mode==='smash'?[[4,3],[5,3],[n-6,3],[n-5,3],[4,n-4],[5,n-4],[n-6,n-4],[n-5,n-4],[3,4],[3,5],[n-4,4],[n-4,5],[3,n-6],[n-4,n-6]].filter(([x,z])=>grid[z]?.[x]===0).map(([x,z])=>toWorld(x,z)):[];
- const map={n,grid,walls,buildings,props,targetSpots,worldId:family,waterCells,bridgeRails,toWorld,toCell,start:toWorld(1,n-2),exit:toWorld(n-2,1),platforms:[],course:[]};
+ const map={n,grid,walls,buildings,props,targetSpots,worldId:family,waterCells,bridgeRails,toWorld,toCell,start:toWorld(1,n-2),exit:toWorld(n-2,1),platforms:[],course:[],objectives:(map0.objectiveCells??[[3,3],[n-4,n-4]]).map(([x,z])=>toWorld(x,z))};
  if(level.mode==='climb'&&!bonus){
   // A spiral of stacked pillars. The rise and the gap are chosen against the actual jump: a
   // standing jump peaks at 1.38m and stays above 0.85m from 0.77m to 3.45m of travel, so a 2.4m

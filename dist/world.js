@@ -102,7 +102,13 @@ export class World{
   this.goal=this.marker(map.exit.x,map.exit.z,0x79edba,'exit');this.goal.visible=bonus||isTrial(level);
   this.zone=this.marker(0,0,0xffcf50,'zone');this.zone.visible=!bonus&&level.mode==='capture';
   this.checkpoints=[];this.pickups=[];this.targets=[];
-  if(bonus){for(const p of [map.toWorld(3,3),map.toWorld(map.n-4,map.n-4)])this.checkpoints.push(this.marker(p.x,p.z,0xffcc3e,'checkpoint'));}
+  if(bonus)for(const [i,p]of (map.objectives??[]).entries()){
+   const marker=this.marker(p.x,p.z,0xffcc3e,'checkpoint');this.checkpoints.push(marker);
+   // A crate to actually stand over and hold, rather than a ring painted on the floor.
+   const crate=this.mesh('rounded',this.mat(0xc9963f,'wood',{roughness:.7}),this.root,p.x,.42,p.z,1.5,.84,1.5);crate.castShadow=true;marker.userData.crate=crate;
+   this.mesh('rounded',this.mat(0xffd76b,null,{emissive:0xffb347,emissiveIntensity:.6}),this.root,p.x,.87,p.z,1.56,.10,1.56).userData.ownMaterial=false;
+   for(const side of[-1,1])this.mesh('rounded',this.mat(0x6d4f2a,'wood'),this.root,p.x+side*.72,.42,p.z,.10,.88,1.52);
+  }
   for(const p of players)this.characters.push(this.character(p.id));
  }
  markTrail(p){if(!this.trail||p.respawn>0)return;const cell=this.map.toCell(p.x,p.z),key=cell.x+','+cell.z;if(this.trailCells.has(key))return;this.trailCells.add(key);const d=new T.Object3D();d.position.set(p.x,.04,p.z);d.scale.set(.15,.025,.15);d.updateMatrix();this.trail.setMatrixAt(this.trail.count++,d.matrix);this.trail.instanceMatrix.needsUpdate=true;this.trail.computeBoundingSphere();}
