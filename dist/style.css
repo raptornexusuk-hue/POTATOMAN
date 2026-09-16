@@ -110,3 +110,22 @@ dialog::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;back
 @media(prefers-reduced-motion:reduce){.menu .play.primary,.menu-worlds button,.level-card,.close{transition:none}.menu .play.primary{background-position:0 0}}
 
 .audio-notice{color:#ffd36b;background:rgba(24,14,6,.72);border:1px solid rgba(255,211,107,.45);border-radius:6px;padding:2px 8px;letter-spacing:.06em;font-weight:600}
+
+/* The arsenal reference: one card per weapon, its own colour, stats as bars you can compare down
+   the column rather than numbers you have to hold in your head. */
+.arsenal-list{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));margin-top:4px}
+.arsenal-card{--weapon:#e4be7d;border:1px solid rgba(255,255,255,.10);border-left:4px solid var(--weapon);border-radius:12px;padding:13px 15px 11px;background:linear-gradient(160deg,rgba(255,255,255,.055),rgba(255,255,255,.015))}
+.arsenal-card header{display:flex;flex-direction:column;gap:3px;margin-bottom:7px}
+.arsenal-card strong{color:var(--weapon);font-size:15px;letter-spacing:.04em}
+.arsenal-card header small{opacity:.55;font-size:10px;letter-spacing:.13em}
+.arsenal-card p{margin:0 0 10px;font-size:12.5px;line-height:1.45;opacity:.82}
+.arsenal-card dl{display:grid;gap:5px;margin:0 0 9px}
+.arsenal-card dl>div{display:grid;grid-template-columns:52px 1fr 58px;align-items:center;gap:8px}
+.arsenal-card dt{font-size:9.5px;letter-spacing:.11em;opacity:.5}
+.arsenal-card dd{margin:0}
+.arsenal-card .meter{height:5px;border-radius:3px;background:rgba(255,255,255,.09);overflow:hidden}
+.arsenal-card .meter i{display:block;height:100%;border-radius:3px;background:var(--weapon);opacity:.85}
+.arsenal-card .figure{font-size:11px;text-align:right;opacity:.68;font-variant-numeric:tabular-nums}
+.arsenal-card footer{font-size:11px;letter-spacing:.02em;opacity:.55;border-top:1px solid rgba(255,255,255,.07);padding-top:8px}
+.arsenal-card.starter{border-left-style:dashed}
+.arsenal-card.earned{border-left-width:4px;box-shadow:inset 0 0 0 1px rgba(255,211,107,.14)}

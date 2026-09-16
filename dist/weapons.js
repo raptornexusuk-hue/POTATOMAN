@@ -5,7 +5,7 @@ export const THROW_DURATION=.46,THROW_WINDUP=.12;
 // `blast`/`blastDamage` the explosion, and `pierce` lets a round carry on through a body.
 export const WEAPONS={
  throw:{name:'HAND-THROWN SPUDS',speed:23,damage:34,cooldown:.62,pellets:1,spread:0,ammo:0,gun:false,color:0xe4be7d,tier:0,blurb:'Lobbed by hand. Always with you.'},
- spud:{name:'SPUD GUN',speed:32,damage:40,cooldown:.34,pellets:1,spread:0,ammo:0,gun:false,color:0xe4be7d,tier:1,blurb:'Earned with a knockout. Faster and flatter than a throw.'},
+ spud:{name:'SPUD GUN',speed:32,damage:40,cooldown:.34,pellets:1,spread:0,ammo:0,gun:false,color:0xe4be7d,tier:1,blurb:'Faster and flatter than a throw, and it never runs out.'},
  repeater:{name:'CHIPPER AUTO',speed:30,damage:28,cooldown:.22,pellets:1,spread:0,ammo:40,gun:false,color:0x72e5cd,tier:2,blurb:'Deep magazine, light damage. Hold the trigger.'},
  scatter:{name:'TRIPLE MASH',speed:26,damage:35,cooldown:.8,pellets:3,spread:.095,ammo:12,gun:false,color:0xb794ff,tier:2,blurb:'Three spuds a shot. Devastating up close.'},
  masher:{name:'THE MASHER',speed:62,damage:12,cooldown:.16,pellets:1,spread:0,ammo:12,gun:true,color:0x91c9f8,tier:2,blurb:'Flat, fast chips. Rewards tracking.'},
