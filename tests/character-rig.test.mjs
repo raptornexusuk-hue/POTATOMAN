@@ -125,3 +125,34 @@ for(const yaw of[0,1.1])for(const crouching of[false,true])for(const dashTime of
  hand.traverse(mesh=>{if(!mesh.isMesh)return;const vertices=mesh.geometry.attributes.position;for(let i=0;i<vertices.count;i++){const point=new T.Vector3().fromBufferAttribute(vertices,i).applyMatrix4(mesh.matrixWorld);assert.ok(point.sub(spud).dot(forward)<-.005,'hand and fingers cannot cross the front half of the held potato');}});
 }
 console.log('PASS palm and every finger remain behind the potato through hold, wind-up and release, including crouch/dash and turned aim');
+
+// Every player slot has its own build and headwear now, and any of them can be the local player —
+// slot 1 in split-screen, any slot online. So the crosshair has to stay clear and the hat has to
+// stay out of the torso for all four, not just the bare-headed baseline the sweeps above use.
+const breeds=[0,1,2,3].map(id=>w.character(id));
+let breedRays=0;
+for(const [id,model]of breeds.entries()){
+ const torso=model.bob.children[0];
+ for(const weapon of['throw','spud','rpg'])for(const crouching of[false,true]){
+  Object.assign(p,initial,{weapon,crouching});
+  m.crouchBlend=crouching?1:0;m.walk=1;m.stride=.7;m.gaitX=0;m.gaitZ=1;m.lastX=p.x;m.lastZ=p.z;
+  w.characters=[model];model.crouchBlend=crouching?1:0;model.walk=1;model.stride=.7;model.gaitX=0;model.gaitZ=1;model.lastX=p.x;model.lastZ=p.z;
+  w.updatePlayers([p],0,0);w.root.updateMatrixWorld(true);
+  for(const pitch of[MIN_PITCH,-.3,0,MAX_PITCH]){
+   p.pitch=pitch;w.updatePlayers([p],0,0);w.root.updateMatrixWorld(true);
+   const view=cameraPose(p),ray=new T.Raycaster(new T.Vector3(view.position.x,view.position.y,view.position.z),new T.Vector3(view.direction.x,view.direction.y,view.direction.z));
+   assert.equal(ray.intersectObject(model.g,true).filter(h=>drawn(h.object)).length,0,`slot ${id} blocks its own crosshair at pitch ${pitch}, ${weapon}, crouch ${crouching}`);breedRays++;
+  }
+  // A hat's inner half is meant to be inside the skull. What matters is that enough of it shows,
+  // and that it sits on the crown rather than across the face.
+  const tree=bvh(triList(torso)),brim=[];model.hat.traverse(o=>{if(o.isMesh)brim.push(o);});
+  if(brim.length){
+   const points=brim.flatMap(meshPoints),outside=points.filter(point=>!inside(tree,point));
+   assert.ok(outside.length>points.length*.25,`slot ${id} headwear is swallowed by its own head`);
+   const eye=model.eyes[0].getWorldPosition(new T.Vector3());
+   assert.ok(outside.every(point=>point.y>eye.y-.02),`slot ${id} headwear hangs over its own face`);
+  }
+ }
+}
+w.characters=[m];
+console.log(`PASS ${breedRays} sight rays across all four player builds; headwear sits on the head, not inside it`);

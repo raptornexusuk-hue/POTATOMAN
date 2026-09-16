@@ -21,6 +21,15 @@ const STEP_REACH=.30,STRIDE_RATE=Math.PI/(2*STEP_REACH),TAU=Math.PI*2;
 // eye at a constant size the way a lid actually moves. Open, it is tipped back out of sight behind
 // the brow; the sweep below carries it down across the front.
 const LID_OPEN=-1.18;
+// One entry per player slot: skin, how the body is stretched, the paint on the klompen carving and
+// which piece of headwear it wears. `hat:null` is the bare-headed baseline the sight-line tests
+// measure against.
+const BREEDS=[
+ {skin:0xc68b49,build:[1,1,1],paint:0xb5342f,hat:null},
+ {skin:0xe7c38e,build:[1.05,.95,1.04],paint:0x2f6f8c,hat:'cap'},
+ {skin:0xa9702f,build:[.94,1.07,.95],paint:0x3f7f4a,hat:'scarf'},
+ {skin:0xd9a765,build:[1.03,1.02,.97],paint:0x7a4b9c,hat:'goggles'}
+];
 const indoorGlow=half=>Math.min(3.4,1.6+half*.045);
 // bulk/length are scales on the shared launcher mesh; kit names an optional attachment group.
 const GUN_SHAPES={spud:{bulk:1,length:.72},repeater:{bulk:1,length:.74,kit:'mag'},scatter:{bulk:1.06,length:.82},
@@ -261,9 +270,12 @@ export class World{
   // Alternate light baked and golden russet skins consistently on every client.
   // Limbs wear the same russet skin a few shades lighter than the torso, so arms and legs
   // match each other and still read as potato rather than pale plastic.
-  const skinColor=id%2?0xe7c38e:0xc68b49,lift=t=>Math.round(t+(255-t)*.22),limbColor=lift(skinColor>>16&255)<<16|lift(skinColor>>8&255)<<8|lift(skinColor&255);
+  // Four rivals that are the same potato in two skin tones are hard to read in a fight. Each one
+  // now has its own variety: a skin, a build, the paint on its klompen and something on its head.
+  // The yellow klompen itself never changes — it is the one thing every Potatoman has in common.
+  const breed=BREEDS[id%BREEDS.length],skinColor=breed.skin,lift=t=>Math.round(t+(255-t)*.22),limbColor=lift(skinColor>>16&255)<<16|lift(skinColor>>8&255)<<8|lift(skinColor&255);
   const skin=this.mat(skinColor,'skin',{roughness:.88,bumpScale:.037,envMapIntensity:.28}),limb=this.mat(limbColor,'skin',{roughness:.86,bumpScale:.032,envMapIntensity:.30}),dark=this.mat(0x352719,null,{roughness:.65}),white=this.mat(0xfff6df,null,{roughness:.25}),wood=this.clogMaterial(),iris=this.mat([0x778146,0x50787e,0x987343,0x6b7190][id],null,{roughness:.32});const bob=new T.Group();g.add(bob);
-  const body=this.mesh('potato',skin,bob,0,1.09,0,.635,.86,.48);body.rotation.z=-.045;
+  const body=this.mesh('potato',skin,bob,0,1.09,0,.635*breed.build[0],.86*breed.build[1],.48*breed.build[2]);body.rotation.z=-.045;
   const brows=[],eyes=[],cheeks=[],pupils=[],lids=[],browSkin=this.mat(0x6a4523,null,{roughness:.92});
   for(const sign of[-1,1]){const x=sign*.225,eye=new T.Group();eye.position.set(x,1.40,.392);bob.add(eye);
    // A socket rim sunk into the skin gives the eyeball somewhere to sit, so it reads as set into
@@ -298,6 +310,33 @@ export class World{
   const mouth=new T.Group();mouth.position.set(0,-.030,.020);smile.add(mouth);const mouthInside=this.mesh(new T.CircleGeometry(.132,32),this.mat(0x3a1f16,null,{roughness:.95}),mouth);mouthInside.userData.ownGeometry=true;
   this.mesh('rounded',this.mat(0xf2e3c6,null,{roughness:.35}),mouth,0,.074,.010,.158,.034,.014);this.mesh(this.geo.sphere,this.mat(0xb67461,null,{roughness:.8}),mouth,0,-.074,.011,.082,.034,.012);mouth.scale.y=.02;mouth.visible=false;
 
+  // Headwear is sized from the skull it sits on rather than hard-coded, so it fits every build:
+  // the potato is an ellipsoid squeezed on x and stretched on z, and the band at a given height
+  // follows from that. Anything guessed instead ends up buried in the head on the rounder bodies.
+  const hat=new T.Group();bob.add(hat);
+  const skull=height=>{const ry=.86*breed.build[1],t=(height-1.09)/ry,band=Math.sqrt(Math.max(.05,1-t*t));
+   return{x:.635*breed.build[0]*band*.917,z:.48*breed.build[2]*band*1.035};};
+  if(breed.hat==='cap'){
+   // A flat cap: crown, a peak over the brow and a button on top.
+   const wool=this.mat(0x4a5560,'wood',{roughness:.95}),at=1.775,fit=skull(at);
+   this.mesh(this.geo.sphere,wool,hat,0,at,-.01,fit.x*1.16,.20,fit.z*1.16);
+   const peak=this.mesh(this.geo.sphere,wool,hat,0,at-.04,fit.z*1.05,fit.x*.82,.035,fit.z*.70);peak.rotation.x=-.14;
+   this.mesh(this.geo.smallSphere,wool,hat,0,at+.19,-.01,.065,.05,.065);
+  }else if(breed.hat==='scarf'){
+   // A knotted headscarf, with the knot and both tails hanging off the back of the head.
+   const cloth=this.mat(0xc4483e,'wood',{roughness:.9}),at=1.74,fit=skull(at);
+   this.mesh(this.geo.sphere,cloth,hat,0,at,-.01,fit.x*1.14,.18,fit.z*1.14);
+   this.mesh(this.geo.smallSphere,cloth,hat,fit.x*.55,at-.05,-fit.z*1.05,.10,.09,.10);
+   for(const side of[-1,1]){const tail=this.mesh(this.geo.sphere,cloth,hat,fit.x*.55+side*.05,at-.19,-fit.z*1.18,.05,.14,.045);tail.rotation.x=.38;tail.rotation.z=side*.28;}
+  }else if(breed.hat==='goggles'){
+   // Welding goggles pushed up onto the forehead, with the strap running round the back.
+   const strap=this.mat(0x3a3126,'wood',{roughness:.92}),brass=this.mat(0xc39a45,null,{metalness:.7,roughness:.32}),glass=this.mat(0x6fa9b8,null,{metalness:.5,roughness:.16});
+   const at=1.695,fit=skull(at);
+   this.mesh(this.geo.sphere,strap,hat,0,at,-.01,fit.x*1.13,.065,fit.z*1.13);
+   for(const side of[-1,1]){this.mesh('cylinder',brass,hat,side*fit.x*.52,at+.02,fit.z*.86,.105,.09,.105).rotation.x=Math.PI/2;
+    this.mesh('cylinder',glass,hat,side*fit.x*.52,at+.02,fit.z*.86+.05,.074,.02,.074).rotation.x=Math.PI/2;}
+   this.mesh('rounded',brass,hat,0,at+.02,fit.z*.86,fit.x*.5,.03,.045);
+  }
   const arms=[],forearms=[],legs=[];
   for(const sign of[-1,1]){const arm=makeArm(this,g,limb,sign);arms.push(arm);forearms.push(arm.userData.lower);
    const leg=new T.Group();leg.position.x=sign*.38;g.add(leg);const thigh=this.mesh('sphere',limb,leg,0,.69,0,.115,.22,.12),shin=this.mesh('sphere',limb,leg,0,.40,0,.125,.21,.135),knee=this.mesh('sphere',limb,leg,0,.53,.08,.13,.13,.13),foot=new T.Group();leg.add(foot);foot.position.y=.09;foot.rotation.y=sign*.32;foot.scale.set(.56,.76,.56);
@@ -308,7 +347,7 @@ export class World{
    const rim=this.mesh(new T.TorusGeometry(.14,.023,10,28),wood,trim,0,.281,-.065);rim.rotation.x=Math.PI/2;rim.scale.y=1.13;rim.userData.ownGeometry=true;
    this.mesh('clog',this.mat(0x815c28,'wood'),foot,0,-.02,.04,1.15,.17,1.15);
    for(let j=0;j<3;j++){const decoration=this.mesh(curveTube([[-.16,.23,.25+j*.047],[0,.278,.27+j*.047],[.16,.23,.25+j*.047]],.012),this.mat(0x735027),trim);decoration.userData.ownGeometry=true;}
-   const carving=this.mat(0x835126,null,{roughness:.6}),inlay=this.mat(0xb5342f,null,{roughness:.5}),detail=[];
+   const carving=this.mat(0x835126,null,{roughness:.6}),inlay=this.mat(breed.paint,null,{roughness:.5}),detail=[];
    const carve=(points,r=.007,mat=carving)=>{const piece=this.mesh(curveTube(points,r),mat,trim);piece.userData.ownGeometry=true;detail.push(piece);return piece;};
    // Painted Dutch folk work: tulip spray on the instep, chevroned heel, beaded side borders
    // and a scalloped collar, in the carved/painted style of a real klomp.
@@ -341,7 +380,7 @@ export class World{
   const crown=new T.Group();crown.position.set(0,1.95,0);bob.add(crown);const gold=this.mat(0xffd365,null,{metalness:.85,roughness:.25});const band=this.mesh(new T.CylinderGeometry(.38,.35,.16,32,1,true),gold,crown,0,.02,0);band.userData.ownGeometry=true;for(let j=0;j<5;j++){const a=j*Math.PI*2/5;const point=this.mesh(new T.ConeGeometry(.10,.31,8),gold,crown,Math.sin(a)*.32,.23,Math.cos(a)*.32);point.userData.ownGeometry=true;this.mesh('sphere',this.mat(0xb52737,null,{metalness:.3,roughness:.18}),crown,Math.sin(a)*.37,.04,Math.cos(a)*.37,.045,.055,.03);}crown.visible=false;
   const label=new PlayerLabel(colors[id]);this.root.add(label.sprite);
   const fadeMaterials=[];g.traverse(o=>{if(o.isMesh){o.material=o.material.clone();o.material.transparent=false;o.userData.ownMaterial=true;fadeMaterials.push(o.material);}});
-  return{g,shadow,label,fadeMaterials,crouchBlend:0,bob,arms,forearms,legs,cape,capeBase,clasp,crown,heldSpud,gun,eyes,brows,cheeks,pupils,lids,smile,mouth,lip,hurt:0,joy:0,gaze:0,lastHP:null,stride:0,walk:0,lastX:null,lastZ:null,blinkAt:2.5+id*.7};
+  return{g,shadow,label,fadeMaterials,crouchBlend:0,bob,hat,arms,forearms,legs,cape,capeBase,clasp,crown,heldSpud,gun,eyes,brows,cheeks,pupils,lids,smile,mouth,lip,hurt:0,joy:0,gaze:0,lastHP:null,stride:0,walk:0,lastX:null,lastZ:null,blinkAt:2.5+id*.7};
  }
  updatePlayers(players,time,dt){const {hip,ankle,knee,direction,inverse,up:upAxis,forward}=this.scratch,aimPlayers=this.isBonus?players.filter(q=>q.runner):players;players.forEach((p,i)=>{const m=this.characters[i];m.g.visible=p.respawn<=0;const dx=m.lastX===null?0:p.x-m.lastX,dz=m.lastZ===null?0:p.z-m.lastZ,travelled=Math.hypot(dx,dz);m.lastX=p.x;m.lastZ=p.z;
   const speed=travelled<2?travelled/Math.max(dt,.001):0;const smoothing=1-Math.exp(-10*dt);m.walk+=(Math.min(speed/6,1.35)-m.walk)*smoothing;if(travelled<2)m.stride+=travelled*STRIDE_RATE;else{m.walk=0;m.stride=0;}
