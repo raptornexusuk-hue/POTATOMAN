@@ -6,10 +6,14 @@ import {mkdir,cp,rm,readdir,writeFile,stat} from 'node:fs/promises';
 import {join} from 'node:path';
 
 const OUT='build/web';
+// Superseded revisions that nothing loads. They stay in the repository as source; there is no
+// reason to make every visitor download five megabytes the game never asks for. Anything the code
+// references — including the PBR sets built from constructed filenames — is untouched.
+const SUPERSEDED=new Set(['potatoman-key-art.png','potato-skin-color.png']);
 await rm(OUT,{recursive:true,force:true});await mkdir(OUT,{recursive:true});
 for(const entry of await readdir('dist',{withFileTypes:true})){
  if(entry.name==='client')continue;
- if(entry.isDirectory()?entry.name==='assets':/\.(html|js|css)$/.test(entry.name))await cp(join('dist',entry.name),join(OUT,entry.name),{recursive:true});
+ if(entry.isDirectory()?entry.name==='assets':/\.(html|js|css)$/.test(entry.name))await cp(join('dist',entry.name),join(OUT,entry.name),{recursive:true,filter:src=>!SUPERSEDED.has(src.split('/').pop())});
 }
 // Long-lived caching for the fingerprint-free asset folder would strand visitors on a stale build,
 // so assets are cached for a day and the code is revalidated every load.
