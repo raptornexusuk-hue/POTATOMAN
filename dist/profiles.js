@@ -1,4 +1,8 @@
 import {ScoreQueue} from './score-queue.js';
+import {LEVELS} from './core.js';
+// Ranked maze boards follow the level list rather than a hand-written set of indices, which is
+// what silently stopped four of the six race levels ever recording a time.
+const RANKED_MAZES=LEVELS.map((l,i)=>i).filter(i=>LEVELS[i].mode==='race');
 const $=id=>document.getElementById(id);
 const escape=v=>String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 // Plain static hosting has no /api. That must not stop anyone playing, so a host without the game
@@ -43,8 +47,8 @@ export const playerAccount={player:null,token:null,session:null,onPlayer:null,re
   $('profileStatus').textContent=e.message;return false;}finally{button.disabled=false;}},
  begin(level,duration,mode,circuitId,remix=false){if(this.session?.circuitId===circuitId)return;if(!this.session?.final)this.finish(false);if(!this.player||!(this.token||this.offline))return;this.session={run:crypto.randomUUID(),token:this.token,start:{level,duration,mode},circuitId,remix,rounds:0,wins:0,score:0,points:0,playedMs:0,knockouts:0,times:[],seen:new Set(),revision:0,final:false};},
  updateTotal(score,knockouts,points,played){const s=this.session;if(!s||s.final)return;s.score=Math.max(s.score,score??0);s.knockouts=Math.max(s.knockouts,knockouts??0);s.points=Math.max(s.points,Math.floor(points??0));s.playedMs=Math.max(s.playedMs,Math.round((played??0)*1000));},
- record({epoch,level,won,total,best,knockouts,rankedMaze=true}){const s=this.session;if(!s||s.seen.has(epoch)||s.final)return;s.seen.add(epoch);s.rounds++;s.wins+=won?1:0;s.score=Math.max(s.score,total);s.knockouts=Math.max(s.knockouts,knockouts??0);if(!s.remix&&rankedMaze&&[1,4,8,9].includes(level)&&Number.isFinite(best))this.raceTime(level,best);},
- raceTime(level,best){const s=this.session;if(!s||s.remix||!Number.isFinite(best)||![1,4,8,9].includes(level))return;const t=s.times.find(t=>t.level===level),milliseconds=Math.round(best*1000);if(t)t.milliseconds=Math.min(t.milliseconds,milliseconds);else s.times.push({level,milliseconds});},
+ record({epoch,level,won,total,best,knockouts,rankedMaze=true}){const s=this.session;if(!s||s.seen.has(epoch)||s.final)return;s.seen.add(epoch);s.rounds++;s.wins+=won?1:0;s.score=Math.max(s.score,total);s.knockouts=Math.max(s.knockouts,knockouts??0);if(!s.remix&&rankedMaze&&RANKED_MAZES.includes(level)&&Number.isFinite(best))this.raceTime(level,best);},
+ raceTime(level,best){const s=this.session;if(!s||s.remix||!Number.isFinite(best)||!RANKED_MAZES.includes(level))return;const t=s.times.find(t=>t.level===level),milliseconds=Math.round(best*1000);if(t)t.milliseconds=Math.min(t.milliseconds,milliseconds);else s.times.push({level,milliseconds});},
  checkpoint(keepalive=false,final=false){this.sample?.();const s=this.session;if(s&&(!s.final||final)&&(s.playedMs>0||s.rounds>0)){s.final||=final;
   // Nothing is queued for a server that is not there; the local store takes it on flush instead.
   if(!this.offline){const payload={revision:++s.revision,score:s.score,points:s.points,playedMs:s.playedMs,rounds:s.rounds,wins:s.wins,knockouts:s.knockouts,times:s.times,final:s.final};this.queue.put({run:s.run,token:s.token,start:s.start,payload});}}return this.flush(keepalive);},

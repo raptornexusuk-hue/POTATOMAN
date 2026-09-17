@@ -58,7 +58,7 @@ function setPlayers(two){if(two!==duo&&!manualPadAssignment)padAssignments=[null
 $('solo').onclick=()=>online?openOnline():setPlayers(false);$('duo').onclick=()=>{if(online){openOnline();return;}if(isTouch){$('sessionNote').textContent='Use a desktop or laptop for two-player split-screen. Touch supports solo play.';return;}setPlayers(true);};
 $('levelsButton').onclick=()=>dialog('levelsDialog');$('controlsButton').onclick=openSettings;$('arsenalButton').onclick=()=>{renderArsenal();dialog('arsenalDialog');};$('artButton').onclick=()=>dialog('artDialog');document.querySelectorAll('.close').forEach(b=>b.onclick=()=>{if(b.closest('dialog').id==='settingsDialog')closeSettings();else b.closest('dialog').close();});
 function durationLabel(seconds){return `${seconds/60}-minute`;}
-function refreshDuration(){setPlayers(duo);$('durationSummary').textContent=`${settings.roundSeconds/60} minutes`;$('huntSummary').textContent=`${BONUS_TIME}-second`;document.querySelectorAll('[data-level-duration]').forEach(el=>el.textContent=`${settings.roundSeconds/60} MIN`);}
+function refreshDuration(){setPlayers(duo);$('durationSummary').textContent=`${settings.roundSeconds/60} minutes`;$('huntSummary').textContent=`${BONUS_TIME}-second`;$('huntLength').textContent=BONUS_TIME;document.querySelectorAll('[data-level-duration]').forEach(el=>el.textContent=`${settings.roundSeconds/60} MIN`);}
 function refreshControlHint(){$('hint').textContent=`${keyLabel(settings.keys[0].forward)}${keyLabel(settings.keys[0].left)}${keyLabel(settings.keys[0].back)}${keyLabel(settings.keys[0].right)} move · mouse pan · ${settings.mouse.fire===0?'Left click / ':''}${keyLabel(settings.keys[0].fire)} fire · ${keyLabel(settings.keys[0].catch)} catch · ${keyLabel(settings.keys[0].jump)} jump · ${keyLabel(settings.keys[0].crouch)} duck · ${keyLabel(settings.keys[0].dodge)} dodge · ${keyLabel(settings.keys[0].resetCamera)} reset view · Esc settings`;}
 function persist(message='Preferences saved on this device.'){refreshControlHint();const ok=saveSettings(settings,preferenceStorage);$('bindingStatus').textContent=ok?message:'Settings work for this session; browser storage is unavailable.';}
 function renderBindings(){
@@ -369,12 +369,12 @@ function tick(dt){readInputs(dt);if(paused&&(!online||online.isHost))return;if(o
  const expired=s.age>s.life;let gone=expired||s.y<.1;let direct=null;
  if(!gone){let contact={t:Infinity,type:null,value:null};
   for(const w of [...map.walls,...map.platforms]){const t=boxContact3D(ax,ay,az,s.x,s.y,s.z,w,s.gun&&s.weapon!=='rpg'?.025:.18);if(t<contact.t)contact={t,type:'wall',value:w};}
-  for(const p of players){if(p.id===s.owner||p.respawn>0||(bonus&&!p.runner))continue;const t=cylinderContact({x:ax,y:ay,z:az},s,p,s.gun?.03:.15);if(t<contact.t)contact={t,type:'player',value:p};}
+  for(const p of players){if(p.id===s.owner||p.respawn>0||s.struck?.has(p.id)||(bonus&&!p.runner))continue;const t=cylinderContact({x:ax,y:ay,z:az},s,p,s.gun?.03:.15);if(t<contact.t)contact={t,type:'player',value:p};}
   if(!bonus&&mode==='smash')for(const t of targets){if(t.hp<=0)continue;const at=circleContact(ax,az,s.x,s.z,t.x,t.z,.65);if(at<contact.t)contact={t:at,type:'target',value:t};}
   if(Number.isFinite(contact.t)){s.x=ax+(s.x-ax)*contact.t;s.y=ay+(s.y-ay)*contact.t;s.z=az+(s.z-az)*contact.t;gone=true;
    // A piercing round spends one charge on the body it passed through and carries on from the
    // far side of it, so a single well-led shot can line two rivals up.
-   if(contact.type==='player'&&s.pierce>0){s.pierce--;hit(contact.value,s);gone=false;s.x+=s.vx*.06;s.z+=s.vz*.06;s.y+=s.vy*.06;}
+   if(contact.type==='player'&&s.pierce>0){s.pierce--;hit(contact.value,s);gone=false;(s.struck??=new Set()).add(contact.value.id);}
    else if(contact.type==='player'){direct=contact.value;hit(contact.value,s);}
    else if(contact.type==='target'){const t=contact.value;t.hp-=s.damage;t.mesh.scale?.setScalar(t.hp>0?.9:1);world.burst(t.x,t.z);if(t.hp<=0){players[s.owner].score++;players[s.owner].points+=50;t.mesh.visible=t.ring.visible=false;t.respawn=6;sound('hit',t);world.shockwave?.(t.x,t.z,0xffd36b,2.4);}}
    else{world.burst(s.x,s.z,0xc9af82,4);sound('impact',s);}

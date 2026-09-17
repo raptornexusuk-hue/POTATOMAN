@@ -255,3 +255,30 @@ console.log(`PASS overhead wind-up/release, death/equip cancellation, immediate 
  a.getSettings().difficulty=oldDifficulty;
  console.log('PASS full battle/capture/smash bot activity, objective progress, shared box pursuit and exact-overlap recovery at every difficulty');
 }
+
+// A piercing round has to survive the body it hits without skipping the ground it has not covered
+// yet. The first attempt jumped the shot 0.06s down its own velocity, which at the Peeler's 96m/s
+// is over six metres — measured, it cleared a wall entirely and struck the rival behind it.
+// Both rivals are placed on the line the round actually travels rather than on a guessed heading,
+// because a shoulder-fired shot does not leave along the player's yaw.
+function rifleRange(gap,wallAt){
+ const {range,p}=firingRange('peeler'),[,near,far,spare]=range.players;
+ range.map.walls.length=0;
+ for(const q of range.players)Object.assign(q,{botDelay:999,invuln:0,respawn:0,hp:100});
+ Object.assign(spare,{x:300,z:300});Object.assign(near,{x:300,z:300});Object.assign(far,{x:300,z:300});
+ Object.assign(p,{x:0,z:0,y:0,yaw:0,pitch:0,throwCD:0});
+ a.fire(p);a.tick(dt);
+ const shot=range.shots[0],speed=Math.hypot(shot.vx,shot.vy,shot.vz),at=d=>({x:shot.x+shot.vx/speed*d,z:shot.z+shot.vz/speed*d});
+ const first=at(5),second=at(gap);
+ Object.assign(near,{x:first.x,z:first.z,y:0});Object.assign(far,{x:second.x,z:second.z,y:0});
+ if(wallAt){const w=at(wallAt);range.map.walls.push({x:w.x,z:w.z,w:10,d:.6,h:4});}
+ for(let i=0;i<120;i++)a.tick(dt);
+ return{near,far};
+}
+{const {near,far}=rifleRange(13,0);
+ assert.ok(near.hp<100||near.respawn>0,'the rifle round must hit the rival in front');
+ assert.ok(far.hp<100||far.respawn>0,'and must carry on through into the one behind');}
+{const {near,far}=rifleRange(13,9);
+ assert.ok(near.hp<100||near.respawn>0,'the round still hits the first rival');
+ assert.equal(far.hp,100,'but a wall in the gap stops it rather than being tunnelled through');}
+console.log('PASS a piercing round carries through one body and is still stopped by a wall behind it');

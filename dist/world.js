@@ -114,7 +114,7 @@ export class World{
   }
   this.dressEnvironment(map,level,night,r);if(level.mode==='assault'&&!bonus)this.assaultCourse(map);if(level.mode==='climb'&&!bonus)this.climbTower(map);
   this.trailCells=new Set();this.trail=null;if(!bonus&&level.mode==='race'){this.trail=new T.InstancedMesh(this.geo.cylinder,this.mat(0xe7cc8d,null,{emissive:0xaa883f,emissiveIntensity:.25}),map.n*map.n);this.trail.count=0;this.root.add(this.trail);}
-  this.goal=this.marker(map.exit.x,map.exit.z,0x79edba,'exit');this.goal.visible=bonus||isTrial(level);
+  this.goal=this.marker(map.exit.x,map.exit.z,0x79edba,'exit');this.goal.position.y=(map.exitHeight??0)+.03;this.goal.visible=bonus||isTrial(level);
   this.zone=this.marker(0,0,0xffcf50,'zone');this.zone.visible=!bonus&&level.mode==='capture';
   this.checkpoints=[];this.pickups=[];this.targets=[];
   if(bonus)for(const [i,p]of (map.objectives??[]).entries()){

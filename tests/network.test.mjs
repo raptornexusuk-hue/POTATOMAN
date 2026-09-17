@@ -30,6 +30,13 @@ const delayed=new RoomConnection();delayed.active=true;delayed.isHost=true;delay
 const closing=new RoomConnection();closing.active=true;closing.isHost=true;let callback=false,reply;closing.callbacks.roster=()=>callback=true;closing.request=()=>new Promise(r=>reply=r);const flight=closing.poll();await closing.close(false);reply({roster:[],signals:[],status:'lobby'});await flight;assert.equal(callback,false);
 console.log('PASS start-click race and in-flight close cannot corrupt room lifecycle');
 const record={weaponLevel:2,roundWins:3,kills:4,id:1,name:'SPUD',knockouts:0,points:0,played:0,weapon:'spud',x:0,y:0,z:0,vx:0,vy:0,vz:0,grounded:true,crouching:false,courseDuckEntry:0,runBoost:0,fireBoost:0,jumpBoost:0,courseStep:0,yaw:0,pitch:0,hp:100,score:0,total:0,attempt:0,respawn:0,invuln:0,throwCD:0,catchCD:0,catchTime:0,dashCD:0,dashTime:0,dashX:0,dashZ:0,shotAnim:0,pendingThrow:0,gun:false,mag:12,reload:0,runner:false,best:Infinity,checks:[false,false]};assert.equal(unpackPlayer(JSON.parse(JSON.stringify(packPlayer(record)))).best,Infinity);
+// Every weapon the game can actually hand out has to survive the wire. The whitelist here was
+// written out by hand and went stale the moment the weapon box started rotating through the new
+// launchers: an unpackable weapon fails validSnapshot, and the host's packets are then dropped
+// silently for the rest of the round.
+const {WEAPONS}=await import('../dist/weapons.js');
+for(const weapon of Object.keys(WEAPONS))assert.equal(unpackPlayer(JSON.parse(JSON.stringify(packPlayer({...record,weapon}))))?.weapon,weapon,weapon+' must survive an online snapshot');
+assert.equal(unpackPlayer(JSON.parse(JSON.stringify(packPlayer({...record,weapon:'trebuchet'})))),null,'an unknown weapon is still rejected');
 const packed=unpackPlayer(JSON.parse(JSON.stringify(packPlayer(record))));assert.equal(packed.weaponLevel,2);assert.equal(packed.roundWins,3);assert.equal(packed.kills,4);assert.equal(packed.cameraDistance,4.6);assert.equal(packed.visualShotSpeed,32);const aimed=unpackPlayer(packPlayer({...record,cameraDistance:8,visualShotSpeed:28.8,pendingThrow:.08}));assert.equal(aimed.cameraDistance,8);assert.equal(aimed.visualShotSpeed,28.8);assert.equal(aimed.pendingThrow,.08);
 console.log('PASS race DNF, progression and crowns survive snapshot serialization');DB.close();
 
