@@ -18,3 +18,20 @@ const old=defaults();old.keys[0].fire='KeyZ';delete old.keys[0].jump;delete old.
 console.log('PASS existing custom controls migrate without loss and camera settings stay bounded');
 const connection=new RoomConnection();connection.observeInput({jump:true},'round');connection.observeInput({jump:false},'round');const packet=connection.input({jump:false,x:0,z:0},{yaw:0,pitch:0},'round');const edges={};assert.equal(remoteControl(packet,{},'round',edges,0).jump,true);assert.equal(remoteControl(packet,{},'round',edges,0).jump,false);assert.equal(connection.input({jump:false,x:0,z:0},{yaw:0,pitch:0},'next').jump,0);
 console.log('PASS jump taps between network sends arrive once and cannot leak into the next round');
+
+// The difficulty curve is written against circuit progress rather than a round number, so it
+// stretches to whatever length the circuit is. It used to clamp at round nine, which meant that
+// once the circuit passed ten rounds the rivals stopped getting harder before the half way point.
+const {circuitProgress}=await import('../dist/core.js');
+const {aiSettings,AI_LEVELS}=await import('../dist/difficulty.js');
+assert.equal(circuitProgress(0),0);assert.equal(circuitProgress(LEVELS.length-1),1);
+assert.equal(circuitProgress(LEVELS.length+50),1,'progress cannot run past the finale');
+for(const name of Object.keys(AI_LEVELS)){
+ const speeds=LEVELS.map((_,i)=>aiSettings(name,circuitProgress(i)).speed);
+ assert.equal(speeds[0],AI_LEVELS[name].speed,name+' opens at its base speed');
+ assert.ok(speeds.every((v,i)=>!i||v>=speeds[i-1]),name+' never gets easier as the circuit goes on');
+ const top=Math.min(1,AI_LEVELS[name].speed+9*AI_LEVELS[name].growth);
+ assert.ok(Math.abs(speeds.at(-1)-top)<1e-12,name+' reaches its full speed at the finale');
+ if(top>speeds[0])assert.ok(speeds.at(-1)>speeds[Math.floor(LEVELS.length/2)],name+' must still be ramping in the back half of the circuit');
+}
+console.log('PASS the rival difficulty ramp spans the whole circuit whatever its length');

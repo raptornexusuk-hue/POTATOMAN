@@ -5,4 +5,7 @@ export const AI_LEVELS={
  normal:{label:'Normal',description:'Balanced rivals with quicker aim, occasional catches and steady fire.',speed:.80,growth:.012,runner:.96,reaction:.35,fireInterval:.85,gunInterval:.25,error:1,turn:3.3,catch:.15,dodge:.25,hesitate:0},
  hard:{label:'Hard',description:'Fast rivals, accurate aim and aggressive fire. Bring your best spuds.',speed:.90,growth:.010,runner:1,reaction:.18,fireInterval:.55,gunInterval:.16,error:.4,turn:4,catch:.30,dodge:.40,hesitate:0}
 };
-export function aiSettings(name,level=0){const a=AI_LEVELS[name]??AI_LEVELS.chill;return{...a,speed:Math.min(1,a.speed+Math.max(0,Math.min(9,level))*a.growth)};}
+// `progress` is how far through the circuit the round is, 0 to 1 — not a round number. Rivals
+// reach their full speed at the finale whatever the circuit's length; this used to take a raw index
+// and clamp it at nine, so once the circuit passed ten rounds the ramp finished before half way.
+export function aiSettings(name,progress=0){const a=AI_LEVELS[name]??AI_LEVELS.chill;return{...a,speed:Math.min(1,a.speed+Math.max(0,Math.min(1,progress))*9*a.growth)};}

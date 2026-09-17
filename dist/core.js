@@ -219,6 +219,10 @@ export function boxContact3D(ax,ay,az,bx,by,bz,w,pad=0){let lo=0,hi=1;for(let ax
 export function launchVerticalSpeed(speed,pitch,drop=1){const flight=10.42/speed;return(pitch*7-.02)/flight+drop*THROW_DROP*flight;}
 
 export const POWERUPS={run:{label:'BUTTER BOOTS',caption:'RUN FASTER',color:0x60edbd,field:'runBoost',seconds:12},fire:{label:'HOT SPUD',caption:'SHOOT FASTER',color:0xff9861,field:'fireBoost',seconds:12},jump:{label:'SPRING CLOGS',caption:'JUMP HIGHER',color:0xb89bff,field:'jumpBoost',seconds:14}};
+// How far through the circuit a round sits, 0 at the opener and 1 at the finale. The game's
+// difficulty curves are written against this rather than against a round number, so a circuit that
+// grows from ten rounds to twenty-one stretches its pacing to fit instead of finishing it early.
+export const circuitProgress=index=>LEVELS.length>1?Math.max(0,Math.min(1,index/(LEVELS.length-1))):0;
 export function isTrial(level){return level.mode==='race'||level.mode==='assault'||level.mode==='climb';}
 export function jump(p){if(p.respawn>0||!p.grounded||p.crouching)return false;p.vy=p.jumpBoost>0?10.4:7.8;p.grounded=false;return true;}
 export function movePlayer(p,input,dt,map,speed=6){
