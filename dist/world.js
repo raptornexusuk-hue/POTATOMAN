@@ -43,7 +43,7 @@ const footReach=(phase,walk)=>{const cycle=((phase%TAU)+TAU)%TAU;return walk*STE
 export class World{
  constructor(canvas,renderer=null){
   if(renderer)this.renderer=renderer;else{try{this.renderer=new T.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});}catch{this.renderer=new T.WebGLRenderer({canvas,antialias:false,powerPreference:'default'});}}this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.autoUpdate=false;this.renderer.shadowMap.type=T.PCFSoftShadowMap;this.renderer.outputColorSpace=T.SRGBColorSpace;this.renderer.toneMapping=T.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.25;
-  this.scene=new T.Scene();this.scene.background=new T.Color(0x8db4c3);this.scene.fog=new T.Fog(0x8db4c3,45,125);this.cameras=[0,1].map(()=>new T.PerspectiveCamera(65,1,.08,180));this.cameraReady=[false,false];this.ray=new T.Raycaster();this.wallMeshes=[];this.materials=new Map();this.geo={box:new T.BoxGeometry(1,1,1),sphere:new T.SphereGeometry(1,24,16),foliage:new T.SphereGeometry(1,16,10),foliageLow:new T.SphereGeometry(1,8,6),eyelid:new T.SphereGeometry(1,24,10,0,Math.PI*2,0,Math.PI*.55),hipRoof:new T.ConeGeometry(Math.SQRT1_2,1,4).rotateY(Math.PI/4),smallSphere:new T.SphereGeometry(1,10,8),potato:potatoGeometry(),rounded:roundedBox(),clog:clogGeometry(),cylinder:new T.CylinderGeometry(1,1,1,20),cone:new T.ConeGeometry(1,1,4),leaf:new T.PlaneGeometry(1,1),leafPlain:new T.CircleGeometry(.5,12)};
+  this.scene=new T.Scene();this.scene.background=new T.Color(0x8db4c3);this.scene.fog=new T.Fog(0x8db4c3,45,125);this.cameras=[0,1].map(()=>new T.PerspectiveCamera(65,1,.08,180));this.cameraReady=[false,false];this.ray=new T.Raycaster();this.wallMeshes=[];this.materials=new Map();this.movers=[];this.geo={box:new T.BoxGeometry(1,1,1),sphere:new T.SphereGeometry(1,24,16),foliage:new T.SphereGeometry(1,16,10),foliageLow:new T.SphereGeometry(1,8,6),eyelid:new T.SphereGeometry(1,24,10,0,Math.PI*2,0,Math.PI*.55),hipRoof:new T.ConeGeometry(Math.SQRT1_2,1,4).rotateY(Math.PI/4),smallSphere:new T.SphereGeometry(1,10,8),potato:potatoGeometry(),rounded:roundedBox(),clog:clogGeometry(),cylinder:new T.CylinderGeometry(1,1,1,20),cone:new T.ConeGeometry(1,1,4),leaf:new T.PlaneGeometry(1,1),leafPlain:new T.CircleGeometry(.5,12)};
   this.scratch={hip:new T.Vector3(),ankle:new T.Vector3(),knee:new T.Vector3(),direction:new T.Vector3(),inverse:new T.Quaternion(),up:new T.Vector3(0,1,0),forward:new T.Vector3(0,0,1)};
   this.textures={skin:this.texture('skin'),brick:this.texture('brick'),stone:this.texture('stone'),wood:this.texture('wood'),hedge:this.texture('hedge')};this.effects=[];this.projectileMeshes=new Map();this.characters=[];this.qualityMode='high';this.ready=this.loadMaterials();this.resize();
  }
@@ -83,7 +83,7 @@ export class World{
  build(map,level,players,bonus){
   this.characters.forEach(m=>m.label.dispose());
   if(this.root){this.scene.remove(this.root);this.root.traverse(o=>{if(o.isInstancedMesh)o.dispose();if(o.isLight&&o.shadow)o.shadow.dispose();if(o.userData.ownGeometry)o.geometry.dispose();if(o.userData.ownMaterial)o.material.dispose();if(o.userData.ownTexture)o.userData.ownTexture.dispose();});}
-  this.root=new T.Group();this.scene.add(this.root);this.map=map;this.level=level;this.isBonus=bonus;this.solids=[...map.walls,...map.platforms];this.wallMeshes=[];this.effects=[];this.projectileMeshes.clear();this.characters=[];this.cameraReady=[false,false];this.water=null;this.waterSurfaces=[];this.waterFlows=[];this.ambientParticles=null;this.leafClock??={value:0};
+  this.root=new T.Group();this.scene.add(this.root);this.map=map;this.level=level;this.isBonus=bonus;this.solids=[...map.walls,...map.platforms];this.movers=[];this.wallMeshes=[];this.effects=[];this.projectileMeshes.clear();this.characters=[];this.cameraReady=[false,false];this.water=null;this.waterSurfaces=[];this.waterFlows=[];this.ambientParticles=null;this.leafClock??={value:0};
   const night=['canal','depot','shop','night','fort','factory','cannery'].includes(level.theme),hedge=['hedge','garden','corn','fort','orchard','grove'].includes(level.theme),stoneWorld=['quarry','pit'].includes(level.theme),r=rng(level.seed),root=this.root;
   // Three surfaces the older worlds never needed: a lit shed with a roof over it, open sand, and
   // a freight yard's asphalt. `indoor` in particular changes what the sky and the horizon mean.
@@ -182,7 +182,7 @@ export class World{
   }
  }
  batchStatic(){
-  this.root.updateMatrixWorld(true);const groups=new Map();this.root.traverse(o=>{if(!o.isMesh||o.isInstancedMesh||o.material.isShaderMaterial)return;const key=o.geometry.uuid+':'+o.material.uuid+':'+o.castShadow+':'+o.receiveShadow+':'+Math.floor(o.matrixWorld.elements[12]/16)+':'+Math.floor(o.matrixWorld.elements[14]/16);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(o);});
+  this.root.updateMatrixWorld(true);const groups=new Map();this.root.traverse(o=>{if(!o.isMesh||o.isInstancedMesh||o.material.isShaderMaterial)return;for(let a=o;a;a=a.parent)if(a.userData.dynamic)return;const key=o.geometry.uuid+':'+o.material.uuid+':'+o.castShadow+':'+o.receiveShadow+':'+Math.floor(o.matrixWorld.elements[12]/16)+':'+Math.floor(o.matrixWorld.elements[14]/16);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(o);});
   for(const meshes of groups.values()){if(meshes.length<2)continue;const first=meshes[0],batch=new T.InstancedMesh(first.geometry,first.material,meshes.length);batch.castShadow=first.castShadow;batch.receiveShadow=first.receiveShadow;batch.userData.ownGeometry=meshes.some(m=>m.userData.ownGeometry);meshes.forEach((m,i)=>{batch.setMatrixAt(i,m.matrixWorld);m.parent.remove(m);});this.root.add(batch);}
  }
  // Rooftops for the deep skyline: silhouette and colour only. Sixty metres out and through fog the
@@ -247,18 +247,25 @@ export class World{
  // A spiral of stacked crates up a crane tower. Each pillar is banded so its top edge reads from
  // below, the catching ledges are a different colour, and the top one carries the finish marker.
  climbTower(map){
-  const root=this.root,crate=this.mat(0xb07b42,'wood',{roughness:.85}),ledge=this.mat(0x3f7f8c,null,{roughness:.6}),edge=this.mat(0xffd36b,null,{roughness:.5}),steelMat=this.mat(0x5d666d,null,{metalness:.55,roughness:.42});
-  for(const c of map.course){
-   const w=c.wide?4.2:2.4,body=this.mesh('rounded',c.wide?ledge:crate,root,c.x,c.h-.225,c.z,w,.45,w);body.receiveShadow=true;
-   this.mesh('rounded',edge,root,c.x,c.h+.02,c.z,w+.06,.06,w+.06);
-   for(const side of[-1,1]){this.mesh('rounded',steelMat,root,c.x+side*(w/2-.12),c.h-.46,c.z,.14,.5,w*.8);this.mesh('rounded',steelMat,root,c.x,c.h-.46,c.z+side*(w/2-.12),w*.8,.5,.14);}
-   const label=this.marker(c.x,c.z,c.index===map.course.length-1?0x79edba:c.wide?0x7fd8e8:0xffd36b,'checkpoint');label.position.y=c.h+.05;
+  const root=this.root,crate=this.mat(0xb07b42,'wood',{roughness:.85}),ledge=this.mat(0x3f7f8c,null,{roughness:.6}),beamMat=this.mat(0x8a6a3c,'wood',{roughness:.8}),moverMat=this.mat(0xd2892f,null,{roughness:.5,emissive:0x7a4409,emissiveIntensity:.35}),edge=this.mat(0xffd36b,null,{roughness:.5}),steelMat=this.mat(0x5d666d,null,{metalness:.55,roughness:.42});
+  // A moving platform's meshes hang off a group that batchStatic leaves alone, so the whole piece
+  // can be driven from the one collider the physics uses rather than drawn a second time.
+  this.movers=[];
+  for(const [index,c]of map.course.entries()){
+   const solid=map.platforms[index],w=solid.w,d=solid.d;
+   let parent=root,ox=c.x,oy=c.h,oz=c.z;
+   if(c.mover){const group=new T.Group();group.userData.dynamic=true;root.add(group);this.movers.push({group,platform:solid});parent=group;ox=oy=oz=0;}
+   const body=this.mesh('rounded',c.mover?moverMat:c.beam?beamMat:c.wide?ledge:crate,parent,ox,oy-.225,oz,w,.45,d);body.receiveShadow=true;
+   this.mesh('rounded',edge,parent,ox,oy+.02,oz,w+.06,.06,d+.06);
+   for(const side of[-1,1]){this.mesh('rounded',steelMat,parent,ox+side*(w/2-.12),oy-.46,oz,.14,.5,d*.8);this.mesh('rounded',steelMat,parent,ox,oy-.46,oz+side*(d/2-.12),w*.8,.5,.14);}
+   if(!c.mover){const label=this.marker(c.x,c.z,c.index===map.course.length-1?0x79edba:c.wide?0x7fd8e8:0xffd36b,'checkpoint');label.position.y=c.h+.05;}
   }
   // The crane that the tower hangs off, so the climb reads as a place rather than floating boxes.
   const top=map.course.at(-1).h;
   for(const side of[-1,1])this.mesh('rounded',steelMat,root,side*9.5,top*.6,-9.5,.6,top*1.2,.6);
   this.mesh('rounded',steelMat,root,0,top+2.4,-9.5,20.4,.7,.8);
   this.mesh('rounded',steelMat,root,0,top+2.0,0,.5,.5,19.4);
+  this.mesh('rounded',steelMat,root,9,top+2.0,6.2,19,.5,.5);
  }
  assaultCourse(map){
   for(const h of map.platforms.filter(p=>p.duckRoof||p.duckPost)){this.mesh('rounded',this.mat(h.duckRoof?0xdc8c3c:0x39474d,h.duckRoof?'wood':null),this.root,h.x,(h.base??0)+h.h/2,h.z,h.w,h.h,h.d);if(h.duckRoof)for(const side of[-1,1])for(let i=0;i<6;i++)this.mesh('box',this.mat(i%2?0x26383e:0xf9d979),this.root,h.x+side*(h.w/2+.01),h.base+h.h/2,h.z+(i-2.5)*.51,.025,.21,.32);}
@@ -451,7 +458,10 @@ export class World{
   const fadeMaterials=[];g.traverse(o=>{if(o.isMesh){o.material=o.material.clone();o.material.transparent=false;o.userData.ownMaterial=true;fadeMaterials.push(o.material);}});
   return{g,shadow,label,fadeMaterials,crouchBlend:0,bob,hat,kit:kitGroup,arms,forearms,legs,cape,capeBase,clasp,crown,heldSpud,gun,eyes,brows,cheeks,pupils,lids,smile,mouth,lip,hurt:0,joy:0,gaze:0,lastHP:null,stride:0,walk:0,lastX:null,lastZ:null,blinkAt:2.5+id*.7};
  }
- updatePlayers(players,time,dt){const {hip,ankle,knee,direction,inverse,up:upAxis,forward}=this.scratch,aimPlayers=this.isBonus?players.filter(q=>q.runner):players;players.forEach((p,i)=>{const m=this.characters[i];m.g.visible=p.respawn<=0;const dx=m.lastX===null?0:p.x-m.lastX,dz=m.lastZ===null?0:p.z-m.lastZ,travelled=Math.hypot(dx,dz);m.lastX=p.x;m.lastZ=p.z;
+ updatePlayers(players,time,dt){// Moving platforms are drawn where the collider already is, so what a climber can stand on and
+  // what they can see are the same object.
+  for(const m of this.movers)m.group.position.set(m.platform.x,m.platform.base+m.platform.h,m.platform.z);
+  const {hip,ankle,knee,direction,inverse,up:upAxis,forward}=this.scratch,aimPlayers=this.isBonus?players.filter(q=>q.runner):players;players.forEach((p,i)=>{const m=this.characters[i];m.g.visible=p.respawn<=0;const dx=m.lastX===null?0:p.x-m.lastX,dz=m.lastZ===null?0:p.z-m.lastZ,travelled=Math.hypot(dx,dz);m.lastX=p.x;m.lastZ=p.z;
   const speed=travelled<2?travelled/Math.max(dt,.001):0;const smoothing=1-Math.exp(-10*dt);m.walk+=(Math.min(speed/6,1.35)-m.walk)*smoothing;if(travelled<2)m.stride+=travelled*STRIDE_RATE;else{m.walk=0;m.stride=0;}
   const stride=m.stride,walk=m.walk,dash=p.dashTime>0?Math.sin(Math.min(1,p.dashTime/.16)*Math.PI):0,throwProgress=p.shotAnim>0?1-p.shotAnim/(p.shotDuration??(p.weapon==='throw'?.46:.18)):0,throwSwing=p.shotAnim>0?Math.sin(throwProgress*Math.PI):0;
   m.shadow.position.set(p.x,.02,p.z);m.shadow.visible=p.respawn<=0;m.shadow.material.opacity=.65/(1+(p.y??0));m.shadow.scale.setScalar(1+(p.y??0)*.15);m.g.position.set(p.x,p.y??0,p.z);m.g.rotation.y=Math.PI-p.yaw+BODY_YAW_OFFSET;m.g.scale.setScalar(p.runner?1.18:1);

@@ -9,7 +9,7 @@ import {GameAudio,permittedVoice} from './game-audio.js';
 import {AI_LEVELS,aiSettings} from './difficulty.js';
 import {MouseCamera} from './camera-input.js';
 import {playerAccount,initializeProfiles} from './profiles.js';
-import {circuitProgress,THROW_DROP,POWERUPS,isTrial,jump,movePlayer,applyPowerup,roundLevel,playableMap,STEP,CELL,ROUND_TIME,BONUS_TIME,LEVELS,MODES,makeMap,route,rng,movement,slideMove,segmentCircle,segmentBox,circleContact,boxContact,boxContact3D,launchVerticalSpeed,clearShot,deadzone,blocked} from './core.js';
+import {circuitProgress,moveCourse,THROW_DROP,POWERUPS,isTrial,jump,movePlayer,applyPowerup,roundLevel,playableMap,STEP,CELL,ROUND_TIME,BONUS_TIME,LEVELS,MODES,makeMap,route,rng,movement,slideMove,segmentCircle,segmentBox,circleContact,boxContact,boxContact3D,launchVerticalSpeed,clearShot,deadzone,blocked} from './core.js';
 import {World,colors} from './world.js';
 import {WARDROBE,SLOTS,TINTS,loadOutfit,saveOutfit,validateOutfit,outfitPreview,pieceName} from './locker.js';
 import {ACTIONS,PAD_ACTIONS,PAD_BUTTONS,defaults,loadSettings,saveSettings,bindKey,bindButton,mouseButtonHeld,keyLabel,cameraDrag,resetCamera,autoLevel} from './controls.js';
@@ -304,7 +304,17 @@ function botInput(p,dt){const ai=aiSettings(settings.difficulty,circuitProgress(
  if(bonus&&p.runner){const n=p.checks.findIndex(v=>!v);goal=n<0?map.exit:{x:world.checkpoints[n].position.x,z:world.checkpoints[n].position.z};}
  else if(bonus)goal=enemy;
  else if(mode==='race')goal=raceGoal(p);
- else if(mode==='assault'||mode==='climb')goal=map.course[p.courseStep]??map.exit;
+ else if(mode==='assault')goal=map.course[p.courseStep]??map.exit;
+ // Whatever the climber is due next, if it is more than a jump and a half above them — they fell,
+ // or the lift is still at the top of its travel — they aim instead at the highest step they can
+ // actually reach from here. That is the step under their feet while they wait for a ride, and the
+ // bottom of the tower after a fall, rather than standing underneath the one they came off
+ // jumping at nothing.
+ else if(mode==='climb'){const due=map.course[p.courseStep]??map.exit;
+  // Only re-read the tower with both feet down. Judged in mid-air the answer changes at the top of
+  // every hop, which had fallen climbers jittering between two steps instead of taking either.
+  if(p.grounded)p.climbAim=(due.h??0)-(p.y??0)>2.6?(map.course.findLast(c=>c.h-(p.y??0)<1.3)?.index??-1):-1;
+  goal=p.climbAim>=0?map.course[p.climbAim]:due;}
  else if(mode==='capture')goal=zonePosition();
  else if(mode==='smash')goal=targets.filter(t=>t.hp>0).sort((a,b)=>Math.hypot(a.x-p.x,a.z-p.z)-Math.hypot(b.x-p.x,b.z-p.z))[0]??enemy;
  else goal=enemy;
@@ -312,11 +322,32 @@ function botInput(p,dt){const ai=aiSettings(settings.difficulty,circuitProgress(
  if(seekingBox)goal=box;
  else if(combat&&!p.runner&&goal)goal=botCombatGoal(p,goal,!bonus&&mode==='capture');
  if(mode==='climb'&&!bonus){
-  // A climber walks to the foot of the next pillar and jumps when it is within a stride, rather
-  // than hammering the jump key every time anything taller is nearby.
+  // A climber walks to the foot of the next step and jumps when it is within a stride, rather than
+  // hammering the jump key every time anything taller is nearby.
   const dx=goal.x-p.x,dz=goal.z-p.z,d=Math.hypot(dx,dz),rise=(goal.h??0)-(p.y??0);
-  return{x:p.botDelay>0?0:dx/Math.max(d,.001),z:p.botDelay>0?0:dz/Math.max(d,.001),crouch:false,
-   jump:p.botDelay<=0&&p.grounded&&rise>.05&&d<2.6,fire:false,catch:false,dodge:false};
+  // A step is reached by landing anywhere on it, so its distance is measured to its edge and not to
+  // its middle: aiming at the centre of a four-metre ledge makes one that is already touching the
+  // step underfoot look like a jump too far.
+  const box=map.platforms[goal.index],gap=Math.hypot(Math.max(0,Math.abs(dx)-(box?box.w/2:0)),Math.max(0,Math.abs(dz)-(box?box.d/2:0)));
+  // A moving step has to be waited for. Walking at one that is still out over the drop, or walking
+  // off the one being ridden before it has carried you anywhere, is exactly how a climber falls, so
+  // both are a stand-still until the platform comes to them. Approaching one is allowed right up to
+  // the edge of whatever is underfoot; past that it is waiting, and a moving step is only committed
+  // to once it is all but touching — anything further and it has moved on by the time you land.
+  // Riding is always waiting, because on a moving step the ride is the progress.
+  const riding=p.ride?.mover?p.ride:null,foot=p.ride,landable=rise<1.25&&gap<(goal.mover?.9:2.9);
+  const ahead={x:p.x+dx/Math.max(d,.001)*.55,z:p.z+dz/Math.max(d,.001)*.55};
+  const supported=!!foot&&Math.abs(ahead.x-foot.x)<foot.w/2+.25&&Math.abs(ahead.z-foot.z)<foot.d/2+.25;
+  const hold=(goal.mover||riding)&&!landable&&(riding||!supported);
+  // Waiting on a moving step means waiting in the middle of it. A passenger who stays where they
+  // stepped on rides the trailing edge, which is a step and a half further from everything the
+  // ride was for — near enough to leave them going round for ever.
+  const toward=hold?(riding?{x:riding.x-p.x,z:riding.z-p.z}:{x:0,z:0}):{x:dx,z:dz},reach=Math.hypot(toward.x,toward.z);
+  const walk=reach>(hold?.25:.001);
+  return{x:p.botDelay>0||!walk?0:toward.x/reach,z:p.botDelay>0||!walk?0:toward.z/reach,crouch:false,
+   // Take off as soon as the step is in range: the flight is long, and a climber steers through it,
+   // so an early jump buys distance that a late one at the edge does not.
+   jump:p.botDelay<=0&&!hold&&!goal.mover&&p.grounded&&rise>.05&&gap<2.6,fire:false,catch:false,dodge:false};
  }
  if(mode==='assault'&&!bonus){const gate=goal.duck;const targetX=goal.x+(gate?goal.direction*1.8:0);let dx=targetX-p.x,dz=goal.z-p.z,d=Math.hypot(dx,dz);
   // The course runners used to trace one identical straight line to one identical point. Each now
@@ -363,7 +394,7 @@ function zonePosition(){if(circuitProgress(levelIndex)<2/3)return{x:0,z:0};const
 function hit(p,s){if(p.invuln>0)return;const fromX=-s.vx,fromZ=-s.vz,l=Math.hypot(fromX,fromZ),dot=(Math.sin(p.yaw)*fromX-Math.cos(p.yaw)*fromZ)/Math.max(l,.01);
  if(!s.gun&&p.catchTime>0&&dot>.25){p.catchTime=0;p.throwCD=0;sound('catch',p);world.burst(p.x,p.z,0xffeb9d,6);return;}
  p.hp-=s.damage;if(p.id!==s.owner)players[s.owner].points+=10;if(s.owner===(online?.slot??0))hitUntil=performance.now()+150;if(p.id===(online?.slot??0)){damageFlashUntil=performance.now()+260;gameAudio.pain();}sound('hit',p);if(s.owner===(online?.slot??0))quip('Baked');world.burst(p.x,p.z,colors[p.id]);if(p.hp<=0){loseLoadout(p);dropHeldWeapon(p);p.respawn=3;p.vx=p.vz=0;world.burst(p.x,p.z,colors[p.id],20);world.shockwave?.(p.x,p.z,colors[p.id],3);if(p.id!==s.owner){if(!bonus&&currentLevel().mode==='battle')players[s.owner].score++;players[s.owner].knockouts++;players[s.owner].kills=(players[s.owner].kills??0)+1;players[s.owner].points+=100;const killer=players[s.owner],now=performance.now();if(!bonus&&earnedKill(killer)){sound('weaponPickup',killer);if(killer.id===(online?.slot??0))quip('KILL EARNED · SPUD GUN',true,'');}killer.comboCount=(killer.comboUntil??0)>now?(killer.comboCount??1)+1:1;killer.comboUntil=now+6000;pushKillFeed(`${escapeHTML(killer.name)} mashed ${escapeHTML(p.name)}`);if(killer.comboCount>1){const label=killer.comboCount===2?'DOUBLE MASH!':killer.comboCount===3?'TRIPLE MASH!':'MASH FRENZY!';pushKillFeed(label);if(killer.id===(online?.slot??0))quip(label,true,label);}}if(bonus&&p.runner){finishBonus(false);return;}}}
-function tick(dt){readInputs(dt);if(paused&&(!online||online.isHost))return;if(online&&paused)Object.assign(inputs[0],{x:0,z:0,fire:false,catch:false,dodge:false,jump:false,crouch:false});if(introRemaining>0){introRemaining=Math.max(0,introRemaining-dt);return;}time+=dt;remaining=Math.max(0,remaining-dt);const mode=currentLevel().mode;
+function tick(dt){readInputs(dt);if(paused&&(!online||online.isHost))return;if(online&&paused)Object.assign(inputs[0],{x:0,z:0,fire:false,catch:false,dodge:false,jump:false,crouch:false});if(introRemaining>0){introRemaining=Math.max(0,introRemaining-dt);return;}time+=dt;remaining=Math.max(0,remaining-dt);const mode=currentLevel().mode;moveCourse(map,time);
  for(const p of players){if(online&&!isHuman(p))continue;p.played+=dt;for(const key of['throwCD','catchCD','catchTime','dashCD','dashTime','invuln','shotAnim','botDelay','runBoost','fireBoost','jumpBoost'])p[key]=Math.max(0,p[key]-dt);
  if(p.reload>0){p.reload=Math.max(0,p.reload-dt);if(!p.reload)p.mag=12;}
  if(p.respawn>0){p.pendingThrow=0;p.shotAnim=0;p.respawn-=dt;if(p.respawn<=0)spawn(p,!bonus&&isTrial(currentLevel()));continue;}
@@ -374,7 +405,10 @@ function tick(dt){readInputs(dt);if(paused&&(!online||online.isHost))return;if(o
  if(!bonus&&mode==='climb'){
   // Height is the objective, so credit the highest pillar actually stood on rather than insisting
   // the climb be done strictly in order — a lucky jump that skips a step still counts.
-  for(const c of map.course)if(p.grounded&&Math.abs((p.y??0)-c.h)<.14&&Math.hypot(p.x-c.x,p.z-c.z)<(c.wide?1.9:1.1)&&c.index>=p.courseStep){p.courseStep=c.index+1;p.points+=20;sound('checkpoint',p);}
+  // Credit is for standing on a step, so the test is the step's own footprint rather than a radius
+  // that happened to suit square ones — a climber on the far end of a beam is still on the beam.
+  for(const c of map.course){const box=map.platforms[c.index];
+   if(p.grounded&&Math.abs((p.y??0)-c.h)<.14&&Math.abs(p.x-c.x)<box.w/2+.3&&Math.abs(p.z-c.z)<box.d/2+.3&&c.index>=p.courseStep){p.courseStep=c.index+1;p.points+=20;sound('checkpoint',p);}}
  }
  if(!bonus&&mode==='assault'){const c=map.course[p.courseStep];if(c){let cleared=false;if(c.duck){const progress=(p.x-c.x)*c.direction,inside=Math.abs(p.z-c.z)<1.4&&p.y<.12&&p.grounded&&p.crouching;if(inside&&progress<-1&&progress>-2.5)p.courseDuckEntry=1;if(inside&&Math.abs(progress)<.7&&p.courseDuckEntry===1)p.courseDuckEntry=2;cleared=inside&&progress>1.3&&p.courseDuckEntry===2;}else cleared=Math.hypot(p.x-c.x,p.z-c.z)<1.05&&Math.abs(p.y-c.h)<.12&&p.grounded;if(cleared){p.courseStep++;p.courseDuckEntry=0;p.points+=25;sound(c.duck?'duckGate':'checkpoint',p);}}}
  // A tower's exit sits directly above its own base, so reaching it has to mean reaching that
@@ -481,7 +515,7 @@ async function drainSnapshots(){applyingSnapshot=true;try{while(pendingSnapshot&
  if(state==='results'&&s.result){resultData=s.result;recordPlayerRound();releaseMouse();$('pauseDialog').close();$('resultTag').textContent=s.result.tag;$('resultTitle').textContent=s.result.title;$('resultText').textContent=s.result.text;$('nextRound').textContent='WAITING FOR HOST';$('nextRound').disabled=true;$('resultsTable').innerHTML=players.map(p=>`<div class="result-row"><span style="color:${hex[p.id]}">${escapeHTML(p.name)}</span><b>${escapeHTML(s.result.rows?.find(r=>r.id===p.id)?.value??'')} <small>· ${p.total} circuit pts · ${Math.floor(p.points)} score</small></b></div>`).join('');if(previousState!=='results'||!$('resultDialog').open)dialog('resultDialog');}
  updateHUD();updatePlayabilityHUD();
  }}catch(e){showStartError('Could not load the online arena. '+e.message);}finally{applyingSnapshot=false;$('loading').hidden=true;}}
-function guestFrame(dt){readInputs(dt);const p=localPlayer(),stale=performance.now()-lastGuestStateTime>1500;
+function guestFrame(dt){readInputs(dt);moveCourse(map,time);const p=localPlayer(),stale=performance.now()-lastGuestStateTime>1500;
  if(paused||hostPaused||stale||introRemaining>0){inputs[0]={x:0,z:0,fire:false,catch:false,dodge:false,jump:false,crouch:false};}else{let steps=dt;while(steps>0){const d=Math.min(STEP,steps);if(p.respawn<=0){p.dashTime=Math.max(0,p.dashTime-d);p.dashCD=Math.max(0,p.dashCD-d);if(inputs[0].dodge&&!guestPriorDodge&&p.dashCD<=0){const l=Math.hypot(inputs[0].x,inputs[0].z);p.dashX=l>.1?inputs[0].x/l:Math.sin(p.yaw);p.dashZ=l>.1?inputs[0].z/l:-Math.cos(p.yaw);p.dashTime=.16;p.dashCD=p.runner?2.6:2;}updateStance(p,inputs[0].crouch,[...map.walls,...map.platforms]);if(inputs[0].jump&&!guestPriorJump)jump(p);guestPriorJump=inputs[0].jump;movePlayer(p,inputs[0],d,map,p.runner?8.5:6);}steps-=d;}time+=dt;remaining=Math.max(0,remaining-dt);}
  if(inputs[0].resetCamera&&!guestPriorReset)resetView(p);guestPriorReset=inputs[0].resetCamera;guestPriorDodge=inputs[0].dodge;
  for(const q of players)if(q.id!==p.id&&q.networkTarget){const k=1-Math.exp(-15*dt);q.x+=(q.networkTarget.x-q.x)*k;q.y+=(q.networkTarget.y-q.y)*k;q.z+=(q.networkTarget.z-q.z)*k;q.yaw+=Math.atan2(Math.sin(q.networkTarget.yaw-q.yaw),Math.cos(q.networkTarget.yaw-q.yaw))*k;}

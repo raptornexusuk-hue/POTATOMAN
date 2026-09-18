@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node tests/core.test.mjs && node tests/controls.test.mjs && node tests/camera-input.test.mjs && node tests/audio.test.mjs && node tests/gameplay.test.mjs && node tests/scene.test.mjs && node tests/network.test.mjs && node tests/profiles.test.mjs && node tests/score-queue.test.mjs && node tests/upgrades.test.mjs && node tests/stance-aim.test.mjs && node tests/spatial-audio.test.mjs && node tests/weapon-pickup.test.mjs && node tests/render-aim.test.mjs && node tests/character-rig.test.mjs && node tests/gait-direction.test.mjs && node tests/frame-safety.test.mjs && node tests/world-progression.test.mjs",
+    "test": "node tests/core.test.mjs && node tests/controls.test.mjs && node tests/camera-input.test.mjs && node tests/audio.test.mjs && node tests/gameplay.test.mjs && node tests/scene.test.mjs && node tests/network.test.mjs && node tests/profiles.test.mjs && node tests/score-queue.test.mjs && node tests/upgrades.test.mjs && node tests/stance-aim.test.mjs && node tests/spatial-audio.test.mjs && node tests/weapon-pickup.test.mjs && node tests/render-aim.test.mjs && node tests/character-rig.test.mjs && node tests/gait-direction.test.mjs && node tests/frame-safety.test.mjs && node tests/world-progression.test.mjs && node tests/climb.test.mjs",
     "build": "node scripts/build.mjs",
     "db:generate": "drizzle-kit generate",
     "start": "node server/node.mjs",

@@ -17,7 +17,7 @@ export const LEVELS=[
  {name:'Canal Carnage',tag:'CANALSIDE • DUSK',mode:'battle',size:19,theme:'canal',seed:82,detail:'Cross three bridges between moonlit quays. Use the warehouses for cover and stay out of the water.',skill:'Lead moving targets'},
  {name:'Quayside Domination',tag:'HARBOUR • NIGHT',mode:'capture',size:21,theme:'depot',seed:96,detail:'Fight between containers for a moving control zone.',skill:'Rotate and intercept'},
  {name:'The Butter Run',tag:'HARBOUR ASSAULT COURSE • SUNSET',mode:'assault',size:21,theme:'course',seed:114,detail:'Jump onto each numbered platform, duck through the three low gates, then reach the exit. Fastest completed run wins.',skill:'Jump · land · keep momentum'},
- {name:'Get Higher',tag:'CRANE TOWER • DUSK',mode:'climb',size:15,theme:'gantry',seed:166,detail:'Twenty-six stacked platforms spiralling up a crane tower. Miss a jump and the wide ledges catch you — for a while. Fastest climb to the top wins.',skill:'Read the gap before you jump'},
+ {name:'Get Higher',tag:'CRANE TOWER • DUSK',mode:'climb',size:15,theme:'gantry',seed:166,detail:'Six stages up a crane tower: switchback scaffolding, a run of long jumps, two shuttles and two lifts that have to be ridden, a beam run round the mast and the jib to the summit. Miss and the wide ledges catch you — for a while. Fastest ascent wins.',skill:'Read the gap, and wait for the ride'},
  {name:'The Midnight Maze',tag:'OLD TOWN • NIGHT',mode:'race',size:23,theme:'night',seed:129,detail:'Twisting brick alleys and longer routes. Fastest complete escape wins.',skill:'Navigate under pressure'},
  {name:'Quarry Quarrel',tag:'CHALK QUARRY • OVERCAST',mode:'battle',size:19,theme:'quarry',seed:157,detail:'Fight across the cutting floor. Stone blocks give cover; the gantry lane is the fast flank.',skill:'Use hard cover'},
  {name:'Cider Run',tag:'ORCHARD • MORNING',mode:'race',size:25,theme:'grove',seed:152,detail:'Race the mown lanes between fruit rows. Fastest complete escape wins.',skill:'Read the rows'},
@@ -151,23 +151,49 @@ export function makeMap(level,bonus=false){
  const targetSpots=!bonus&&level.mode==='smash'?[[4,3],[5,3],[n-6,3],[n-5,3],[4,n-4],[5,n-4],[n-6,n-4],[n-5,n-4],[3,4],[3,5],[n-4,4],[n-4,5],[3,n-6],[n-4,n-6]].filter(([x,z])=>grid[z]?.[x]===0).map(([x,z])=>toWorld(x,z)):[];
  const map={n,grid,walls,buildings,props,targetSpots,worldId:family,waterCells,bridgeRails,toWorld,toCell,start:toWorld(1,n-2),exit:toWorld(n-2,1),platforms:[],course:[],objectives:(map0.objectiveCells??[[3,3],[n-4,n-4]]).map(([x,z])=>toWorld(x,z))};
  if(level.mode==='climb'&&!bonus){
-  // A spiral of stacked pillars. The rise and the gap are chosen against the actual jump: a
-  // standing jump peaks at 1.38m and stays above 0.85m from 0.77m to 3.45m of travel, so a 2.4m
-  // gap with a 0.85m step sits in the middle of that window rather than at the edge of it.
-  // The helix widens as it rises. A fixed-radius spiral comes back over itself after one turn,
-  // which would put a later step in the same place on the floor plan as an earlier one; growing
-  // the radius by more than a platform's width per turn keeps every step its own piece of sky.
-  const steps=26,rise=.85;let angle=0,radius=4.4;map.course=[];
-  for(let i=0;i<steps;i++){
-   map.course.push({x:Math.cos(angle)*radius,z:Math.sin(angle)*radius,h:.9+i*rise,index:i,wide:i%5===4||i===steps-1});
-   angle+=2*Math.asin(Math.min(.9,1.2/radius));radius+=.22;
-  }
-  // Slabs, not columns: a floating platform can sit above an earlier one without the climber
-  // being blocked by a tower of solid geometry on the way to it. Every fifth one is broad, so a
-  // missed jump usually costs a few steps rather than the whole climb.
-  map.platforms=map.course.map(c=>({x:c.x,z:c.z,w:c.wide?4.2:2.4,d:c.wide?4.2:2.4,base:Math.max(0,c.h-.45),h:c.h>.45?.45:c.h,platform:true}));
-  const top=map.course.at(-1);
-  map.start={x:4.4,z:-2.45};
+  // Six stages, not one spiral. Every gap is measured against the actual jump: a standing jump
+  // peaks at 1.38m and clears 0.85m of rise between 0.8m and 3.45m of travel, or nearly 3.9m when
+  // the step up is small. The moving stages bridge gaps deliberately wider than that, so the only
+  // way across is to wait and ride — which is the point of putting them there.
+  const course=[],motion=[];
+  const add=(x,z,h,extra={})=>{const c={x,z,h,index:course.length,...extra};course.push(c);return c;};
+  // A mover is an ordinary platform whose position is recomputed before anything touches it, so
+  // collision, the climbers' route and the meshes all read the same numbers. Its travel is set so
+  // that at each end of the sweep it overlaps the ledge it serves: mistiming costs a wait, not a
+  // fall, while the gap between those ledges stays far past anything a jump can cross.
+  const shuttle=(x,z,h,axis,range,period,phase=0)=>{const c=add(x,z,h,{mover:true});motion.push({course:c,x,z,h,axis,range,period,phase});return c;};
+  // 1 · Scaffold switchbacks up the west face: two runs of four, doubling back on themselves.
+  let h=.9;
+  for(const [x,z]of[[-10,-9],[-10,-6],[-10,-3],[-10,0],[-6.6,0],[-6.6,-3],[-6.6,-6],[-6.6,-9]]){add(x,z,h,{wide:x===-6.6&&z===0});h+=.7;}
+  // 2 · Four long jumps east along the deck. Barely any step up, so the whole jump buys distance.
+  h=6.1;for(const x of[-2.8,1,4.8,8.6]){add(x,-9,h);h+=.3;}
+  // 3 · Two shuttles, each crossing a gap no jump can make: one along the deck, one across it. A
+  // ride collects at the height of the ledge it serves and sets down a step below the next, so
+  // boarding is a walk taken when it arrives and leaving it is a hop onto something that will
+  // still be there — never a jump at a platform that has moved on by the time you land.
+  add(12,-9,7.6,{wide:true});
+  shuttle(12,-4.3,7.6,'z',2.15,6.4);
+  add(12,.4,8,{wide:true});
+  shuttle(7,.4,8,'x',2,5.6,.35);
+  add(2,.4,8.4,{wide:true});
+  // 4 · Two lifts. They rise and fall between the ledge that loads them and the one they unload
+  // onto, so the ride is the climb: nothing up here can be jumped to from the floor below it.
+  shuttle(2,2.6,10.4,'y',2,7.2,.5);
+  add(2,5.8,12.8,{wide:true});
+  shuttle(2,9,14.7,'y',1.9,6.8,.15);
+  add(2,12.2,17,{wide:true});
+  // 5 · A beam run round the mast: narrow, and it turns two corners.
+  h=17.6;for(const [x,z,along]of[[-1.2,12.2,'x'],[-4.4,12.2,'x'],[-4.4,9,'z'],[-4.4,5.8,'z'],[-1.2,5.8,'x'],[2,5.8,'x']]){add(x,z,h,{beam:along});h+=.6;}
+  // 6 · Out along the crane jib to the summit.
+  h=21.2;for(const x of[5.2,8.4,11.6]){add(x,5.8,h);h+=.6;}
+  add(14.8,5.8,23,{wide:true});
+  map.course=course;map.motion=motion;
+  // Slabs, not columns: a floating platform can sit above an earlier one without the climber being
+  // blocked by a tower of solid geometry on the way to it.
+  map.platforms=course.map(c=>{const span=c.wide?4.2:2.4,platform={x:c.x,z:c.z,w:c.beam?(c.beam==='x'?3:1.3):span,d:c.beam?(c.beam==='x'?1.3:3):span,base:Math.max(0,c.h-.45),h:c.h>.45?.45:c.h,platform:true};if(c.mover)platform.mover=true;return platform;});
+  for(const m of motion)m.platform=map.platforms[m.course.index];
+  const top=course.at(-1);
+  map.start={x:-10,z:-11.6};
   map.exit={x:top.x,z:top.z};map.exitHeight=top.h;
  }
  if(level.mode==='assault'&&!bonus){
@@ -227,17 +253,33 @@ export function isTrial(level){return level.mode==='race'||level.mode==='assault
 export function jump(p){if(p.respawn>0||!p.grounded||p.crouching)return false;p.vy=p.jumpBoost>0?10.4:7.8;p.grounded=false;return true;}
 export function movePlayer(p,input,dt,map,speed=6){
  const solids=map.platforms?.length?[...map.walls,...map.platforms]:map.walls;
+ // Whatever the player was standing on last tick takes them with it.
+ if(p.ride?.mover&&p.ride.shift){p.x+=p.ride.shift.x;p.z+=p.ride.shift.z;}
  updateStance(p,input.crouch,solids);
  const oldY=p.y??0;p.vy=(p.vy??0)-22*dt;p.y=oldY+p.vy*dt;
  if(p.dashTime>0)slideMove(p,p.dashX*17*dt,p.dashZ*17*dt,solids);else movement(p,input,dt,solids,speed*(p.runBoost>0?1.4:1)*(p.crouching?.58:1));
- let floor=0;
+ let floor=0,ride=null;
  for(const w of solids){if(Math.abs(p.x-w.x)>=w.w/2+.30||Math.abs(p.z-w.z)>=w.d/2+.30)continue;const bottom=w.base??0,top=bottom+w.h;
-  if(oldY>=top-.06&&p.y<=top)floor=Math.max(floor,top);
+  if(oldY>=top-.06&&p.y<=top){if(top>=floor)ride=w;floor=Math.max(floor,top);}
   if(bottom>0&&p.vy>0&&oldY+bodyHeight(p)<=bottom+.02&&p.y+bodyHeight(p)>bottom){p.y=bottom-bodyHeight(p);p.vy=0;}
  }
  p.grounded=p.vy<=0&&p.y<=floor;if(p.grounded){p.y=floor;p.vy=0;}
+ // Whatever is underfoot, so a mover can carry its passenger and a climber can tell where its edge is.
+ p.ride=p.grounded?ride:null;
  p.inWater=!!map.waterCells?.length&&p.y<.18&&map.grid[map.toCell(p.x,p.z).z]?.[map.toCell(p.x,p.z).x]===2;
  if(map.n){const limit=(map.n-2)*CELL/2-.43;p.x=Math.max(-limit,Math.min(limit,p.x));p.z=Math.max(-limit,Math.min(limit,p.z));}
+}
+// Moving platforms are updated once per tick, before anything reads them. Each one also remembers
+// how far it travelled this tick so a climber standing on it is carried rather than left behind,
+// which is the difference between riding a lift and watching it leave.
+export function moveCourse(map,time){
+ if(!map.motion?.length)return;
+ for(const m of map.motion){
+  const at=Math.sin((time/m.period+m.phase)*Math.PI*2)*m.range,platform=m.platform,before={x:platform.x,z:platform.z,base:platform.base};
+  if(m.axis==='y')platform.base=Math.max(0,m.h+at-.45);else platform[m.axis]=m[m.axis]+at;
+  m.course.x=platform.x;m.course.z=platform.z;m.course.h=platform.base+platform.h;
+  platform.shift={x:platform.x-before.x,z:platform.z-before.z,y:platform.base-before.base};
+ }
 }
 export function applyPowerup(p,kind){const boost=POWERUPS[kind];if(!boost)return false;p[boost.field]=boost.seconds;return true;}
 export function circuitLevels(seed=0){
