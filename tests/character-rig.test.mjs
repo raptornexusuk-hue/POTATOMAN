@@ -156,3 +156,33 @@ for(const [id,model]of breeds.entries()){
 }
 w.characters=[m];
 console.log(`PASS ${breedRays} sight rays across all four player builds; headwear sits on the head, not inside it`);
+
+// The locker lets a player put any piece on any potato, so every piece has to hold the same two
+// promises the four bots do: it shows (it is not swallowed by the head it sits on), and it never
+// gets between the player and their own crosshair.
+const {WARDROBE,SLOTS}=await import('../dist/locker.js');
+let pieces=0,rays=0;
+for(const [slot]of SLOTS){
+ if(slot==='tint'||slot==='skin')continue;
+ for(const [piece]of WARDROBE[slot]){
+  const model=w.character(0,{head:'none',eyes:'none',neck:'none',[slot]:piece});
+  const torso=model.bob.children[0],worn=[];for(const part of[model.hat,model.kit])part.traverse(o=>{if(o.isMesh)worn.push(o);});
+  Object.assign(p,initial);w.characters=[model];model.crouchBlend=0;model.walk=0;model.stride=0;model.lastX=p.x;model.lastZ=p.z;
+  w.updatePlayers([p],0,0);w.root.updateMatrixWorld(true);
+  if(piece!=='none'){
+   assert.ok(worn.length,`${slot}/${piece} builds nothing at all`);
+   const tree=bvh(triList(torso)),points=worn.flatMap(meshPoints),outside=points.filter(point=>!inside(tree,point));
+   assert.ok(outside.length>points.length*.25,`${slot}/${piece} is swallowed by the potato wearing it`);
+   if(slot==='head'){const eye=model.eyes[0].getWorldPosition(new T.Vector3());
+    assert.ok(outside.every(point=>point.y>eye.y-.02),`${slot}/${piece} hangs over its own face`);}
+   pieces++;
+  }
+  for(const weapon of['throw','spud','rpg'])for(const pitch of[MIN_PITCH,0,MAX_PITCH]){
+   Object.assign(p,initial,{weapon,pitch});w.updatePlayers([p],0,0);w.root.updateMatrixWorld(true);
+   const view=cameraPose(p),ray=new T.Raycaster(new T.Vector3(view.position.x,view.position.y,view.position.z),new T.Vector3(view.direction.x,view.direction.y,view.direction.z));
+   assert.equal(ray.intersectObject(model.g,true).filter(h=>drawn(h.object)).length,0,`${slot}/${piece} blocks the crosshair at pitch ${pitch} with ${weapon}`);rays++;
+  }
+ }
+}
+w.characters=[m];
+console.log(`PASS all ${pieces} wardrobe pieces are visible on the potato and clear of its own sight across ${rays} rays`);

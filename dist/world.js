@@ -1,5 +1,6 @@
 import {makeSpudGun} from './weapon-model.js';
 import {makeArm,poseArms,BODY_YAW_OFFSET,TORSO} from './character-rig.js';
+import {validateOutfit,tintColor,skinColor} from './locker.js';
 import {dressWorld,barn} from './environment-design.js';
 import {mapId} from './map-catalogue.js';
 import {leafMaterial,addTree,waterSurface,fountainFlow} from './nature.js';
@@ -24,11 +25,13 @@ const LID_OPEN=-1.18;
 // One entry per player slot: skin, how the body is stretched, the paint on the klompen carving and
 // which piece of headwear it wears. `hat:null` is the bare-headed baseline the sight-line tests
 // measure against.
+// Each rival's kit is written in the same wardrobe the player picks from, so the locker and the
+// four bots can never drift apart: one list of pieces, one set of builders.
 const BREEDS=[
- {skin:0xc68b49,build:[1,1,1],paint:0xb5342f,hat:null},
- {skin:0xe7c38e,build:[1.05,.95,1.04],paint:0x2f6f8c,hat:'cap'},
- {skin:0xa9702f,build:[.94,1.07,.95],paint:0x3f7f4a,hat:'scarf'},
- {skin:0xd9a765,build:[1.03,1.02,.97],paint:0x7a4b9c,hat:'goggles'}
+ {build:[1,1,1],paint:0xb5342f,outfit:{skin:'russet',head:'none',eyes:'none',neck:'none',tint:'sun'}},
+ {build:[1.05,.95,1.04],paint:0x2f6f8c,outfit:{skin:'maris',head:'cap',eyes:'none',neck:'none',tint:'slate'}},
+ {build:[.94,1.07,.95],paint:0x3f7f4a,outfit:{skin:'rooster',head:'headscarf',eyes:'none',neck:'none',tint:'rust'}},
+ {build:[1.03,1.02,.97],paint:0x7a4b9c,outfit:{skin:'golden',head:'goggles',eyes:'none',neck:'none',tint:'coal'}}
 ];
 const indoorGlow=half=>Math.min(3.4,1.6+half*.045);
 // bulk/length are scales on the shared launcher mesh; kit names an optional attachment group.
@@ -124,7 +127,7 @@ export class World{
    this.mesh('rounded',this.mat(0xffd76b,null,{emissive:0xffb347,emissiveIntensity:.6}),this.root,p.x,.87,p.z,1.56,.10,1.56).userData.ownMaterial=false;
    for(const side of[-1,1])this.mesh('rounded',this.mat(0x6d4f2a,'wood'),this.root,p.x+side*.72,.42,p.z,.10,.88,1.52);
   }
-  for(const p of players)this.characters.push(this.character(p.id));
+  for(const p of players)this.characters.push(this.character(p.id,p.outfit));
  }
  markTrail(p){if(!this.trail||p.respawn>0)return;const cell=this.map.toCell(p.x,p.z),key=cell.x+','+cell.z;if(this.trailCells.has(key))return;this.trailCells.add(key);const d=new T.Object3D();d.position.set(p.x,.04,p.z);d.scale.set(.15,.025,.15);d.updateMatrix();this.trail.setMatrixAt(this.trail.count++,d.matrix);this.trail.instanceMatrix.needsUpdate=true;this.trail.computeBoundingSphere();}
  building(x,z,w,h,r,night,front=z<0?1:-1){
@@ -269,7 +272,86 @@ export class World{
   }
  }
  clogMaterial(){const key='painted-yellow-klompens';if(!this.materials.has(key)){const m=new T.MeshPhysicalMaterial({color:0xffc522,roughness:.34,clearcoat:.42,clearcoatRoughness:.28,emissive:0x4f3100,emissiveIntensity:.10});if(this.pbr?.oak){m.normalMap=this.pbr.oak[1];m.normalScale.set(.11,.11);m.roughnessMap=this.pbr.oak[2];}this.materials.set(key,m);}return this.materials.get(key);}
- character(id){
+ // Every piece is cut from the skull band at its own height, so nothing has to be re-guessed for
+ // the rounder or narrower bodies. Headgear belongs above the eyes and is the only kit the sight
+ // audit measures as such; eyewear and neckwear sit on the face and the shoulders and go in their
+ // own group so that rule still means something.
+ headwear(kind,hat,skull,colour){
+  if(kind==='cap'){
+   // A flat cap: crown, a peak over the brow and a button on top.
+   const wool=this.mat(colour,'wood',{roughness:.95}),at=1.775,fit=skull(at);
+   this.mesh(this.geo.sphere,wool,hat,0,at,-.01,fit.x*1.16,.20,fit.z*1.16);
+   const peak=this.mesh(this.geo.sphere,wool,hat,0,at-.04,fit.z*1.05,fit.x*.82,.035,fit.z*.70);peak.rotation.x=-.14;
+   this.mesh(this.geo.smallSphere,wool,hat,0,at+.19,-.01,.065,.05,.065);
+  }else if(kind==='headscarf'){
+   // A knotted headscarf, with the knot and both tails hanging off the back of the head.
+   const cloth=this.mat(colour,'wood',{roughness:.9}),at=1.74,fit=skull(at);
+   this.mesh(this.geo.sphere,cloth,hat,0,at,-.01,fit.x*1.14,.18,fit.z*1.14);
+   this.mesh(this.geo.smallSphere,cloth,hat,fit.x*.55,at-.05,-fit.z*1.05,.10,.09,.10);
+   for(const side of[-1,1]){const tail=this.mesh(this.geo.sphere,cloth,hat,fit.x*.55+side*.05,at-.19,-fit.z*1.18,.05,.14,.045);tail.rotation.x=.38;tail.rotation.z=side*.28;}
+  }else if(kind==='goggles'){
+   // Welding goggles pushed up onto the forehead, with the strap running round the back.
+   const strap=this.mat(colour,'wood',{roughness:.92}),brass=this.mat(0xc39a45,null,{metalness:.7,roughness:.32}),glass=this.mat(0x6fa9b8,null,{metalness:.5,roughness:.16});
+   const at=1.695,fit=skull(at);
+   this.mesh(this.geo.sphere,strap,hat,0,at,-.01,fit.x*1.13,.065,fit.z*1.13);
+   for(const side of[-1,1]){this.mesh('cylinder',brass,hat,side*fit.x*.52,at+.02,fit.z*.86,.105,.09,.105).rotation.x=Math.PI/2;
+    this.mesh('cylinder',glass,hat,side*fit.x*.52,at+.02,fit.z*.86+.05,.074,.02,.074).rotation.x=Math.PI/2;}
+   this.mesh('rounded',brass,hat,0,at+.02,fit.z*.86,fit.x*.5,.03,.045);
+  }else if(kind==='bucket'){
+   // A soft crown with an all-round brim that turns down towards the back.
+   const cloth=this.mat(colour,'wood',{roughness:.93}),at=1.80,fit=skull(at),brim=skull(1.70);
+   this.mesh(this.geo.sphere,cloth,hat,0,at-.03,-.01,fit.x*1.12,.19,fit.z*1.12);
+   const ring=this.mesh('cylinder',cloth,hat,0,1.685,-.01,brim.x*1.62,.028,brim.z*1.62);ring.rotation.x=-.07;
+  }else if(kind==='beanie'){
+   // A knitted dome, a rolled band at the brow and a bobble on top.
+   const wool=this.mat(colour,'wood',{roughness:.98}),at=1.79,fit=skull(at),band=skull(1.68);
+   this.mesh(this.geo.sphere,wool,hat,0,at-.05,-.01,fit.x*1.13,.24,fit.z*1.13);
+   this.mesh('cylinder',wool,hat,0,1.675,-.01,band.x*1.19,.075,band.z*1.19);
+   this.mesh(this.geo.smallSphere,wool,hat,0,at+.20,-.01,.095,.09,.095);
+  }else if(kind==='tophat'){
+   // Absurd on a potato, which is the point. Straight sides, flat brim, ribbon at the base.
+   const felt=this.mat(colour,'wood',{roughness:.62}),ribbon=this.mat(0x1d1a17,null,{roughness:.5}),fit=skull(1.76);
+   this.mesh('cylinder',felt,hat,0,2.05,-.01,fit.x*.86,.20,fit.z*.96);
+   this.mesh('cylinder',ribbon,hat,0,1.875,-.01,fit.x*.88,.035,fit.z*.98);
+   this.mesh('cylinder',felt,hat,0,1.845,-.01,fit.x*1.42,.022,fit.z*1.52);
+  }
+ }
+ eyewear(kind,group,skull,colour){
+  if(kind==='none')return;
+  const at=1.40,fit=skull(at),lens=fit.z*1.02,dark=this.mat(0x241f1c,null,{roughness:.38}),frame=this.mat(colour,null,{metalness:.45,roughness:.36});
+  if(kind==='glasses'){
+   for(const side of[-1,1]){this.mesh('cylinder',frame,group,side*.225,at,lens,.20,.018,.20).rotation.x=Math.PI/2;
+    this.mesh('cylinder',this.mat(0xcfe6ee,null,{roughness:.1,metalness:.2,opacity:.55,transparent:true}),group,side*.225,at,lens-.004,.172,.012,.172).rotation.x=Math.PI/2;
+    this.mesh('rounded',frame,group,side*fit.x*.92,at+.03,lens*.32,.02,.02,fit.z*.8);}
+   this.mesh('rounded',frame,group,0,at+.02,lens,.10,.018,.02);
+  }else if(kind==='shades'){
+   for(const side of[-1,1]){const glass=this.mesh(this.geo.sphere,dark,group,side*.235,at-.01,lens*.94,.22,.145,.10);glass.rotation.y=side*.18;
+    this.mesh('rounded',frame,group,side*fit.x*.93,at+.04,lens*.30,.02,.022,fit.z*.82);}
+   this.mesh('rounded',frame,group,0,at+.03,lens*.96,.11,.02,.024);
+  }else if(kind==='visor'){
+   const tinted=this.mat(colour,null,{metalness:.6,roughness:.14,opacity:.72,transparent:true});
+   const band=this.mesh(this.geo.sphere,tinted,group,0,at+.01,.02,fit.x*1.08,.13,fit.z*1.08);band.scale.z=fit.z*1.08;
+   this.mesh(this.geo.sphere,this.mat(0x2c2a27,null,{roughness:.8}),group,0,at+.15,.02,fit.x*1.05,.045,fit.z*1.05);
+  }else if(kind==='patch'){
+   this.mesh(this.geo.sphere,dark,group,-.225,at,lens*.99,.20,.20,.045);
+   const strap=this.mesh(this.geo.sphere,dark,group,0,at+.14,.02,fit.x*1.04,.028,fit.z*1.04);strap.rotation.z=.16;
+  }
+ }
+ neckwear(kind,group,skull,colour){
+  if(kind==='none')return;
+  const at=1.16,fit=skull(at),cloth=this.mat(colour,'wood',{roughness:.95});
+  if(kind==='scarf'){
+   this.mesh('cylinder',cloth,group,0,at,0,fit.x*1.08,.105,fit.z*1.13);
+   for(const side of[-1,1]){const tail=this.mesh('rounded',cloth,group,side*.13,at-.28,fit.z*1.02,.13,.44,.055);tail.rotation.z=side*.12;}
+  }else if(kind==='bandana'){
+   this.mesh('cylinder',cloth,group,0,at+.02,0,fit.x*1.06,.055,fit.z*1.11);
+   const front=this.mesh(this.geo.sphere,cloth,group,0,at-.17,fit.z*1.02,.30,.22,.05);front.rotation.x=.12;
+  }else if(kind==='tie'){
+   this.mesh('rounded',cloth,group,0,at+.02,fit.z*1.04,.085,.075,.045);
+   this.mesh('rounded',cloth,group,0,at-.30,fit.z*1.00,.11,.52,.035);
+  }
+ }
+ character(id,worn){
   const g=new T.Group();this.root.add(g);
   if(!this.contactTexture){const pixels=new Uint8Array(64*64*4);for(let z=0;z<64;z++)for(let x=0;x<64;x++){const i=(z*64+x)*4,d=Math.hypot((x-31.5)/31.5,(z-31.5)/31.5);pixels[i+3]=Math.max(0,1-d)**2*150;}this.contactTexture=new T.DataTexture(pixels,64,64);this.contactTexture.needsUpdate=true;}
   const shadow=new T.Mesh(new T.PlaneGeometry(2.7,2.7),new T.MeshBasicMaterial({map:this.contactTexture,transparent:true,depthWrite:false,opacity:.65}));shadow.rotation.x=-Math.PI/2;shadow.userData.ownGeometry=shadow.userData.ownMaterial=true;this.root.add(shadow);
@@ -279,8 +361,8 @@ export class World{
   // Four rivals that are the same potato in two skin tones are hard to read in a fight. Each one
   // now has its own variety: a skin, a build, the paint on its klompen and something on its head.
   // The yellow klompen itself never changes — it is the one thing every Potatoman has in common.
-  const breed=BREEDS[id%BREEDS.length],skinColor=breed.skin,lift=t=>Math.round(t+(255-t)*.22),limbColor=lift(skinColor>>16&255)<<16|lift(skinColor>>8&255)<<8|lift(skinColor&255);
-  const skin=this.mat(skinColor,'skin',{roughness:.88,bumpScale:.037,envMapIntensity:.28}),limb=this.mat(limbColor,'skin',{roughness:.86,bumpScale:.032,envMapIntensity:.30}),dark=this.mat(0x352719,null,{roughness:.65}),white=this.mat(0xfff6df,null,{roughness:.25}),wood=this.clogMaterial(),iris=this.mat([0x778146,0x50787e,0x987343,0x6b7190][id],null,{roughness:.32});const bob=new T.Group();g.add(bob);
+  const breed=BREEDS[id%BREEDS.length],kit=validateOutfit({...breed.outfit,...worn}),tone=skinColor(kit),lift=t=>Math.round(t+(255-t)*.22),limbColor=lift(tone>>16&255)<<16|lift(tone>>8&255)<<8|lift(tone&255);
+  const skin=this.mat(tone,'skin',{roughness:.88,bumpScale:.037,envMapIntensity:.28}),limb=this.mat(limbColor,'skin',{roughness:.86,bumpScale:.032,envMapIntensity:.30}),dark=this.mat(0x352719,null,{roughness:.65}),white=this.mat(0xfff6df,null,{roughness:.25}),wood=this.clogMaterial(),iris=this.mat([0x778146,0x50787e,0x987343,0x6b7190][id],null,{roughness:.32});const bob=new T.Group();g.add(bob);
   const body=this.mesh('potato',skin,bob,0,TORSO.centre,0,TORSO.x*breed.build[0],TORSO.y*breed.build[1],TORSO.z*breed.build[2]);body.rotation.z=-.045;
   const brows=[],eyes=[],cheeks=[],pupils=[],lids=[],browSkin=this.mat(0x6a4523,null,{roughness:.92});
   for(const sign of[-1,1]){const x=sign*.225,eye=new T.Group();eye.position.set(x,1.40,.392);bob.add(eye);
@@ -322,27 +404,8 @@ export class World{
   const hat=new T.Group();bob.add(hat);
   const skull=height=>{const ry=TORSO.y*breed.build[1],t=(height-TORSO.centre)/ry,band=Math.sqrt(Math.max(.05,1-t*t));
    return{x:TORSO.x*breed.build[0]*band*.917,z:TORSO.z*breed.build[2]*band*1.035};};
-  if(breed.hat==='cap'){
-   // A flat cap: crown, a peak over the brow and a button on top.
-   const wool=this.mat(0x4a5560,'wood',{roughness:.95}),at=1.775,fit=skull(at);
-   this.mesh(this.geo.sphere,wool,hat,0,at,-.01,fit.x*1.16,.20,fit.z*1.16);
-   const peak=this.mesh(this.geo.sphere,wool,hat,0,at-.04,fit.z*1.05,fit.x*.82,.035,fit.z*.70);peak.rotation.x=-.14;
-   this.mesh(this.geo.smallSphere,wool,hat,0,at+.19,-.01,.065,.05,.065);
-  }else if(breed.hat==='scarf'){
-   // A knotted headscarf, with the knot and both tails hanging off the back of the head.
-   const cloth=this.mat(0xc4483e,'wood',{roughness:.9}),at=1.74,fit=skull(at);
-   this.mesh(this.geo.sphere,cloth,hat,0,at,-.01,fit.x*1.14,.18,fit.z*1.14);
-   this.mesh(this.geo.smallSphere,cloth,hat,fit.x*.55,at-.05,-fit.z*1.05,.10,.09,.10);
-   for(const side of[-1,1]){const tail=this.mesh(this.geo.sphere,cloth,hat,fit.x*.55+side*.05,at-.19,-fit.z*1.18,.05,.14,.045);tail.rotation.x=.38;tail.rotation.z=side*.28;}
-  }else if(breed.hat==='goggles'){
-   // Welding goggles pushed up onto the forehead, with the strap running round the back.
-   const strap=this.mat(0x3a3126,'wood',{roughness:.92}),brass=this.mat(0xc39a45,null,{metalness:.7,roughness:.32}),glass=this.mat(0x6fa9b8,null,{metalness:.5,roughness:.16});
-   const at=1.695,fit=skull(at);
-   this.mesh(this.geo.sphere,strap,hat,0,at,-.01,fit.x*1.13,.065,fit.z*1.13);
-   for(const side of[-1,1]){this.mesh('cylinder',brass,hat,side*fit.x*.52,at+.02,fit.z*.86,.105,.09,.105).rotation.x=Math.PI/2;
-    this.mesh('cylinder',glass,hat,side*fit.x*.52,at+.02,fit.z*.86+.05,.074,.02,.074).rotation.x=Math.PI/2;}
-   this.mesh('rounded',brass,hat,0,at+.02,fit.z*.86,fit.x*.5,.03,.045);
-  }
+  const kitGroup=new T.Group();bob.add(kitGroup);
+  this.headwear(kit.head,hat,skull,tintColor(kit));this.eyewear(kit.eyes,kitGroup,skull,tintColor(kit));this.neckwear(kit.neck,kitGroup,skull,tintColor(kit));
   const arms=[],forearms=[],legs=[];
   for(const sign of[-1,1]){const arm=makeArm(this,g,limb,sign);arms.push(arm);forearms.push(arm.userData.lower);
    const leg=new T.Group();leg.position.x=sign*.38;g.add(leg);const thigh=this.mesh('sphere',limb,leg,0,.69,0,.115,.22,.12),shin=this.mesh('sphere',limb,leg,0,.40,0,.125,.21,.135),knee=this.mesh('sphere',limb,leg,0,.53,.08,.13,.13,.13),foot=new T.Group();leg.add(foot);foot.position.y=.09;foot.rotation.y=sign*.32;foot.scale.set(.56,.76,.56);
@@ -386,7 +449,7 @@ export class World{
   const crown=new T.Group();crown.position.set(0,1.95,0);bob.add(crown);const gold=this.mat(0xffd365,null,{metalness:.85,roughness:.25});const band=this.mesh(new T.CylinderGeometry(.38,.35,.16,32,1,true),gold,crown,0,.02,0);band.userData.ownGeometry=true;for(let j=0;j<5;j++){const a=j*Math.PI*2/5;const point=this.mesh(new T.ConeGeometry(.10,.31,8),gold,crown,Math.sin(a)*.32,.23,Math.cos(a)*.32);point.userData.ownGeometry=true;this.mesh('sphere',this.mat(0xb52737,null,{metalness:.3,roughness:.18}),crown,Math.sin(a)*.37,.04,Math.cos(a)*.37,.045,.055,.03);}crown.visible=false;
   const label=new PlayerLabel(colors[id]);this.root.add(label.sprite);
   const fadeMaterials=[];g.traverse(o=>{if(o.isMesh){o.material=o.material.clone();o.material.transparent=false;o.userData.ownMaterial=true;fadeMaterials.push(o.material);}});
-  return{g,shadow,label,fadeMaterials,crouchBlend:0,bob,hat,arms,forearms,legs,cape,capeBase,clasp,crown,heldSpud,gun,eyes,brows,cheeks,pupils,lids,smile,mouth,lip,hurt:0,joy:0,gaze:0,lastHP:null,stride:0,walk:0,lastX:null,lastZ:null,blinkAt:2.5+id*.7};
+  return{g,shadow,label,fadeMaterials,crouchBlend:0,bob,hat,kit:kitGroup,arms,forearms,legs,cape,capeBase,clasp,crown,heldSpud,gun,eyes,brows,cheeks,pupils,lids,smile,mouth,lip,hurt:0,joy:0,gaze:0,lastHP:null,stride:0,walk:0,lastX:null,lastZ:null,blinkAt:2.5+id*.7};
  }
  updatePlayers(players,time,dt){const {hip,ankle,knee,direction,inverse,up:upAxis,forward}=this.scratch,aimPlayers=this.isBonus?players.filter(q=>q.runner):players;players.forEach((p,i)=>{const m=this.characters[i];m.g.visible=p.respawn<=0;const dx=m.lastX===null?0:p.x-m.lastX,dz=m.lastZ===null?0:p.z-m.lastZ,travelled=Math.hypot(dx,dz);m.lastX=p.x;m.lastZ=p.z;
   const speed=travelled<2?travelled/Math.max(dt,.001):0;const smoothing=1-Math.exp(-10*dt);m.walk+=(Math.min(speed/6,1.35)-m.walk)*smoothing;if(travelled<2)m.stride+=travelled*STRIDE_RATE;else{m.walk=0;m.stride=0;}

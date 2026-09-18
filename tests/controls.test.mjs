@@ -14,3 +14,34 @@ const legacy=defaults();legacy.version=5;legacy.keys[0].jump='KeyC';legacy.keys[
 console.log('PASS Space jump / left click defaults migrate while customised jump and mouse choices persist');
 
 assert.equal(validateSettings({version:6,zoom:5.6}).zoom,4.6);assert.equal(validateSettings({version:6,zoom:7}).zoom,7);
+
+// The locker writes into the same browser storage as everything else, so a hand-edited or
+// out-of-date entry has to come back as a wearable outfit rather than an unbuildable one.
+{
+ const L=await import('../dist/locker.js');
+ const kept={};const store={setItem(k,v){kept[k]=v;},getItem(k){return kept[k]??null;}};
+ assert.deepEqual(L.validateOutfit(null),L.defaultOutfit());
+ assert.deepEqual(L.validateOutfit({head:'sombrero',eyes:'shades',neck:7,skin:'maris',tint:'nope'}),
+  {...L.defaultOutfit(),eyes:'shades',skin:'maris'},'unknown pieces fall back one slot at a time');
+ const chosen={head:'tophat',eyes:'patch',neck:'tie',skin:'purple',tint:'plum'};
+ assert.equal(L.saveOutfit(chosen,store),true);assert.deepEqual(L.loadOutfit(store),chosen);
+ assert.equal(L.saveOutfit(chosen,{setItem(){throw Error('full');}}),false,'a blocked store is not a crash');
+ assert.deepEqual(L.loadOutfit({getItem(){return '{not json';}}),L.defaultOutfit());
+ assert.deepEqual(L.loadOutfit(undefined),L.defaultOutfit());
+ // Every piece the racks offer has to be a piece the world can build and the preview can draw.
+ const {World}=await import('../dist/world.js');
+ for(const [slot] of L.SLOTS){
+  const options=slot==='tint'?L.TINTS:L.WARDROBE[slot];
+  assert.ok(options.length>1,`${slot} needs something to choose between`);
+  for(const [id,name] of options){
+   assert.equal(L.pieceName(slot,id),name);
+   const svg=L.outfitPreview({head:'none',eyes:'none',neck:'none',skin:'russet',tint:'sun',[slot]:id});
+   assert.ok(svg.startsWith('<svg')&&svg.endsWith('</svg>'),`${slot}/${id} must still draw a preview`);
+   if(slot!=='tint'&&slot!=='skin'&&id!=='none')assert.ok(/<(path|circle|rect|ellipse|g) /.test(svg.slice(svg.indexOf('stroke-linecap'))),`${slot}/${id} draws nothing in the preview`);
+   assert.ok(typeof World.prototype[{head:'headwear',eyes:'eyewear',neck:'neckwear'}[slot]??'character']==='function');
+  }
+ }
+ assert.equal(L.tintColor({tint:'sea'}),0x2f6f8c);assert.equal(L.tintColor({tint:'bogus'}),L.TINTS[0][2]);
+ assert.equal(L.skinColor({skin:'purple'}),L.SKIN_TINTS.purple);assert.equal(L.skinColor(null),L.SKIN_TINTS.russet);
+ console.log('PASS the locker stores a wearable outfit, survives a broken or blocked store, and every rack entry draws and builds');
+}
