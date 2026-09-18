@@ -31,9 +31,9 @@ export function outfitPreview(input){const o=validateOutfit(input),kit=hex(tintC
  parts.push(`<ellipse cx="100" cy="112" rx="58" ry="78" fill="${skin}"/>`);
  for(const side of[-1,1]){parts.push(`<ellipse cx="${100+side*21}" cy="96" rx="13" ry="15" fill="#fff6df"/><circle cx="${100+side*21}" cy="98" r="6" fill="${dark}"/>`);}
  parts.push(`<path d="M78 138 Q100 154 122 138" stroke="${dark}" stroke-width="5" fill="none" stroke-linecap="round"/>`);
- if(o.neck==='scarf')parts.push(`<path d="M52 158 Q100 182 148 158 L148 172 Q100 196 52 172 Z" fill="${kit}"/><path d="M112 172 l10 44 l18 -6 l-10 -42 Z" fill="${kit}"/>`);
- if(o.neck==='bandana')parts.push(`<path d="M56 156 Q100 178 144 156 L128 200 L72 200 Z" fill="${kit}"/>`);
- if(o.neck==='tie')parts.push(`<path d="M92 156 l16 0 l-3 12 l9 44 l-14 12 l-14 -12 l9 -44 Z" fill="${kit}"/>`);
+ if(o.neck==='scarf')parts.push(`<path d="M50 146 Q100 170 150 146 L150 162 Q100 186 50 162 Z" fill="${kit}"/><path d="M114 162 l11 42 l18 -6 l-11 -40 Z" fill="${kit}"/>`);
+ if(o.neck==='bandana')parts.push(`<path d="M54 144 Q100 168 146 144 L128 192 L72 192 Z" fill="${kit}"/>`);
+ if(o.neck==='tie')parts.push(`<path d="M92 146 l16 0 l-3 12 l9 42 l-14 12 l-14 -12 l9 -42 Z" fill="${kit}"/>`);
  if(o.eyes==='glasses')parts.push(`<g fill="none" stroke="${kit}" stroke-width="4"><circle cx="79" cy="97" r="17"/><circle cx="121" cy="97" r="17"/><path d="M96 97 h8M62 94 l-14 -6M138 94 l14 -6"/></g>`);
  if(o.eyes==='shades')parts.push(`<path d="M58 84 h36 q6 0 6 6 v10 q0 12 -12 12 h-18 q-12 0 -12 -14 Z M142 84 h-36 q-6 0 -6 6 v10 q0 12 12 12 h18 q12 0 12 -14 Z" fill="${dark}"/><path d="M94 88 h12M58 86 l-12 -6M142 86 l12 -6" stroke="${kit}" stroke-width="4" fill="none"/>`);
  if(o.eyes==='visor')parts.push(`<path d="M46 82 q54 -12 108 0 v20 q-54 14 -108 0 Z" fill="${kit}" opacity=".85"/>`);
