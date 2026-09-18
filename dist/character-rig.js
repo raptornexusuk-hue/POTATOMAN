@@ -1,18 +1,28 @@
 import * as T from './assets/three.module.js';
 import {muzzlePosition} from './aiming.js';
 import {THROW_DURATION,THROW_WINDUP} from './weapons.js';
-// A quarter-turned torso exposes the throwing hand and receiver in the shoulder view.
-export const BODY_YAW_OFFSET=-.55;
+// A side-on torso puts the shoulder, the throwing hand and the whole receiver in the shoulder view,
+// so the weapon reads as pointing at the crosshair instead of hiding behind the potato.
+export const BODY_YAW_OFFSET=-.80;
 export const ARM_LENGTHS=Object.freeze({upper:.46,forearm:.48});
-// Shoulder sockets, rest pose and elbow pole targets, expressed in the aim-aligned frame:
-// "across" is the player's right, "fwd" is the sight direction, so arms hang at the sides
-// of the quarter-turned torso rather than off its front.
-export const ARM_TUNING={shoulderWidth:.645,shoulderHeight:1.30,shoulderDepth:.02,restAcross:.82,restHeight:.80,pole:[.60,.95,.70],lightPole:[1.06,.80,.35],heavyOffPole:[-.75,.72,1.15],aimDownSpread:.55,aimDownDrop:.30};
+// The torso ellipsoid the arms socket into. world.js builds the actual mesh from these numbers,
+// so the shoulder can be placed against the real surface rather than a width that suited one turn.
+export const TORSO=Object.freeze({x:.635,y:.86,z:.48,centre:1.09});
+const SHOULDER_HEIGHT=1.30,SOCKET_REACH=1.15;
+const shoulderBand=Math.sqrt(Math.max(.05,1-((SHOULDER_HEIGHT-TORSO.centre)/TORSO.y)**2));
+// Half-width of the torso at shoulder height along a body-local direction.
+const torsoReach=(x,z)=>1/Math.hypot(x/(TORSO.x*shoulderBand),z/(TORSO.z*shoulderBand));
 const xAxis=new T.Vector3(1,0,0),up=new T.Vector3(0,1,0),direction=new T.Vector3(),bend=new T.Vector3(),elbow=new T.Vector3(),wrist=new T.Vector3(),target=new T.Vector3(),inverse=new T.Quaternion(),handTurn=new T.Quaternion(),spud=new T.Vector3();
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const smooth=t=>t*t*(3-2*t);
 const palmAxis=new T.Vector3(),align=new T.Quaternion(),identity=new T.Quaternion();
 const handSocket=new T.Vector3(0,-.13,.235),socketOffset=new T.Vector3(),aimRight=new T.Vector3(-Math.cos(BODY_YAW_OFFSET),0,-Math.sin(BODY_YAW_OFFSET)),aimForward=new T.Vector3(-Math.sin(BODY_YAW_OFFSET),0,Math.cos(BODY_YAW_OFFSET));
+// Shoulders sit a fixed fraction past the torso surface along the aim frame's "across" axis, so
+// turning the body further keeps the socket sphere buried instead of leaving it floating outside.
+// Shoulder sockets, rest pose and elbow pole targets are all in that aim-aligned frame: "across"
+// is the player's right and "fwd" is the sight direction, so arms hang at the sides of the
+// side-on torso rather than off its front.
+export const ARM_TUNING={shoulderWidth:torsoReach(aimRight.x,aimRight.z)*SOCKET_REACH,shoulderHeight:SHOULDER_HEIGHT,shoulderDepth:.02,restAcross:.82,restHeight:.80,pole:[.07,.95,.864],lightPole:[1.06,.80,.35],heavyOffPole:[-.75,.72,1.15],aimDownSpread:.55,aimDownDrop:.30};
 const sleeveU=new T.Vector3(),sleeveV=new T.Vector3(),sleeveNormal=new T.Vector3(),sleeveSide=new T.Vector3(),sleevePoint=new T.Vector3(),sleeveTangent=new T.Vector3(),sleeveTurn=new T.Vector3(),sleeveCentre=new T.Vector3(),cornerIn=new T.Vector3(),cornerOut=new T.Vector3();
 const ringCos=Array.from({length:17},(_,j)=>Math.cos(j*Math.PI/8)),ringSin=ringCos.map((_,j)=>Math.sin(j*Math.PI/8));
 function sleeveGeometry(){const geometry=new T.TubeGeometry(new T.LineCurve3(new T.Vector3(),new T.Vector3(0,1,0)),10,.07,16,false);geometry.attributes.position.setUsage(T.DynamicDrawUsage);geometry.attributes.normal.setUsage(T.DynamicDrawUsage);geometry.boundingSphere=new T.Sphere(new T.Vector3(0,1.3,.35),2);return geometry;}
@@ -75,8 +85,12 @@ export function poseArms(m,p,stride,walk,crouch,canThrow=true){
  const toLocal=(out,x,y,z)=>out.set(x-p.x,y-(p.y??0),z-p.z).applyQuaternion(inverse).divideScalar(scale);
  m.bob.updateMatrix();
  const bodyPoint=(out,x,y,z)=>out.set(x,y,z).applyMatrix4(m.bob.matrix);
+ // Everything the arms reach for is authored in the aim-aligned frame — "across" is the player's
+ // right and "fwd" the sight direction — so turning the torso swings the body under a fixed
+ // throwing action instead of dragging the action round with it.
+ const aimLocal=(out,across,height,fwd)=>bodyPoint(out,aimRight.x*across+aimForward.x*fwd,height,aimRight.z*across+aimForward.z*fwd);
  const tossing=canThrow&&p.weapon==='throw'&&!p.runner,duration=p.shotDuration??THROW_DURATION,clock=p.shotAnim>0?Math.max(0,duration-p.shotAnim):0,recovery=Math.max(.01,duration-THROW_WINDUP),u=clamp((clock-THROW_WINDUP)/recovery,0,1),k=recovery/(THROW_DURATION-THROW_WINDUP),mapped=k*u+(1-k)*smooth(u),elapsed=clock<=THROW_WINDUP?clock:THROW_WINDUP+(THROW_DURATION-THROW_WINDUP)*mapped;
- if(tossing){const origin=muzzlePosition(p);bodyPoint(ready,-.78,1.78,.24);bodyPoint(windup,-.80,2.04,.08);toLocal(release,origin.x,origin.y,origin.z);bodyPoint(follow,-.32,1.20,.92);bodyPoint(recoverPoint,-.90,1.85,.60);recoverVelocity.copy(ready).sub(follow).multiplyScalar(2);
+ if(tossing){const origin=muzzlePosition(p);aimLocal(ready,.790,1.78,-.203);aimLocal(windup,.724,2.04,-.350);toLocal(release,origin.x,origin.y,origin.z);aimLocal(follow,.754,1.20,.617);aimLocal(recoverPoint,1.081,1.85,.041);recoverVelocity.copy(ready).sub(follow).multiplyScalar(2);
   windVelocity.copy(release).sub(ready).multiplyScalar(4);releaseVelocity.copy(follow).sub(windup).multiplyScalar(4);followVelocity.copy(ready).sub(release).multiplyScalar(2);
   if(!p.shotAnim)spud.copy(ready);else if(elapsed<.068)arc(spud,ready,windup,zero,windVelocity,elapsed/.068,.068);else if(elapsed<THROW_WINDUP)arc(spud,windup,release,windVelocity,releaseVelocity,(elapsed-.068)/(THROW_WINDUP-.068),THROW_WINDUP-.068);else if(elapsed<.27)arc(spud,release,follow,releaseVelocity,followVelocity,(elapsed-THROW_WINDUP)/(.27-THROW_WINDUP),.27-THROW_WINDUP);else if(elapsed<.37)arc(spud,follow,recoverPoint,followVelocity,recoverVelocity,(elapsed-.27)/.10,.10);else arc(spud,recoverPoint,ready,recoverVelocity,zero,(elapsed-.37)/(THROW_DURATION-.37),THROW_DURATION-.37);
   // A carried potato follows the gait, then settles into the throwing action and
@@ -90,18 +104,22 @@ export function poseArms(m,p,stride,walk,crouch,canThrow=true){
   // Shoulders and elbow poles are placed on the aim-aligned left/right axis, so the
   // quarter-turned torso no longer swings one arm across the chest and the other behind the back.
   // `side` is +1 for the weapon arm (the player's right) and -1 for the support arm.
-  const aimLocal=(out,across,height,fwd)=>bodyPoint(out,aimRight.x*across+aimForward.x*fwd,height,aimRight.z*across+aimForward.z*fwd);
   const socketX=aimRight.x*side*ARM_TUNING.shoulderWidth+aimForward.x*ARM_TUNING.shoulderDepth,socketZ=aimRight.z*side*ARM_TUNING.shoulderWidth+aimForward.z*ARM_TUNING.shoulderDepth;
   bodyPoint(shoulder,socketX,ARM_TUNING.shoulderHeight,socketZ);
   // Aiming down swings the elbow wide and low, the way a real shoulder clears the ribs, instead
   // of letting the upper arm fold back through the torso.
   const aimDown=m.gun.visible?Math.max(0,-(p.pitch??0))/.85:0,spread=1+aimDown*ARM_TUNING.aimDownSpread,drop=aimDown*ARM_TUNING.aimDownDrop;
-  // A free elbow sits outboard of its own socket and behind the torso — measured from that
-  // socket, so both arms bend rearward however far the body is turned away from the aim.
-  bodyPoint(pole,socketX+aimRight.x*side*ARM_TUNING.pole[0]*spread,ARM_TUNING.pole[1]-drop,socketZ-ARM_TUNING.pole[2]);
+  // A free elbow sits a little outboard of its own socket and well behind the torso. Both offsets
+  // are measured in the aim frame, like the socket itself: pushing the elbow out along body x
+  // alone only happened to look outboard at one particular body turn.
+  const poleAcross=ARM_TUNING.pole[0]*spread,poleBack=ARM_TUNING.pole[2];
+  bodyPoint(pole,socketX+aimRight.x*side*poleAcross-aimForward.x*poleBack,ARM_TUNING.pole[1]-drop,socketZ+aimRight.z*side*poleAcross-aimForward.z*poleBack);
   if(j===0&&m.gun.visible)aimLocal(pole,ARM_TUNING.lightPole[0]*spread,ARM_TUNING.lightPole[1]-drop,ARM_TUNING.lightPole[2]);
   else if(j===1&&m.gun.visible&&(p.weapon==='scatter'||p.weapon==='rpg'))aimLocal(pole,ARM_TUNING.heavyOffPole[0],ARM_TUNING.heavyOffPole[1]-drop,ARM_TUNING.heavyOffPole[2]);
-  if(j===0&&tossing){bodyPoint(readyPole,-.92,1.17,-.14);bodyPoint(windPole,-.92,1.40,-.14);bodyPoint(releasePole,-.64,1.85,.40);bodyPoint(followPole,-.67,.90,.39);bodyPoint(recoverPole,-.98,1.40,.35);
+  // The throw arc lives in the aim frame like every other pole here, not in body coordinates:
+   // the spud it reaches for is placed in aim space, so a further-turned torso has to swing under
+   // the same arm path rather than drag the upper arm through the chest.
+   if(j===0&&tossing){aimLocal(readyPole,.90,1.17,-.84);aimLocal(windPole,.90,1.40,-.84);aimLocal(releasePole,.755,1.85,.006);aimLocal(followPole,.775,.90,-.018);aimLocal(recoverPole,1.018,1.40,-.214);
    if(!p.shotAnim)pole.copy(readyPole);else if(elapsed<.068)pole.lerpVectors(readyPole,windPole,smooth(elapsed/.068));else if(elapsed<THROW_WINDUP)pole.lerpVectors(windPole,releasePole,smooth((elapsed-.068)/(THROW_WINDUP-.068)));else if(elapsed<.27)pole.lerpVectors(releasePole,followPole,smooth((elapsed-THROW_WINDUP)/(.27-THROW_WINDUP)));else if(elapsed<.37)pole.lerpVectors(followPole,recoverPole,smooth((elapsed-.27)/.10));else pole.lerpVectors(recoverPole,readyPole,smooth((elapsed-.37)/(THROW_DURATION-.37)));
   }hand.rotation.set(0,0,sign*.08);let curl=.22;
   // Only the weapon arm grips. A potato torso is wider than the arms are long, so a support

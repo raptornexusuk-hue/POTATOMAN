@@ -1,5 +1,5 @@
 import {makeSpudGun} from './weapon-model.js';
-import {makeArm,poseArms,BODY_YAW_OFFSET} from './character-rig.js';
+import {makeArm,poseArms,BODY_YAW_OFFSET,TORSO} from './character-rig.js';
 import {dressWorld,barn} from './environment-design.js';
 import {mapId} from './map-catalogue.js';
 import {leafMaterial,addTree,waterSurface,fountainFlow} from './nature.js';
@@ -281,7 +281,7 @@ export class World{
   // The yellow klompen itself never changes — it is the one thing every Potatoman has in common.
   const breed=BREEDS[id%BREEDS.length],skinColor=breed.skin,lift=t=>Math.round(t+(255-t)*.22),limbColor=lift(skinColor>>16&255)<<16|lift(skinColor>>8&255)<<8|lift(skinColor&255);
   const skin=this.mat(skinColor,'skin',{roughness:.88,bumpScale:.037,envMapIntensity:.28}),limb=this.mat(limbColor,'skin',{roughness:.86,bumpScale:.032,envMapIntensity:.30}),dark=this.mat(0x352719,null,{roughness:.65}),white=this.mat(0xfff6df,null,{roughness:.25}),wood=this.clogMaterial(),iris=this.mat([0x778146,0x50787e,0x987343,0x6b7190][id],null,{roughness:.32});const bob=new T.Group();g.add(bob);
-  const body=this.mesh('potato',skin,bob,0,1.09,0,.635*breed.build[0],.86*breed.build[1],.48*breed.build[2]);body.rotation.z=-.045;
+  const body=this.mesh('potato',skin,bob,0,TORSO.centre,0,TORSO.x*breed.build[0],TORSO.y*breed.build[1],TORSO.z*breed.build[2]);body.rotation.z=-.045;
   const brows=[],eyes=[],cheeks=[],pupils=[],lids=[],browSkin=this.mat(0x6a4523,null,{roughness:.92});
   for(const sign of[-1,1]){const x=sign*.225,eye=new T.Group();eye.position.set(x,1.40,.392);bob.add(eye);
    // A socket rim sunk into the skin gives the eyeball somewhere to sit, so it reads as set into
@@ -320,8 +320,8 @@ export class World{
   // the potato is an ellipsoid squeezed on x and stretched on z, and the band at a given height
   // follows from that. Anything guessed instead ends up buried in the head on the rounder bodies.
   const hat=new T.Group();bob.add(hat);
-  const skull=height=>{const ry=.86*breed.build[1],t=(height-1.09)/ry,band=Math.sqrt(Math.max(.05,1-t*t));
-   return{x:.635*breed.build[0]*band*.917,z:.48*breed.build[2]*band*1.035};};
+  const skull=height=>{const ry=TORSO.y*breed.build[1],t=(height-TORSO.centre)/ry,band=Math.sqrt(Math.max(.05,1-t*t));
+   return{x:TORSO.x*breed.build[0]*band*.917,z:TORSO.z*breed.build[2]*band*1.035};};
   if(breed.hat==='cap'){
    // A flat cap: crown, a peak over the brow and a button on top.
    const wool=this.mat(0x4a5560,'wood',{roughness:.95}),at=1.775,fit=skull(at);

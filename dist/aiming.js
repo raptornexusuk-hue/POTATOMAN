@@ -2,8 +2,13 @@ import {boxContact3D,THROW_DROP} from './core.js';
 import {bodyHeight,bodyScale,muzzleHeight} from './stance.js';
 import {weaponConfig,dropFactor} from './weapons.js';
 const GUN_TUNING={lightRight:.60,lightLift:.10,heavyRight:.42,heavyForward:.90,heavyLift:0};
-export const MIN_PITCH=-.85,MAX_PITCH=.70,DEFAULT_PITCH=-.08,CAMERA_SHOULDER=.98;
+export const MIN_PITCH=-.85,MAX_PITCH=.70,CAMERA_SHOULDER=1.24,REST_ZOOM=4.6;
 export const cameraHeight=p=>(p.crouching?1.17:1.55)*bodyScale(p);
+// A fresh view sights a standing rival's chest at duelling range instead of the dirt underfoot.
+// Tilting the sight up swings the boom down by the same angle, so over the small angle involved
+// the resting pitch solves eye - pitch*REST_ZOOM + pitch*SIGHT_RANGE = CHEST_HEIGHT.
+export const SIGHT_RANGE=14,CHEST_HEIGHT=1.35;
+export const DEFAULT_PITCH=(CHEST_HEIGHT-cameraHeight({}))/(SIGHT_RANGE-REST_ZOOM);
 // Socket locations are independent of camera distance and body animation.
 export function muzzlePosition(p,solids=[]){const scale=bodyScale(p),throwing=p.weapon==='throw',right=(throwing?.58:.74)*scale,forward=(throwing?.56:p.weapon==='rpg'?.96:.82)*scale,origin={x:p.x,y:(p.y??0)+(throwing?(p.crouching?1.54:2.04)*scale:muzzleHeight(p)),z:p.z},muzzle={x:p.x+Math.sin(p.yaw)*forward+Math.cos(p.yaw)*right,y:origin.y,z:p.z-Math.cos(p.yaw)*forward+Math.sin(p.yaw)*right};let fraction=1;for(const w of solids)fraction=Math.min(fraction,boxContact3D(origin.x,origin.y,origin.z,muzzle.x,muzzle.y,muzzle.z,w,.18));if(fraction<1)for(const k of ['x','y','z'])muzzle[k]=mix(origin[k],muzzle[k],Math.max(0,fraction-.04));return muzzle;}
 
@@ -16,16 +21,22 @@ export function cylinderContact(a,b,p,pad=0){
  if(Math.abs(dy)<1e-12){if(a.y<bottom||a.y>top)return Infinity;}else{const t1=(bottom-a.y)/dy,t2=(top-a.y)/dy;lo=Math.max(lo,Math.min(t1,t2));hi=Math.min(hi,Math.max(t1,t2));}return lo<=hi?lo:Infinity;
 }
 export function cameraPose(p,settings={},solids=[]){
- const pitch=Math.max(MIN_PITCH,Math.min(MAX_PITCH,p.pitch??DEFAULT_PITCH)),horizontal=Math.cos(pitch),direction={x:Math.sin(p.yaw)*horizontal,y:Math.sin(pitch),z:-Math.cos(p.yaw)*horizontal},right={x:Math.cos(p.yaw),z:Math.sin(p.yaw)},zoom=Math.max(3,Math.min(9,settings.zoom??p.cameraDistance??4.6));
+ const pitch=Math.max(MIN_PITCH,Math.min(MAX_PITCH,p.pitch??DEFAULT_PITCH)),horizontal=Math.cos(pitch),direction={x:Math.sin(p.yaw)*horizontal,y:Math.sin(pitch),z:-Math.cos(p.yaw)*horizontal},right={x:Math.cos(p.yaw),z:Math.sin(p.yaw)},zoom=Math.max(3,Math.min(9,settings.zoom??p.cameraDistance??REST_ZOOM));
  const body={x:p.x,y:(p.y??0)+cameraHeight(p),z:p.z},shoulder=CAMERA_SHOULDER*bodyScale(p),anchor={x:body.x+right.x*shoulder,y:body.y,z:body.z+right.z*shoulder};
  // The shoulder pivot is fixed. Looking up tilts the sight without driving the boom into the floor.
  // Only solid cover may compress the boom; aiming never changes the selected zoom.
  let side=1;for(const w of solids)side=Math.min(side,boxContact3D(body.x,body.y,body.z,anchor.x,anchor.y,anchor.z,w,.16));if(side<1)for(const k of ['x','y','z'])anchor[k]=mix(body[k],anchor[k],Math.max(0,side-.04));
- const orbitPitch=Math.min(pitch,Math.asin(Math.max(-1,Math.min(1,(anchor.y-.28)/zoom)))),orbitCos=Math.cos(orbitPitch),desired={x:anchor.x-Math.sin(p.yaw)*orbitCos*zoom,y:anchor.y-Math.sin(orbitPitch)*zoom,z:anchor.z+Math.cos(p.yaw)*orbitCos*zoom};let fraction=1;
- for(const w of solids)fraction=Math.min(fraction,boxContact3D(anchor.x,anchor.y,anchor.z,desired.x,desired.y,desired.z,w,.18));
- fraction=Math.max(0,fraction-(fraction<1?.035:0));
- const position={x:mix(anchor.x,desired.x,fraction),y:mix(anchor.y,desired.y,fraction),z:mix(anchor.z,desired.z,fraction)},look={x:position.x+direction.x*10,y:position.y+direction.y*10,z:position.z+direction.z*10};return{position,direction,look,anchor,distance:zoom*fraction};
+ const orbitPitch=Math.min(pitch,Math.asin(Math.max(-1,Math.min(1,(anchor.y-.28)/zoom)))),orbitCos=Math.cos(orbitPitch),desired={x:anchor.x-Math.sin(p.yaw)*orbitCos*zoom,y:anchor.y-Math.sin(orbitPitch)*zoom,z:anchor.z+Math.cos(p.yaw)*orbitCos*zoom};let fit=1;
+ for(const w of solids)fit=Math.min(fit,boxContact3D(anchor.x,anchor.y,anchor.z,desired.x,desired.y,desired.z,w,.18));
+ fit=Math.max(0,fit-(fit<1?.035:0));
+ // Cover crowds the boom in the instant it appears; `settleBoom` is what lets it back out, so
+ // walking away from a wall restores the view rather than leaving the camera in the player's neck.
+ const fraction=Math.min(fit,p.boom??1);
+ const position={x:mix(anchor.x,desired.x,fraction),y:mix(anchor.y,desired.y,fraction),z:mix(anchor.z,desired.z,fraction)},look={x:position.x+direction.x*10,y:position.y+direction.y*10,z:position.z+direction.z*10};return{position,direction,look,anchor,fit,distance:zoom*fraction};
 }
+// The boom is the only camera value that carries between frames. Snapping in is what keeps the
+// camera out of walls; snapping out is what made a wall feel like it had broken the camera.
+export function settleBoom(p,settings,solids,dt){const {fit}=cameraPose(p,settings,solids),now=p.boom??1;p.boom=fit<now?fit:now+(fit-now)*(1-Math.exp(-7*Math.max(0,dt)));return p.boom;}
 export function aimPoint(p,view,players,solids,targets=[],range=28){const camera=view.position,dir=view.direction,horizontal=dir.x*dir.x+dir.z*dir.z;
  // Sight starts just ahead of the player, so a long barrel cannot skip a point-blank opponent.
  const near=Math.max(0,((p.x-camera.x)*dir.x+(p.z-camera.z)*dir.z+.20)/horizontal),a={x:camera.x+dir.x*near,y:camera.y+dir.y*near,z:camera.z+dir.z*near},b={x:a.x+dir.x*range,y:a.y+dir.y*range,z:a.z+dir.z*range};let at=1;

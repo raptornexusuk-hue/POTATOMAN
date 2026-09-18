@@ -19,7 +19,7 @@ for(const crouching of[false,true])for(const yaw of[0,1.3,-2.7])for(const pitch 
 }
 console.log('PASS actual barrel geometry matches projectile origin/direction for every weapon across 162 stance, pitch and yaw combinations, including recoil');
 Object.assign(p,player(0));
-for(const crouching of[false,true])for(const distance of[1,2,4,11]){
+for(const crouching of[false,true])for(const distance of[CAMERA_SHOULDER+.06,2,4,11]){
  Object.assign(players[1],player(1),{z:-distance,crouching});
  p.yaw=-Math.asin(CAMERA_SHOULDER/distance);p.pitch=Math.atan2((crouching?1.05:1.44)-cameraHeight(p),Math.sqrt(distance**2-CAMERA_SHOULDER**2));
  for(let frame=0;frame<60;frame++)w.updatePlayers(players,4,1/60);w.root.updateMatrixWorld(true);

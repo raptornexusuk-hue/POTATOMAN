@@ -1,7 +1,7 @@
 import {earnedKill,loseLoadout,respawnLoadout,awardRoundWins,lastPlaceLine} from './progression.js';
 import {MAPS,mapInfo,mapId,nextCircuitSeed} from './map-catalogue.js';
 import {bodyHeight,eyeHeight,updateStance} from './stance.js';
-import {cameraPose,aimPoint,shotVelocity,cylinderContact,weaponAim,cameraHeight,CAMERA_SHOULDER,DEFAULT_PITCH,MIN_PITCH,MAX_PITCH} from './aiming.js';
+import {cameraPose,aimPoint,shotVelocity,cylinderContact,weaponAim,cameraHeight,settleBoom,CAMERA_SHOULDER,DEFAULT_PITCH,MIN_PITCH,MAX_PITCH} from './aiming.js';
 import {createWeaponPickup,claimWeapon,useWeaponRound,dropWeapon,rearmWeapon} from './weapon-pickup.js';
 import {THROW_DURATION,THROW_WINDUP,WEAPONS,equipWeapon,weaponConfig,dropFactor} from './weapons.js';
 import {SOUND_TYPES} from './spatial-audio.js';
@@ -11,7 +11,7 @@ import {MouseCamera} from './camera-input.js';
 import {playerAccount,initializeProfiles} from './profiles.js';
 import {circuitProgress,THROW_DROP,POWERUPS,isTrial,jump,movePlayer,applyPowerup,roundLevel,playableMap,STEP,CELL,ROUND_TIME,BONUS_TIME,LEVELS,MODES,makeMap,route,rng,movement,slideMove,segmentCircle,segmentBox,circleContact,boxContact,boxContact3D,launchVerticalSpeed,clearShot,deadzone,blocked} from './core.js';
 import {World,colors} from './world.js';
-import {ACTIONS,PAD_ACTIONS,PAD_BUTTONS,defaults,loadSettings,saveSettings,bindKey,bindButton,mouseButtonHeld,keyLabel,cameraDrag,resetCamera} from './controls.js';
+import {ACTIONS,PAD_ACTIONS,PAD_BUTTONS,defaults,loadSettings,saveSettings,bindKey,bindButton,mouseButtonHeld,keyLabel,cameraDrag,resetCamera,autoLevel} from './controls.js';
 import {RoomConnection} from './network.js';
 import {packPlayer,unpackPlayer,validSnapshot,remoteControl} from './net-state.js';
 const $=id=>document.getElementById(id),names=['YOU','PLAYER 2','ROAST','CHIP'],hex=colors.map(c=>'#'+c.toString(16).padStart(6,'0'));
@@ -53,7 +53,7 @@ $('testVoice').onclick=()=>{initAudio();if(!settings.voice){settings.voice=true;
 $('testMusic').onclick=()=>{settings.music=true;if(settings.musicVolume===0)settings.musicVolume=.45;$('music').checked=true;$('musicVolume').value=settings.musicVolume;musicPreviewUntil=performance.now()+20000;initAudio();gameAudio.loadAssets(true);syncAudio();persist();};
 $('voiceName').onchange=e=>{settings.voiceName=e.target.value;persist();};
 function dialog(id){$(id).showModal();}
-function clearInput(){mouseCamera.reset();keys.clear();mouseButtons=0;movePointer=aimPointer=null;touchMove={x:0,z:0};touchFire=touchCatch=touchDodge=touchJump=touchCrouch=false;inputs.forEach(i=>Object.assign(i,{x:0,z:0,fire:false,catch:false,dodge:false,jump:false,crouch:false}));prior.forEach(i=>Object.keys(i).forEach(k=>delete i[k]));$('moveStick').querySelector('i').style.transform='';}
+function clearInput(){mouseCamera.reset();keys.clear();mouseButtons=0;aimPointer=null;releaseStick();movePointer=null;touchMove={x:0,z:0};touchFire=touchCatch=touchDodge=touchJump=touchCrouch=false;inputs.forEach(i=>Object.assign(i,{x:0,z:0,fire:false,catch:false,dodge:false,jump:false,crouch:false}));prior.forEach(i=>Object.keys(i).forEach(k=>delete i[k]));$('moveStick').querySelector('i').style.transform='';}
 function setPlayers(two){if(two!==duo&&!manualPadAssignment)padAssignments=[null,null];duo=two;$('duo').classList.toggle('active',two);$('solo').classList.toggle('active',!two);$('duo').setAttribute('aria-pressed',two);$('solo').setAttribute('aria-pressed',!two);$('sessionNote').innerHTML=two?'Two players, one screen, two AI rivals.<br>Keyboard + controller, two controllers or shared keyboard.':`${durationLabel(settings.roundSeconds)} rounds. Bonus hunts between levels.<br>${AI_LEVELS[settings.difficulty].label} bots · keyboard, controller or touch.`;}
 $('solo').onclick=()=>online?openOnline():setPlayers(false);$('duo').onclick=()=>{if(online){openOnline();return;}if(isTouch){$('sessionNote').textContent='Use a desktop or laptop for two-player split-screen. Touch supports solo play.';return;}setPlayers(true);};
 $('levelsButton').onclick=()=>dialog('levelsDialog');$('controlsButton').onclick=openSettings;$('arsenalButton').onclick=()=>{renderArsenal();dialog('arsenalDialog');};$('artButton').onclick=()=>dialog('artDialog');document.querySelectorAll('.close').forEach(b=>b.onclick=()=>{if(b.closest('dialog').id==='settingsDialog')closeSettings();else b.closest('dialog').close();});
@@ -130,7 +130,7 @@ function loadRound(isBonus,hostDuration=null){
  if(bonus){quip(`${players[runnerId].name} is Potatoman. Clogs on, Game on`,true,'Clogs on, Game on');}
  else if(currentLevel().mode==='smash'){for(const pos of map.targetSpots){const mesh=world.crate(pos.x,pos.z,0,.9),ring=world.marker(pos.x,pos.z,0xffcf44,'target');targets.push({...pos,hp:80,mesh,ring,respawn:0});}}
  world.aimTargets=targets;if(!bonus)spawnPowerups();if(bonus||!isTrial(currentLevel()))spawnWeaponPads();
- $('touch').hidden=!isTouch||duo;$('hint').textContent=`${keyLabel(settings.keys[0].forward)}${keyLabel(settings.keys[0].left)}${keyLabel(settings.keys[0].back)}${keyLabel(settings.keys[0].right)} move · mouse pan · ${settings.mouse.fire===0?'Left click / ':''}${keyLabel(settings.keys[0].fire)} fire · ${keyLabel(settings.keys[0].catch)} catch · ${keyLabel(settings.keys[0].jump)} jump · ${keyLabel(settings.keys[0].crouch)} duck · ${keyLabel(settings.keys[0].dodge)} dodge · ${keyLabel(settings.keys[0].resetCamera)} reset view · Esc settings`;
+ $('touch').hidden=!isTouch||duo;if(isTouch&&!duo)releaseStick();$('hint').textContent=`${keyLabel(settings.keys[0].forward)}${keyLabel(settings.keys[0].left)}${keyLabel(settings.keys[0].back)}${keyLabel(settings.keys[0].right)} move · mouse pan · ${settings.mouse.fire===0?'Left click / ':''}${keyLabel(settings.keys[0].fire)} fire · ${keyLabel(settings.keys[0].catch)} catch · ${keyLabel(settings.keys[0].jump)} jump · ${keyLabel(settings.keys[0].crouch)} duck · ${keyLabel(settings.keys[0].dodge)} dodge · ${keyLabel(settings.keys[0].resetCamera)} reset view · Esc settings`;
  $('reticles').innerHTML=duo?'<div class="split-line"></div><div class="reticle" style="left:25%"></div><div class="reticle" style="left:75%"></div>':'<div class="reticle"></div>';
  if(!bonus&&isTrial(currentLevel()))$('reticles').innerHTML=duo?'<div class="split-line"></div>':'';
  $('world').focus({preventScroll:true});updateHUD();updatePlayabilityHUD();
@@ -173,8 +173,22 @@ canvas.addEventListener('mousedown',e=>{if(mouseReady()){e.preventDefault();mous
 document.addEventListener('mouseup',e=>{mouseButtons=e.buttons??0;});document.addEventListener('mousemove',e=>{if(mouseReady()&&Number.isInteger(e.buttons))mouseButtons=e.buttons;});
 canvas.addEventListener('pointercancel',clearInput);
 let movePointer=null,aimPointer=null,moveOrigin=null,aimOrigin=null;
-$('moveStick').addEventListener('pointerdown',e=>{movePointer=e.pointerId;const b=e.currentTarget.getBoundingClientRect();moveOrigin={x:b.x+b.width/2,y:b.y+b.height/2};e.currentTarget.setPointerCapture(e.pointerId);});$('moveStick').addEventListener('pointermove',e=>{if(movePointer!==e.pointerId)return;const dx=(e.clientX-moveOrigin.x)/42,dz=(e.clientY-moveOrigin.y)/42;touchMove=deadzone(dx,dz,.07);$('moveStick').querySelector('i').style.transform=`translate(${touchMove.x*30}px,${touchMove.z*30}px)`;});for(const name of['pointerup','pointercancel'])$('moveStick').addEventListener(name,()=>{movePointer=null;touchMove={x:0,z:0};$('moveStick').querySelector('i').style.transform='';});
+// Which views are driven by a thumb or a stick, and which of those is being steered right now.
+let assisted=[false,false],steering=[false,false];
+// The stick is planted wherever the left thumb lands rather than waiting in one corner, which is
+// what made it awkward to find on a tablet. `STICK_THROW` is the travel to full speed, and the knob
+// is drawn at the same fraction of the ring so what you see is what the player is actually giving.
+const STICK_THROW=52,STICK_KNOB=40;
+function plantStick(x,y){const el=$('moveStick');el.style.left=x+'px';el.style.top=y+'px';}
+// At rest the stick sits low and inboard in its own zone, so it is always where a thumb already is
+// and always on screen, whatever the tablet's shape.
+function homeStick(){const b=$('moveZone').getBoundingClientRect();plantStick(b.left+b.width*.34,b.bottom-b.height*.26);}
+function releaseStick(){const el=$('moveStick');homeStick();el.classList.remove('live');el.querySelector('i').style.transform='';movePointer=null;touchMove={x:0,z:0};}
+$('moveZone').addEventListener('pointerdown',e=>{movePointer=e.pointerId;moveOrigin={x:e.clientX,y:e.clientY};plantStick(e.clientX,e.clientY);$('moveStick').classList.add('live');e.currentTarget.setPointerCapture(e.pointerId);});
+$('moveZone').addEventListener('pointermove',e=>{if(movePointer!==e.pointerId)return;touchMove=deadzone((e.clientX-moveOrigin.x)/STICK_THROW,(e.clientY-moveOrigin.y)/STICK_THROW,.09);$('moveStick').querySelector('i').style.transform=`translate(${touchMove.x*STICK_KNOB}px,${touchMove.z*STICK_KNOB}px)`;});
+for(const name of['pointerup','pointercancel'])$('moveZone').addEventListener(name,releaseStick);
 $('aimPad').addEventListener('pointerdown',e=>{aimPointer=e.pointerId;aimOrigin={x:e.clientX,y:e.clientY};e.currentTarget.setPointerCapture(e.pointerId);});$('aimPad').addEventListener('pointermove',e=>{if(e.pointerId!==aimPointer||!players.length)return;localPlayer().yaw+=(e.clientX-aimOrigin.x)*.009*settings.sensitivity;localPlayer().pitch=Math.max(MIN_PITCH,Math.min(MAX_PITCH,localPlayer().pitch-(e.clientY-aimOrigin.y)*.003*settings.sensitivity*(settings.invertY?-1:1)));aimOrigin={x:e.clientX,y:e.clientY};});for(const name of['pointerup','pointercancel'])$('aimPad').addEventListener(name,()=>aimPointer=null);
+$('resetTouch').addEventListener('pointerdown',e=>{e.preventDefault();const p=localPlayer();if(p)resetView(p);});
 for(const[id,set]of[['fireTouch',v=>touchFire=v],['catchTouch',v=>touchCatch=v],['dodgeTouch',v=>touchDodge=v],['jumpTouch',v=>touchJump=v],['crouchTouch',v=>touchCrouch=v]]){const el=$(id);el.addEventListener('pointerdown',e=>{e.currentTarget.setPointerCapture(e.pointerId);set(true);});for(const evt of['pointerup','pointercancel'])el.addEventListener(evt,()=>set(false));}
 function gamepads(){try{return Array.from(navigator.getGamepads?.()??[]).filter(p=>p&&p.connected&&p.mapping==='standard');}catch{return[];}}
 function assignedPads(pads){
@@ -186,11 +200,12 @@ function assignedPads(pads){
  padAssignments=assigned.map(p=>p?.index??null);return assigned;
 }
 function readInputs(dt){const pads=gamepads(),assignment=assignedPads(pads);if(paused||document.querySelector('dialog[open]')){inputs.forEach(o=>Object.assign(o,{x:0,z:0,fire:false,catch:false,dodge:false,jump:false,crouch:false}));const held=pads.some(p=>p.buttons[9]?.pressed);if(paused&&held&&!padPause&&!$('settingsDialog').open&&!$('controllerDialog').open)resume();padPause=held;return;}
+ assisted=[isTouch,isTouch];steering=[isTouch&&aimPointer!==null,false];
  inputs.slice(0,duo?2:1).forEach((o,i)=>{const p=online?localPlayer():players[i];if(!p)return;const binding=settings.keys[i],held=a=>keys.has(binding[a]);let x=Number(held('right'))-Number(held('left')),z=Number(held('back'))-Number(held('forward'));
  o.fire=held('fire');o.catch=held('catch');o.dodge=held('dodge');o.jump=held('jump');o.crouch=held('crouch');p.cameraDistance=settings.zoom;o.resetCamera=held('resetCamera');
  if(i===0){o.fire||=mouseButtonHeld(settings.mouse.fire,mouseButtons);x+=touchMove.x;z+=touchMove.z;o.fire||=touchFire;o.catch||=touchCatch;o.dodge||=touchDodge;o.jump||=touchJump;o.crouch||=touchCrouch;}
  p.yaw+=(Number(held('lookRight'))-Number(held('lookLeft')))*2.4*dt*settings.sensitivity;p.pitch=Math.max(MIN_PITCH,Math.min(MAX_PITCH,p.pitch+(Number(held('lookUp'))-Number(held('lookDown')))*.6*dt));
- const pad=assignment[i];if(pad){const m=deadzone(pad.axes[0]??0,pad.axes[1]??0),aim=deadzone(pad.axes[2]??0,pad.axes[3]??0);x+=m.x;z+=m.z;p.yaw+=aim.x*3.2*settings.sensitivity*dt;p.pitch=Math.max(MIN_PITCH,Math.min(MAX_PITCH,p.pitch+(settings.invertY?1:-1)*aim.z*.65*dt));for(const[a]of PAD_ACTIONS)o[a]||=!!pad.buttons[settings.pad[i][a]]?.pressed;}
+ const pad=assignment[i];if(pad){const m=deadzone(pad.axes[0]??0,pad.axes[1]??0),aim=deadzone(pad.axes[2]??0,pad.axes[3]??0);x+=m.x;z+=m.z;assisted[i]=true;if(aim.x||aim.z)steering[i]=true;p.yaw+=aim.x*3.2*settings.sensitivity*dt;p.pitch=Math.max(MIN_PITCH,Math.min(MAX_PITCH,p.pitch+(settings.invertY?1:-1)*aim.z*.65*dt));for(const[a]of PAD_ACTIONS)o[a]||=!!pad.buttons[settings.pad[i][a]]?.pressed;}
  o.x=x*Math.cos(p.yaw)-z*Math.sin(p.yaw);o.z=x*Math.sin(p.yaw)+z*Math.cos(p.yaw);
  });if(online&&!online.isHost)online.observeInput?.(inputs[0],roundEpoch);const menuHeld=pads.some(p=>p.buttons[9]?.pressed);if(menuHeld&&!padPause&&!$('settingsDialog').open){paused?resume():pause();}padPause=menuHeld;
 }
@@ -449,7 +464,7 @@ function guestFrame(dt){readInputs(dt);const p=localPlayer(),stale=performance.n
  if(!hostPaused&&!stale){for(const q of players){q.shotAnim=Math.max(0,q.shotAnim-dt);q.catchTime=Math.max(0,q.catchTime-dt);}}
  if(!hostPaused&&!stale)for(const s of shots){s.x+=s.vx*dt;s.z+=s.vz*dt;s.y+=s.vy*dt;s.age+=dt;}
  $('networkHud').hidden=false;if(hostPaused)$('networkHud').textContent='Host paused the match';else if(stale)$('networkHud').textContent='Waiting for the host…';
- updatePlayabilityHUD();world.updatePlayers(players,time,dt);world.syncProjectiles(shots);world.viewSettings=settings;world.render([p],false,dt);listenToWorld();if(time-lastUI>.08||time<lastUI){updateHUD();lastUI=time;}}
+ updatePlayabilityHUD();settleView([p],dt);world.updatePlayers(players,time,dt);world.syncProjectiles(shots);world.viewSettings=settings;world.render([p],false,dt);listenToWorld();if(time-lastUI>.08||time<lastUI){updateHUD();lastUI=time;}}
 let guestPriorJump=false,guestPriorDodge=false,guestPriorReset=false,guestFireHeld=false;
 function updatePlayabilityHUD(){if(!map||!players.length)return;$('roundIntro').hidden=introRemaining<=0;
  $('damageFlash').style.opacity=Math.max(0,damageFlashUntil-performance.now())/260*.5;hudText('introTitle',bonus?'The Great Spud Escape':currentLevel().name);hudText('introMode',bonus?'BONUS HUNT':MODES[currentLevel().mode]);hudText('introDetail',bonus?'Runner: stand on each crate long enough to secure it, then reach the exit. Each grab lights you up for six seconds. Hunters: race for the one shared gun, and close in — you get a run of speed for the last fourteen seconds.':currentLevel().detail);hudText('introCount',Math.ceil(introRemaining));$('hitFeedback').hidden=performance.now()>hitUntil;
@@ -466,16 +481,23 @@ function controllerFeedback(){if(!$('controllerDialog').open)return;scanControll
 const invited=new URLSearchParams(location.hash.slice(1)).get('room');if(invited&&/^[A-Z2-9]{10}$/i.test(invited)){$('joinCode').value=invited.toUpperCase();openOnline();}
 
 let frames=0,frameTime=0,padScanTime=0,qualityTicks=0;
+// One pass per rendered frame over the views a person is actually looking through: the boom eases
+// back out of cover, and a view that a thumb or a stick left pointing at the sky or the floor walks
+// itself back to level once that player moves off again. Mouse aim is continuous, so it is exempt.
+function settleView(view,dt){const solids=world?.solids??[];
+ for(let i=0;i<view.length;i++){const p=view[i];if(!p)continue;settleBoom(p,{zoom:p.cameraDistance??settings.zoom},solids,dt);
+  if(assisted[i])autoLevel(p,dt,steering[i],Math.hypot(inputs[i]?.x??0,inputs[i]?.z??0)>.2);}
+}
 function runFrame(now){requestAnimationFrame(frame);syncAudio();networkFrame(now);controllerFeedback();let delta=(now-last)/1000;last=now;frames++;frameTime+=delta;padScanTime+=delta;if(frameTime>1){const fps=Math.round(frames/frameTime);$('fps').textContent=fps+' FPS';if(state==='playing'&&!paused&&++qualityTicks%3===0)world?.balanceResolution?.(fps);frames=0;frameTime=0;}if(padScanTime>1){const pads=gamepads();$('padsInfo').textContent=pads.length?`${pads.length} controller${pads.length>1?'s':''} connected. ${duo&&pads.length===1?'Controller → Player 2; keyboard → Player 1.':'Controllers are assigned in connection order.'}`:'No standard controller detected. Connect it to your device, then press a button.';padScanTime=0;}
  if(state==='playing'&&paused&&(!online||online.isHost)){const held=gamepads().some(p=>p.buttons[9]?.pressed);if(held&&!padPause&&!$('settingsDialog').open)resume();padPause=held;return;}
  if(state!=='playing'||(paused&&(!online||online.isHost))||!world)return;
  // Bound foreground catch-up; slow frames must never open a pause dialog or trap the player.
  delta=Math.max(0,Math.min(delta,STEP*8));mouseCamera.update(delta);if(online&&!online.isHost){guestFrame(Math.min(delta,.05));return;}acc=Math.min(acc+delta,STEP*8);while(acc>=STEP&&state==='playing'&&!paused){tick(STEP);roundTick++;acc-=STEP;}
- updatePlayabilityHUD();world.updatePlayers(players,time,delta);world.syncProjectiles(shots);world.viewSettings=settings;world.render(online?[localPlayer()]:players,duo,delta);listenToWorld();
+ updatePlayabilityHUD();const view=online?[localPlayer()]:players.slice(0,duo?2:1);settleView(view,delta);world.updatePlayers(players,time,delta);world.syncProjectiles(shots);world.viewSettings=settings;world.render(view,duo,delta);listenToWorld();
  if(time-lastUI>.08||time<lastUI){updateHUD();lastUI=time;}
 }
 function frame(now){try{runFrame(now);}catch(e){showStartError('The game encountered a problem. Retry the level to recover. '+e.message);}}
 canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();if(state==='playing')showStartError('The graphics connection was interrupted. Retry the level to rebuild the arena.');});
 initializeProfiles(p=>{$('onlineName').value=p.name;});
 renderSettings();
-requestAnimationFrame(frame);addEventListener('resize',()=>world?.resize());
+requestAnimationFrame(frame);addEventListener('resize',()=>{world?.resize();if(movePointer===null)homeStick();});
