@@ -145,9 +145,10 @@ export function makeMap(level,bonus=false){
    // rank halfway along each side turns the gaps between them into streets: the corner blocks and
    // the mid-side ones face each other across a lane, with the middle left open. The mid-side
    // anchors are the corner set turned a quarter at a time, so no spawn is better covered.
-   // A second rank needs a map wide enough to leave streets around it; on the smallest arenas the
-   // two ranks meet and close the block plan into courtyards nobody can get into.
-   const ranked=n>=17;
+   // A second rank of buildings needs two things: a map wide enough to leave streets around it —
+   // on the smallest arenas the two ranks meet and close the plan into courtyards nobody can get
+   // into — and a world where a terrace belongs. A chalk quarry is not short of a row of houses.
+   const streets=['village','harbour','farm'].includes(family),ranked=n>=17&&streets;
    const blocks=family==='harbour'
     ?[[5,4],[n-7,4],[5,n-6],[n-7,n-6],...(ranked?[[2,4],[n-4,4],[2,n-6],[n-4,n-6]]:[])]
     :[[4,4],[n-6,4],[4,n-6],[n-6,n-6],...(ranked?[[mid-1,2],[2,mid],[mid,n-4],[n-4,mid-1]]:[])];
@@ -158,12 +159,18 @@ export function makeMap(level,bonus=false){
    // other two once there were buildings on the streets to route around.
    const furnish=(cx,cz,...rest)=>spin(cx,cz,(x,z)=>{if(grid[z]?.[x]===0)addProp(x,z,...rest);});
    if(family==='village'){furnish(mid-2,mid-1,'marketStall',2.2);furnish(4,6,'bin',1.45,1.1);}
-   if(family==='harbour')furnish(5,6,'cargo',1.8);
+   // The canal runs one way across the harbour, so that world is symmetric about its two axes
+   // rather than under a quarter turn; its quayside cargo is placed to match, one stack per bank end.
+   if(family==='harbour')for(const x of[4,n-5])for(const z of[2,n-3])if(grid[z]?.[x]===0)addProp(x,z,'cargo',1.8);
    if(family==='farm')furnish(mid-3,mid-1,'hay',1.25);
    // Cut blocks on the quarry floor and pressing barrels in the orchard yard give each new
    // world its own hard cover, placed on the same authored grid as the other families.
-   if(family==='quarry'){furnish(mid-3,mid-2,'stoneBlock',1.75,2.6);furnish(5,6,'spoil',1.2,2.4);}
-   if(family==='orchard'){furnish(mid-3,mid-1,'cider',1.35,2.3);furnish(4,6,'crateStack',1.5,2.2);}
+   // The working worlds get a second rank of their own kit instead: cut blocks and spoil on the
+   // quarry floor, barrels and crate stacks in the pressing yard, on the same quarter turn.
+   if(family==='quarry'){furnish(mid-3,mid-2,'stoneBlock',1.75,2.6);furnish(5,6,'spoil',1.2,2.4);
+    if(n>=17){furnish(mid-1,3,'stoneBlock',1.75,2.6);furnish(3,mid+2,'spoil',1.2,2.4);}}
+   if(family==='orchard'){furnish(mid-3,mid-1,'cider',1.35,2.3);furnish(4,6,'crateStack',1.5,2.2);
+    if(n>=17){furnish(mid-1,3,'crateStack',1.5,2.2);furnish(3,mid+2,'cider',1.35,2.3);}}
   }
  }
  if(bonus){const cleared=new Set(),mid=Math.floor(n/2);
