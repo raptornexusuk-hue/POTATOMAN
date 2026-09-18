@@ -6,27 +6,30 @@ export const STEP=1/120, CELL=3.2, ROUND_TIME=120, BONUS_TIME=55;
 // crosshair keeps converging on the same point the potato actually reaches.
 export const THROW_DROP=5.4;
 export const LEVELS=[
+// The circuit is three acts. It opens on the friendliest arena and closes on the tower, and in
+// between no two rounds running share a world or a mode, so every round is a change of place and a
+// change of job. The mazes still appear in order of size, because that is the ramp a racer feels.
  {name:'Market Mayhem',tag:'VILLAGE • DAY',mode:'battle',size:15,theme:'market',seed:11,detail:'Fight through the town streets. Flank around the buildings and contest weapon drops in the market.',skill:'Move · aim · dodge'},
  {name:'Hedge Your Bets',tag:'GARDENS • DAY',mode:'race',size:15,theme:'hedge',seed:32,detail:'Fastest complete escape wins. Follow the landmarks, then improve your route.',skill:'Find the fastest route'},
- {name:'King of the Crop',tag:'ALLOTMENTS • GOLDEN HOUR',mode:'capture',size:17,theme:'garden',seed:48,detail:'Cut through hedge courtyards to hold the golden crop circle. A contested zone earns no points.',skill:'Control space'},
  {name:'Harvest Havoc',tag:'FARMYARD • SUNSET',mode:'smash',size:17,theme:'fair',seed:53,detail:'Fight around barns and hay stacks. Break the marked harvest crates before your opponents do.',skill:'Aim under pressure'},
- {name:'A-maize-ing Escape',tag:'FARMLAND • AFTERNOON',mode:'race',size:19,theme:'corn',seed:71,detail:'Longer paths and more dead ends. Keep your bearings.',skill:'Route memory'},
  {name:'Shipment',tag:'CONTAINER YARD • OVERCAST',mode:'battle',size:11,theme:'shipment',seed:64,detail:'A yard the size of a tennis court, walled in by containers. Everyone is always in range of everyone.',skill:'Snap aim · never stand still'},
- {name:'Butterscotch Bay',tag:'BEACH • MIDDAY',mode:'battle',size:17,theme:'beach',seed:77,detail:'Fight across open sand between timber groynes and beach huts. The tide takes anyone who backs up too far.',skill:'Use what little cover there is'},
- {name:'Dune Dash',tag:'DUNES • AFTERNOON',mode:'race',size:21,theme:'dunes',seed:88,detail:'Marram-grass ridges hide the turns. Fastest complete escape wins.',skill:'Commit to a line'},
+ {name:'A-maize-ing Escape',tag:'FARMLAND • AFTERNOON',mode:'race',size:19,theme:'corn',seed:71,detail:'Longer paths and more dead ends. Keep your bearings.',skill:'Route memory'},
  {name:'Canal Carnage',tag:'CANALSIDE • DUSK',mode:'battle',size:19,theme:'canal',seed:82,detail:'Cross three bridges between moonlit quays. Use the warehouses for cover and stay out of the water.',skill:'Lead moving targets'},
- {name:'Quayside Domination',tag:'HARBOUR • NIGHT',mode:'capture',size:21,theme:'depot',seed:96,detail:'Fight between containers for a moving control zone.',skill:'Rotate and intercept'},
- {name:'The Butter Run',tag:'HARBOUR ASSAULT COURSE • SUNSET',mode:'assault',size:21,theme:'course',seed:114,detail:'Jump onto each numbered platform, duck through the three low gates, then reach the exit. Fastest completed run wins.',skill:'Jump · land · keep momentum'},
- {name:'Get Higher',tag:'CRANE TOWER • DUSK',mode:'climb',size:15,theme:'gantry',seed:166,detail:'Six stages up a crane tower: switchback scaffolding, a run of long jumps, two shuttles and two lifts that have to be ridden, a beam run round the mast and the jib to the summit. Miss and the wide ledges catch you — for a while. Fastest ascent wins.',skill:'Read the gap, and wait for the ride'},
- {name:'The Midnight Maze',tag:'OLD TOWN • NIGHT',mode:'race',size:23,theme:'night',seed:129,detail:'Twisting brick alleys and longer routes. Fastest complete escape wins.',skill:'Navigate under pressure'},
+ {name:'King of the Crop',tag:'ALLOTMENTS • GOLDEN HOUR',mode:'capture',size:17,theme:'garden',seed:48,detail:'Cut through hedge courtyards to hold the golden crop circle. A contested zone earns no points.',skill:'Control space'},
+ {name:'Dune Dash',tag:'DUNES • AFTERNOON',mode:'race',size:21,theme:'dunes',seed:88,detail:'Marram-grass ridges hide the turns. Fastest complete escape wins.',skill:'Commit to a line'},
  {name:'Quarry Quarrel',tag:'CHALK QUARRY • OVERCAST',mode:'battle',size:19,theme:'quarry',seed:157,detail:'Fight across the cutting floor. Stone blocks give cover; the gantry lane is the fast flank.',skill:'Use hard cover'},
- {name:'Cider Run',tag:'ORCHARD • MORNING',mode:'race',size:25,theme:'grove',seed:152,detail:'Race the mown lanes between fruit rows. Fastest complete escape wins.',skill:'Read the rows'},
- {name:'Stone Cold Smash',tag:'CUTTING FLOOR • AFTERNOON',mode:'smash',size:19,theme:'pit',seed:181,detail:'Break the marked blocks stacked around the cutting floor before your rivals do.',skill:'Pick your target'},
+ {name:'The Butter Run',tag:'HARBOUR ASSAULT COURSE • SUNSET',mode:'assault',size:21,theme:'course',seed:114,detail:'Jump onto each numbered platform, duck through the three low gates, then reach the exit. Fastest completed run wins.',skill:'Jump · land · keep momentum'},
+ {name:'Butterscotch Bay',tag:'BEACH • MIDDAY',mode:'battle',size:17,theme:'beach',seed:77,detail:'Fight across open sand between timber groynes and beach huts. The tide takes anyone who backs up too far.',skill:'Use what little cover there is'},
+ {name:'The Midnight Maze',tag:'OLD TOWN • NIGHT',mode:'race',size:23,theme:'night',seed:129,detail:'Twisting brick alleys and longer routes. Fastest complete escape wins.',skill:'Navigate under pressure'},
  {name:'Orchard Ambush',tag:'CIDER ORCHARD • GOLDEN HOUR',mode:'capture',size:21,theme:'orchard',seed:194,detail:'Hold the pressing yard while rivals close in through the fruit rows.',skill:'Hold and rotate'},
+ {name:'Stone Cold Smash',tag:'CUTTING FLOOR • AFTERNOON',mode:'smash',size:19,theme:'pit',seed:181,detail:'Break the marked blocks stacked around the cutting floor before your rivals do.',skill:'Pick your target'},
+ {name:'Cider Run',tag:'ORCHARD • MORNING',mode:'race',size:25,theme:'grove',seed:152,detail:'Race the mown lanes between fruit rows. Fastest complete escape wins.',skill:'Read the rows'},
  {name:'The Chip Factory',tag:'INDOORS • NIGHT SHIFT',mode:'battle',size:17,theme:'factory',seed:203,detail:'Inside the works. Partition walls, doorways and fryer vats turn every fight into a room fight.',skill:'Clear corners'},
- {name:'Cannery Row',tag:'PACKING FLOOR • NIGHT SHIFT',mode:'capture',size:19,theme:'cannery',seed:211,detail:'Hold the packing floor in the middle of the shed while rivals push through the side doors.',skill:'Hold a room'},
+ {name:'Quayside Domination',tag:'HARBOUR • NIGHT',mode:'capture',size:21,theme:'depot',seed:96,detail:'Fight between containers for a moving control zone.',skill:'Rotate and intercept'},
  {name:'Gantry Grab',tag:'CONTAINER YARD • DUSK',mode:'smash',size:17,theme:'gantry',seed:219,detail:'Break the marked crates stacked between container rows before your rivals reach them.',skill:'Move between lanes'},
- {name:'The Final Mash',tag:'FORTRESS GARDEN • STORM',mode:'race',size:27,theme:'fort',seed:143,detail:'The longest maze and the quickest rivals. One final escape.',skill:'Bring it all together'}
+ {name:'Cannery Row',tag:'PACKING FLOOR • NIGHT SHIFT',mode:'capture',size:19,theme:'cannery',seed:211,detail:'Hold the packing floor in the middle of the shed while rivals push through the side doors.',skill:'Hold a room'},
+ {name:'The Final Mash',tag:'FORTRESS GARDEN • STORM',mode:'race',size:27,theme:'fort',seed:143,detail:'The longest maze and the quickest rivals. One final escape.',skill:'Bring it all together'},
+ {name:'Get Higher',tag:'CRANE TOWER • DUSK',mode:'climb',size:15,theme:'gantry',seed:166,detail:'Six stages up a crane tower: switchback scaffolding, a run of long jumps, two shuttles and two lifts that have to be ridden, a beam run round the mast and the jib to the summit. Miss and the wide ledges catch you — for a while. Fastest ascent wins.',skill:'Read the gap, and wait for the ride'}
 ];
 export const MODES={battle:'TOTALLY MASH',race:'MAZE RACE',assault:'BUTTER RUN · TIME TRIAL',climb:'GET HIGHER · ASCENT',capture:'KING OF THE CROP',smash:'BANGERS & SMASH'};
 export function rng(seed){return()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}

@@ -11,6 +11,20 @@ for(const previous of MAPS.map(m=>m.id))for(let trial=0;trial<100;trial++){
  const circuit=circuitLevels(seed);assert.equal(new Set(circuit).size,LEVELS.length);assert.equal(circuit.at(-1),LEVELS.length-1);
  assert.equal(new Set(circuit.map(i=>mapId(LEVELS[i]))).size,9);
 }
+// The shape of the circuit, rather than the levels in it: consecutive rounds have to be a change of
+// place and a change of job, the mazes have to arrive in order of size because that is the ramp a
+// racer feels, and the last round has to be the one worth finishing on.
+for(let i=1;i<LEVELS.length;i++){
+ assert.notEqual(mapId(LEVELS[i]),mapId(LEVELS[i-1]),`rounds ${i} and ${i+1} are the same world twice running`);
+ assert.notEqual(LEVELS[i].mode,LEVELS[i-1].mode,`rounds ${i} and ${i+1} ask for the same thing twice running`);
+}
+{
+ let last=0;for(const level of LEVELS.filter(l=>l.mode==='race')){assert.ok(level.size>last,`${level.name} is not longer than the maze before it`);last=level.size;}
+ assert.equal(LEVELS.at(-1).mode,'climb','the circuit finishes on the tower');
+ const modes=new Set(LEVELS.map(l=>l.mode));assert.ok(modes.size>=5,'the circuit is more than two kinds of round');
+ for(const mode of modes)assert.ok(LEVELS.filter(l=>l.mode===mode).length<=LEVELS.length/3,`too much of the circuit is ${mode}`);
+}
+console.log('PASS the circuit changes world and job every round, the mazes grow, and it ends on the tower');
 // Every authored combat level must stay navigable corner-to-centre with colliding props.
 for(const i of LEVELS.map((l,i)=>i).filter(i=>!['race','assault'].includes(LEVELS[i].mode))){
  const map=makeMap(LEVELS[i]),mid=Math.floor(map.n/2),goal=map.toWorld(mid,mid);

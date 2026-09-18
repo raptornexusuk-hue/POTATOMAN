@@ -4,7 +4,7 @@ const number=(v,min,max)=>Number.isInteger(v)&&v>=min&&v<=max;
 // Level index -> maze grid size, for the ranked escape boards. The server cannot import the game's
 // level table, so this is checked against it by tests/profiles.test.mjs; a maze added to the game
 // without a line here fails that test rather than silently rejecting every time players set on it.
-export const MAZE_LEVELS={1:15,4:19,7:21,12:23,14:25,20:27};
+export const MAZE_LEVELS={1:15,4:19,7:21,11:23,14:25,19:27};
 // Everything the server bounds about a circuit follows from how many levels there are: the highest
 // level a run may start on, how many rounds it may report, and the most circuit points a player can
 // come away with (three for winning each main round, one for each hunt between them). These were
