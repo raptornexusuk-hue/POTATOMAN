@@ -16,8 +16,27 @@ for(const i of LEVELS.map((l,i)=>i).filter(i=>!['race','assault'].includes(LEVEL
  const map=makeMap(LEVELS[i]),mid=Math.floor(map.n/2),goal=map.toWorld(mid,mid);
  for(const [x,z]of[[2,2],[map.n-3,2],[2,map.n-3],[map.n-3,map.n-3]])assert.ok(route(map,map.toWorld(x,z),goal).length>0);
  for(const prop of map.props){const cell=map.toCell(prop.x,prop.z);assert.equal(map.grid[cell.z][cell.x],1);assert.ok(map.walls.includes(prop));}
+ // A block plan that closes on itself leaves courtyards nobody can reach, which reads on the map as
+ // cover and plays as a bot standing in a corner for two minutes. Routing corner to centre does not
+ // catch it: what does is flooding the arena and finding almost all of it.
+ const seen=new Set(['2,2']),queue=[[2,2]];
+ while(queue.length){const [x,z]=queue.pop();
+  for(const [dx,dz]of[[1,0],[-1,0],[0,1],[0,-1]]){const a=x+dx,b=z+dz;
+   if(a<1||b<1||a>map.n-2||b>map.n-2||map.grid[b][a]===1||seen.has(a+','+b))continue;seen.add(a+','+b);queue.push([a,b]);}}
+ let open=0;for(let z=1;z<map.n-1;z++)for(let x=1;x<map.n-1;x++)if(map.grid[z][x]!==1)open++;
+ assert.ok(seen.size>=open*.92,`${LEVELS[i].name}: only ${seen.size} of ${open} open cells can be walked to`);
+ // Containers are boxes laid in rows, not cubes dropped in a heap: each one is longer than it is
+ // wide, and everything in a row points the same way.
+ const rows=new Map();
+ for(const prop of map.props.filter(p=>p.prop==='container')){
+  assert.ok(Math.max(prop.w,prop.d)>Math.min(prop.w,prop.d)*2,'a container is longer than it is wide');
+  const along=prop.w>prop.d?'x':'z',line=along==='x'?prop.z:prop.x;
+  const key=along+':'+line.toFixed(2);rows.set(key,(rows.get(key)??0)+1);
+ }
+ const boxes=map.props.filter(p=>p.prop==='container').length;
+ if(boxes>3)assert.ok(boxes>=rows.size*1.5,`containers are scattered across ${rows.size} lines rather than laid in rows: ${boxes} boxes`);
 }
-console.log('PASS nine world families, all fourteen rounds, 600 non-repeating openings and authored combat route/collider consistency');
+console.log('PASS nine world families, every round, 600 non-repeating openings, authored routes and colliders, walkable arenas and containers in rows');
 
 const players=[{id:0,name:'MACCA',score:0,best:Infinity},{id:1,name:'JAMIE',score:8,best:40},{id:2,name:'SAM',score:4,best:70}];
 for(let i=0;i<10;i++){assert.ok(lastPlaceLine(players,false,i).includes('MACCA'));assert.ok(lastPlaceLine(players,true,i).includes('MACCA'));}

@@ -68,20 +68,45 @@ export function makeMap(level,bonus=false){
  if(level.mode!=='race'||bonus)for(const [cx,cz]of[[2,2],[n-3,n-3],[n-3,2],[2,n-3]])for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++)grid[cz+dz][cx+dx]=0;
  const toWorld=(x,z)=>({x:(x-(n-1)/2)*CELL,z:(z-(n-1)/2)*CELL});
  const toCell=(x,z)=>({x:Math.max(0,Math.min(n-1,Math.round(x/CELL+(n-1)/2))),z:Math.max(0,Math.min(n-1,Math.round(z/CELL+(n-1)/2)))});
- const buildings=[],waterCells=[],props=[],family=mapId(level),map0={};
+ // What each prop is standing on, so clearing a cell can take the thing on it away again
+ // whichever cells it was laid across.
+ const buildings=[],waterCells=[],props=[],propCells=new Map(),family=mapId(level),map0={};
  if(bonus||!isTrial(level)){
   for(let z=1;z<n-1;z++)for(let x=1;x<n-1;x++)grid[z][x]=0;
-  const mid=Math.floor(n/2),addProp=(cx,cz,type,h=1.3,size=2.5,depth=size,extra={})=>{grid[cz][cx]=1;props.push({...toWorld(cx,cz),w:size,d:depth,h,prop:type,...extra});};
+  const mid=Math.floor(n/2),addProp=(cx,cz,type,h=1.3,size=2.5,depth=size,extra={})=>{grid[cz][cx]=1;const prop={...toWorld(cx,cz),w:size,d:depth,h,prop:type,...extra};propCells.set(prop,[[cx,cz]]);props.push(prop);};
   // Quarter-turn about the centre. Anything placed through this is symmetric under 90 degrees, so
   // no spawn corner is closer to the middle — or better covered — than any other.
   const spin=(cx,cz,place)=>{let x=cx,z=cz;for(let k=0;k<4;k++){place(x,z,k);const nx=z,nz=n-1-x;x=nx;z=nz;}};
+  // The four headings a quarter turn maps a row onto, so a row authored once comes out the same
+  // way round on all four sides instead of being rebuilt by hand for each.
+  const TURNS=[[1,0],[0,-1],[-1,0],[0,1]];
+  // A shipping container is two cells long, so it occupies both of them and stands between them.
+  // Laid out a cell at a time they were nearly square, and a yard of square boxes reads as rubble.
+  const addLong=(cx,cz,dx,dz,type,h,extra={})=>{if(cx<1||cz<1||cx+dx>n-2||cz+dz>n-2||cx+dx<1||cz+dz<1)return;
+   if(grid[cz][cx]===1||grid[cz+dz][cx+dx]===1)return;
+   // The middle cell and the four ways into it stay clear: it is where the contested weapon box
+   // lands on every map, and a ring of rows closed neatly around it is a ring nobody can enter.
+   const core=(x,z)=>Math.abs(x-mid)+Math.abs(z-mid)<=1;if(core(cx,cz)||core(cx+dx,cz+dz))return;
+   // The spawn corners and the ring round them are cleared before anything is placed here; a row
+   // that lands back on one walls a player into their own spawn.
+   const spawn=(x,z)=>[[2,2],[n-3,2],[2,n-3],[n-3,n-3]].some(([a,b])=>x===a&&z===b);
+   if(spawn(cx,cz)||spawn(cx+dx,cz+dz))return;
+   grid[cz][cx]=1;grid[cz+dz][cx+dx]=1;const a=toWorld(cx,cz),b=toWorld(cx+dx,cz+dz);
+   const prop={x:(a.x+b.x)/2,z:(a.z+b.z)/2,w:dx?CELL*2-.62:2.42,d:dz?CELL*2-.62:2.42,h,prop:type,...extra};
+   propCells.set(prop,[[cx,cz],[cx+dx,cz+dz]]);props.push(prop);};
   if(family==='shipyard'){
    // Shipment: a yard you can cross in four seconds, packed tight enough that every sightline is
    // short and nowhere is safe for long. Double-stacked rows are the only cover a mortar must arc.
-   spin(mid-1,2,(x,z)=>{addProp(x,z,'container',5.2,3.0,2.3,{stacked:true,turned:Math.abs(z-mid)<Math.abs(x-mid)});addProp(x===mid-1?x+1:x,z,'container',5.2,3.0,2.3,{stacked:true,turned:Math.abs(z-mid)<Math.abs(x-mid)});});
-   spin(2,mid+1,(x,z)=>addProp(x,z,'container',2.6,3.0,2.3,{turned:Math.abs(z-mid)>=Math.abs(x-mid)}));
-   spin(mid-1,mid-1,(x,z)=>addProp(x,z,'container',2.6,3.0,2.3,{turned:(x+z)%2===0}));
-   for(const [x,z]of[[mid,2],[2,mid],[mid,n-3],[n-3,mid]])addProp(x,z,'cargo',1.8,2.4);
+   // Boxes lie in rows, not in a heap: every container in a row shares its heading, the rows
+   // against the walls are double-stacked, and the single-height inner square leaves four lanes
+   // and an open middle where the weapon box lands.
+   // A container yard is rows. Every box in a row shares its heading, rows sit two cells apart so
+   // a four-metre lane runs between them, alternate rows are offset so the cross gaps stagger instead of
+   // lining up into one clear run end to end, and every second row is double-stacked so the
+   // skyline steps rather than walling the yard in.
+   for(let z=2,row=0;z<=n-3;z+=2,row++)for(let x=row%2?2:3;x+1<=n-2;x+=3)addLong(x,z,1,0,'container',row%2?2.6:5.2,row%2?{}:{stacked:true});
+   // Pallets of crates on the cross lanes: low enough to shoot over, solid enough to stop a run.
+   spin(mid,2,(x,z)=>{if(grid[z][x]===0)addProp(x,z,'cargo',1.8,2.4);});
   }
   else if(family==='coast'){
    // Open sand broken only by timber groynes running down to the water, with painted huts along
@@ -113,17 +138,29 @@ export function makeMap(level,bonus=false){
    for(const [cx,cz]of[[4,4],[n-5,4],[4,n-5],[n-5,n-5]])for(let j=-1;j<=1;j++){grid[cz-1][cx+j]=1;grid[cz+1][cx+j]=1;grid[cz][cx-1]=1;grid[cz][cx+1]=1;}
    for(const [x,z]of[[4,5],[n-5,3],[3,n-5],[n-4,n-5]])grid[z][x]=0;
   }else{
-   const blocks=family==='harbour'?[[5,4],[n-7,4],[5,n-6],[n-7,n-6]]:[[4,4],[n-6,4],[4,n-6],[n-6,n-6]];
-   for(const [x,z]of blocks){for(let dz=0;dz<2;dz++)for(let dx=0;dx<2;dx++)grid[z+dz][x+dx]=1;buildings.push({...toWorld(x+.5,z+.5),w:CELL*2,d:CELL*2,h:family==='farm'?4.2:family==='harbour'?5.8:5.2,architecture:true,kind:family});}
+   // Four blocks at the corners is a field with something in each corner, not a place. A second
+   // rank halfway along each side turns the gaps between them into streets: the corner blocks and
+   // the mid-side ones face each other across a lane, with the middle left open. The mid-side
+   // anchors are the corner set turned a quarter at a time, so no spawn is better covered.
+   // A second rank needs a map wide enough to leave streets around it; on the smallest arenas the
+   // two ranks meet and close the block plan into courtyards nobody can get into.
+   const ranked=n>=17;
+   const blocks=family==='harbour'
+    ?[[5,4],[n-7,4],[5,n-6],[n-7,n-6],...(ranked?[[2,4],[n-4,4],[2,n-6],[n-4,n-6]]:[])]
+    :[[4,4],[n-6,4],[4,n-6],[n-6,n-6],...(ranked?[[mid-1,2],[2,mid],[mid,n-4],[n-4,mid-1]]:[])];
+   for(const [x,z]of blocks){const cells=[];for(let dz=0;dz<2;dz++)for(let dx=0;dx<2;dx++){grid[z+dz][x+dx]=1;cells.push([x+dx,z+dz]);}const block={...toWorld(x+.5,z+.5),w:CELL*2,d:CELL*2,h:family==='farm'?4.2:family==='harbour'?5.8:5.2,architecture:true,kind:family};propCells.set(block,cells);buildings.push(block);}
    if(family==='harbour'){const bridges=[3,mid,n-4];for(let z=mid-1;z<=mid+1;z++)for(let x=1;x<n-1;x++)if(!bridges.includes(x)){grid[z][x]=2;waterCells.push(toWorld(x,z));}}
-   if(family==='village')for(const x of[mid-2,mid+2])for(const z of[mid-1,mid+1])addProp(x,z,'marketStall',2.2);
-   if(family==='village')for(const x of[4,n-5])for(const z of[6,n-7])addProp(x,z,'bin',1.45,1.1);
-   if(family==='harbour')for(const x of[5,n-6])for(const z of[6,n-7])addProp(x,z,'cargo',1.8);
-   if(family==='farm')for(const x of[mid-3,mid+3])for(const z of[mid-1,mid+1])addProp(x,z,'hay',1.25);
+   // Street furniture goes round on the quarter turn like everything else. Mirrored pairs looked
+   // symmetric and were not: two spawn corners ended up four steps nearer the weapon box than the
+   // other two once there were buildings on the streets to route around.
+   const furnish=(cx,cz,...rest)=>spin(cx,cz,(x,z)=>{if(grid[z]?.[x]===0)addProp(x,z,...rest);});
+   if(family==='village'){furnish(mid-2,mid-1,'marketStall',2.2);furnish(4,6,'bin',1.45,1.1);}
+   if(family==='harbour')furnish(5,6,'cargo',1.8);
+   if(family==='farm')furnish(mid-3,mid-1,'hay',1.25);
    // Cut blocks on the quarry floor and pressing barrels in the orchard yard give each new
    // world its own hard cover, placed on the same authored grid as the other families.
-   if(family==='quarry'){for(const x of[mid-3,mid+3])for(const z of[mid-2,mid+2])addProp(x,z,'stoneBlock',1.75,2.6);for(const x of[5,n-6])for(const z of[6,n-7])addProp(x,z,'spoil',1.2,2.4);}
-   if(family==='orchard'){for(const x of[mid-3,mid+3])for(const z of[mid-1,mid+1])addProp(x,z,'cider',1.35,2.3);for(const x of[4,n-5])for(const z of[6,n-7])addProp(x,z,'crateStack',1.5,2.2);}
+   if(family==='quarry'){furnish(mid-3,mid-2,'stoneBlock',1.75,2.6);furnish(5,6,'spoil',1.2,2.4);}
+   if(family==='orchard'){furnish(mid-3,mid-1,'cider',1.35,2.3);furnish(4,6,'crateStack',1.5,2.2);}
   }
  }
  if(bonus){const cleared=new Set(),mid=Math.floor(n/2);
@@ -133,10 +170,15 @@ export function makeMap(level,bonus=false){
   const pairs=[[[3,3],[n-4,n-4]],[[n-4,3],[3,n-4]],[[3,mid],[n-4,mid]],[[mid,3],[3,n-4]],[[n-4,mid],[mid,3]]];
   const pick=pairs[level.seed%pairs.length];
   map0.objectiveCells=pick;
-  for(const [cx,cz] of [...pick,[mid,n-3]])for(const[dx,dz]of[[0,0],[1,0],[-1,0],[0,1],[0,-1]]){grid[cz+dz][cx+dx]=0;const at=toWorld(cx+dx,cz+dz);cleared.add(at.x+','+at.z);}
-  // Clearing a checkpoint cell has to take the prop standing on it as well, or a hunt map keeps a
-  // container parked exactly where the runner has to reach.
-  for(let i=props.length-1;i>=0;i--)if(cleared.has(props[i].x+','+props[i].z))props.splice(i,1);
+  const spots=[];
+  for(const [cx,cz] of [...pick,[mid,n-3]])for(const[dx,dz]of[[0,0],[1,0],[-1,0],[0,1],[0,-1]]){grid[cz+dz][cx+dx]=0;spots.push(toWorld(cx+dx,cz+dz));cleared.add(cx+dx+','+(cz+dz));}
+  // Clearing a checkpoint has to take whatever is standing on it, and free every cell that thing
+  // was laid across. Matching on the prop's own coordinates only ever caught the ones placed a
+  // single cell at a time, so a container laid between two cells stayed parked exactly where the
+  // runner had to reach.
+  for(const list of[props,buildings])for(let i=list.length-1;i>=0;i--){const piece=list[i];
+   if(!spots.some(at=>Math.abs(at.x-piece.x)<piece.w/2+.7&&Math.abs(at.z-piece.z)<piece.d/2+.7))continue;
+   for(const [cx,cz]of propCells.get(piece)??[])grid[cz][cx]=0;list.splice(i,1);}
  }
  const fountain=!bonus&&level.theme==='garden'?{...toWorld(Math.floor(n/2),3),w:2.5,d:2.5,h:1.35,prop:'fountain'}:null;if(fountain)grid[3][Math.floor(n/2)]=1;
  const walls=[...buildings,...props];let cover=0;for(let z=0;z<n;z++)for(let x=0;x<n;x++)if(grid[z][x]===1){const p=toWorld(x,z);if(props.some(w=>w.x===p.x&&w.z===p.z))continue;if(fountain&&p.x===fountain.x&&p.z===fountain.z){walls.push(fountain);continue;}if(buildings.some(b=>Math.abs(p.x-b.x)<b.w/2&&Math.abs(p.z-b.z)<b.d/2))continue;const interior=x>1&&x<n-2&&z>1&&z<n-2,w={...p,w:CELL,d:CELL,h:2.65};
