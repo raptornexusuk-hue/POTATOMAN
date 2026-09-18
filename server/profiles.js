@@ -11,7 +11,7 @@ export const MAZE_LEVELS={1:15,4:19,7:21,11:23,14:25,19:27};
 // written out as 9, 10 and 39 for a ten-level circuit and quietly rejected every save once the
 // circuit grew. tests/profiles.test.mjs checks LEVEL_COUNT against the game's level list.
 export const LEVEL_COUNT=21;
-const MAX_ROUNDS=LEVEL_COUNT,MAX_TOTAL=LEVEL_COUNT*3+(LEVEL_COUNT-1);
+const MAX_TOTAL=LEVEL_COUNT*3+(LEVEL_COUNT-1);
 const isMaze=level=>Object.hasOwn(MAZE_LEVELS,level);
 export async function profileAPI(path,body,db){if(!path.startsWith('/api/player/')&&!path.startsWith('/api/scores/'))return null;
  const sql=(s,...args)=>db.prepare(s).bind(...args);

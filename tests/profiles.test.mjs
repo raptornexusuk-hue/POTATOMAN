@@ -51,6 +51,20 @@ globalThis.addEventListener=()=>{};globalThis.setInterval=()=>({unref(){}});
 globalThis.fetch=async()=>new Response('<!doctype html>',{status:404,headers:{'content-type':'text/html'}});
 const {playerAccount}=await import('../dist/profiles.js');
 playerAccount.queue={put(){},flush:async()=>{},items:{}};
+// A reply that simply took too long is not a host with no server behind it. Latching on one slow
+// request left rooms and the shared leaderboard switched off for the rest of the page.
+{
+ const server=globalThis.fetch;
+ globalThis.fetch=async()=>{throw Object.assign(new Error('signal timed out'),{name:'TimeoutError'});};
+ await assert.rejects(playerAccount.api('player/get'),e=>{assert.equal(e.offline,false,'a timeout is a slow server, not an absent one');return true;});
+ assert.equal(playerAccount.offline,false,'and it must not latch the whole session offline');
+ globalThis.fetch=async()=>{throw Object.assign(new Error('aborted'),{name:'AbortError'});};
+ await assert.rejects(playerAccount.api('player/get'),e=>{assert.equal(e.offline,false);return true;});
+ globalThis.fetch=async()=>{throw Object.assign(new TypeError('Failed to fetch'));};
+ await assert.rejects(playerAccount.api('player/get'),e=>{assert.equal(e.offline,true,'a connection that cannot be made is still an absent host');return true;});
+ globalThis.fetch=server;
+ console.log('PASS a slow reply is a slow server; only an unreachable one drops the game to local scores');
+}
 await playerAccount.refresh().catch(e=>{if(e)playerAccount.goOffline();});
 assert.equal(playerAccount.offline,true,'a file host must be detected as having no game server');
 

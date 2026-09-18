@@ -18,7 +18,10 @@ export const playerAccount={player:null,token:null,session:null,onPlayer:null,re
  async api(path,data={},keepalive=false){
   if(this.offline)throw Object.assign(Error('This copy is running without the game server.'),{offline:true});
   let response;try{response=await fetch(apiURL(path),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({playerToken:this.token,...data}),keepalive,signal:AbortSignal.timeout(7000)});}
-  catch(e){throw Object.assign(Error('Could not reach player services.'),{offline:e.name!=='AbortError'});}
+  // A request that simply took too long is not a host without a server. AbortSignal.timeout rejects
+  // with a TimeoutError, so treating anything but AbortError as "there is nothing here" latched one
+  // slow reply into rooms and shared scores being off for the rest of the session.
+  catch(e){throw Object.assign(Error('Could not reach player services.'),{offline:!['AbortError','TimeoutError'].includes(e.name)});}
   let value;try{value=await response.json();}catch{throw Object.assign(Error('Player profiles need the Potatoman game server on this host.'),{offline:true});}
   if(!response.ok)throw Object.assign(Error(value.error||'Could not reach player services.'),{status:response.status});return value;},
  goOffline(){if(this.offline)return;this.offline=true;this.token=null;

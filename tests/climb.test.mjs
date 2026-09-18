@@ -75,7 +75,21 @@ console.log(`PASS ${map.course.length} climb steps: every jump inside the jump t
  assert.ok(travelled>1.5,`the platform actually went somewhere: ${travelled.toFixed(2)}m`);
  assert.equal(Math.hypot(still.x-map.platforms[m.course.index-1].x,still.z-map.platforms[m.course.index-1].z),0,'nobody standing on solid ground is dragged along with it');
 }
-console.log('PASS a climber standing on a moving platform is carried by it, and one standing beside it is not');
+// How far a passenger is carried is a property of the platform and the time, not of how the caller
+// chose to chop that time up. Stepping the platforms once per frame and the player in fixed
+// substeps carried a rider several times the distance the platform actually went.
+{
+ const m=map.motion.find(m=>m.axis!=='y'),index=m.course.index;
+ const carry=substep=>{moveCourse(map,0);const ride=map.platforms[index];
+  const rider={id:9,x:ride.x,z:ride.z,y:ride.base+ride.h,vy:0,grounded:true,crouching:false,respawn:0,dashTime:0,runBoost:0};
+  for(let clock=0;clock<2;){const d=Math.min(substep,2-clock);clock+=d;moveCourse(map,clock);movePlayer(rider,{x:0,z:0,crouch:false},d,map);}
+  return{x:rider.x,z:rider.z};};
+ const fine=carry(STEP),coarse=carry(STEP*4);
+ assert.ok(Math.hypot(fine.x-coarse.x,fine.z-coarse.z)<.06,`a two-second ride has to be the same ride at either step size: ${JSON.stringify({fine,coarse})}`);
+ moveCourse(map,2);
+ assert.ok(Math.hypot(fine.x-map.platforms[index].x,fine.z-map.platforms[index].z)<.06,'and the passenger ends where the platform ended, not past it');
+}
+console.log('PASS a climber standing on a moving platform is carried by it, one standing beside it is not, and the ride is the same at any step size');
 // And the whole thing can be climbed: three bots, from the floor to the top, inside a round.
 const dt=1/120;
 a.init(LEVELS.findIndex(l=>l.mode==='climb'));a.clearIntro();
