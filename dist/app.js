@@ -131,7 +131,7 @@ function loadRound(isBonus,hostDuration=null){
  else if(currentLevel().mode==='smash'){for(const pos of map.targetSpots){const mesh=world.crate(pos.x,pos.z,0,.9),ring=world.marker(pos.x,pos.z,0xffcf44,'target');targets.push({...pos,hp:80,mesh,ring,respawn:0});}}
  world.aimTargets=targets;if(!bonus)spawnPowerups();if(bonus||!isTrial(currentLevel()))spawnWeaponPads();
  $('touch').hidden=!isTouch||duo;if(isTouch&&!duo)releaseStick();$('hint').textContent=`${keyLabel(settings.keys[0].forward)}${keyLabel(settings.keys[0].left)}${keyLabel(settings.keys[0].back)}${keyLabel(settings.keys[0].right)} move · mouse pan · ${settings.mouse.fire===0?'Left click / ':''}${keyLabel(settings.keys[0].fire)} fire · ${keyLabel(settings.keys[0].catch)} catch · ${keyLabel(settings.keys[0].jump)} jump · ${keyLabel(settings.keys[0].crouch)} duck · ${keyLabel(settings.keys[0].dodge)} dodge · ${keyLabel(settings.keys[0].resetCamera)} reset view · Esc settings`;
- $('reticles').innerHTML=duo?'<div class="split-line"></div><div class="reticle" style="left:25%"></div><div class="reticle" style="left:75%"></div>':'<div class="reticle"></div>';
+ $('reticles').innerHTML=duo?'<div class="split-line"></div><div class="reticle" style="left:25%"><i></i></div><div class="reticle" style="left:75%"><i></i></div>':'<div class="reticle"><i></i></div>';
  if(!bonus&&isTrial(currentLevel()))$('reticles').innerHTML=duo?'<div class="split-line"></div>':'';
  $('world').focus({preventScroll:true});updateHUD();updatePlayabilityHUD();
  // Construct and render once before starting the frame clock, including shader warm-up.

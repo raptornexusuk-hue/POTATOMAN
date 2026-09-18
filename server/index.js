@@ -5,11 +5,21 @@ const now=()=>Date.now();
 const token=()=>crypto.randomUUID()+crypto.randomUUID();
 const cleanName=v=>typeof v==='string'?v.replace(/[^\p{L}\p{M}0-9 '’_-]/gu,'').trim().slice(0,24)||'SPUD':'SPUD';
 export function cleanInput(v){if(!v||typeof v!=='object')return null;const n=(k,min,max)=>Number.isFinite(v[k])?Math.max(min,Math.min(max,v[k])):0;return{epoch:typeof v.epoch==='string'?v.epoch.slice(0,64):'',seq:n('seq',0,1e12),x:n('x',-1,1),z:n('z',-1,1),yaw:n('yaw',-100000,100000),pitch:n('pitch',-.85,.70),fire:v.fire===true,crouch:v.crouch===true,crouchSerial:n('crouchSerial',0,1e12),zoom:n('zoom',3,9)||5.6,dodge:n('dodge',0,1e12),catch:n('catch',0,1e12),jump:n('jump',0,1e12)};}
+// A game uploaded to plain web hosting has to reach this service on a different origin. Only the
+// origins the operator listed in POTATOMAN_ALLOWED_ORIGINS may do so; every other cross-origin
+// request is still refused, which is what keeps the same-origin rule doing its job.
 export default {async fetch(request,env){const url=new URL(request.url);if(!url.pathname.startsWith('/api/')){const asset=await env.ASSETS.fetch(request);if(url.pathname==='/'||/\.(html|js|css)$/.test(url.pathname)){const response=new Response(asset.body,asset);response.headers.set('cache-control','no-cache');return response;}return asset;}
+ const origin=request.headers.get('origin'),foreign=!!origin&&origin!==url.origin,permitted=!foreign||(env.ORIGINS??[]).includes(origin);
+ const response=request.method==='OPTIONS'?new Response(null,{status:permitted?204:403}):await rooms(request,env,url,permitted);
+ response.headers.set('vary','origin');
+ if(foreign&&permitted)for(const [key,value]of Object.entries({'access-control-allow-origin':origin,'access-control-allow-headers':'content-type','access-control-allow-methods':'POST,OPTIONS','access-control-max-age':'86400'}))response.headers.set(key,value);
+ return response;
+}};
+async function rooms(request,env,url,permitted){
  try{
   if(!env.DB)return json({error:'Online rooms are not configured on this host.'},503);
   if(request.method!=='POST')return json({error:'Use POST.'},405);
-  if(request.headers.get('origin')&&request.headers.get('origin')!==url.origin)return json({error:'Origin not allowed.'},403);
+  if(!permitted)return json({error:'Origin not allowed.'},403);
   const raw=await request.text();if(raw.length>110000)return json({error:'Request too large.'},413);let body;try{body=JSON.parse(raw);}catch{return json({error:'Invalid request.'},400);}
   const db=env.DB.withSession?env.DB.withSession('first-primary'):env.DB;
   const sql=(s,...args)=>db.prepare(s).bind(...args);const at=now();const profileResponse=await profileAPI(url.pathname,body,db);if(profileResponse)return profileResponse;
@@ -48,4 +58,4 @@ export default {async fetch(request,env){const url=new URL(request.url);if(!url.
   if(!current)failure('The host closed this room.',410);
   return json({status:current.status,hostSeen:current.updated,roster:roster.results.map(m=>({slot:m.slot,name:m.name,seen:m.seen,generation:m.generation,...(member.slot===0?{input:m.input?JSON.parse(m.input):null}:{})})),signals:signals.results.map(s=>({from:s.sender,description:JSON.parse(s.description)})),snapshot:member.slot!==0&&current.snapshot?JSON.parse(current.snapshot):null});
  }catch(e){if(!e.status)console.error('Room service error:',e.message);return json({error:e.status?e.message:'Online rooms are temporarily unavailable. Try again.'},e.status??503);}
-}};
+}

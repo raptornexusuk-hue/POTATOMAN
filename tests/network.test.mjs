@@ -41,3 +41,23 @@ const packed=unpackPlayer(JSON.parse(JSON.stringify(packPlayer(record))));assert
 console.log('PASS race DNF, progression and crowns survive snapshot serialization');DB.close();
 
 assert.equal(unpackPlayer(packPlayer({...record,shotDuration:.3286})).shotDuration,.3286);console.log('PASS shortened throw duration survives network round trip');
+
+// Plain web hosting can serve the game but not this service, so the game has to be able to call it
+// on another host. That is exactly the cross-origin request the CSRF guard exists to refuse, so it
+// is allowed only for origins the operator listed and refused for every other.
+const SITE='https://potatoman.co.uk',CORS_DB=await openDatabase(':memory:');
+const call=(method,origin,env)=>worker.fetch(new Request('https://rooms.test/api/rooms/create',{method,headers:{'content-type':'application/json',...(origin?{origin}:{})},...(method==='POST'?{body:'{"name":"SPUD"}'}:{})}),{DB:CORS_DB,...env});
+const listed={ORIGINS:[SITE]};
+assert.equal((await call('POST',SITE,listed)).status,200,'a listed site may create a room from its own origin');
+assert.equal((await call('POST',SITE,listed)).headers.get('access-control-allow-origin'),SITE,'and the browser is told so');
+assert.equal((await call('POST','https://someone-else.example',listed)).status,403,'an unlisted origin is still refused');
+assert.equal((await call('POST','https://someone-else.example',listed)).headers.get('access-control-allow-origin'),null,'and gets no permission header');
+assert.equal((await call('POST',SITE,{})).status,403,'with nothing listed, cross-origin stays shut');
+assert.equal((await call('POST','https://rooms.test',listed)).status,200,'the service always serves the page it hosts itself');
+assert.equal((await call('POST',null,listed)).status,200,'requests with no origin at all are unaffected');
+const preflight=await call('OPTIONS',SITE,listed);assert.equal(preflight.status,204);
+assert.equal(preflight.headers.get('access-control-allow-headers'),'content-type','the JSON content type is what forces the preflight');
+assert.equal(preflight.headers.get('vary'),'origin','a shared cache must not serve one origin the answer meant for another');
+assert.equal((await call('OPTIONS','https://someone-else.example',listed)).status,403);
+CORS_DB.close();
+console.log('PASS the room service answers a listed game host cross-origin, including preflight, and refuses every other');

@@ -73,3 +73,24 @@ await playerAccount.leaderboard();
 assert.ok(document.getElementById('leaderboardRows').innerHTML.includes('MACCA'));
 assert.ok(document.getElementById('leaderboardStatus').textContent.includes('this device'));
 console.log('PASS a host with no game server still names a player, starts the round and keeps scores on the device');
+
+// The address of the room and score service is the one thing a player editing config.js on a shared
+// web host can get wrong, so every shape of wrong is rejected rather than turned into a dead URL.
+{
+ const api=await import('../dist/api.js');
+ const set=value=>{if(value===undefined)delete globalThis.POTATOMAN_API;else globalThis.POTATOMAN_API=value;};
+ globalThis.document={querySelector:()=>null};
+ set(undefined);assert.equal(api.apiBase(),'','with nothing configured the game talks to its own origin');
+ assert.equal(api.apiURL('player/get'),'/api/player/get');
+ assert.equal(api.apiRemote(),false);
+ set('https://rooms.example.com/');assert.equal(api.apiBase(),'https://rooms.example.com','a trailing slash cannot double up');
+ assert.equal(api.apiURL('/rooms/create'),'https://rooms.example.com/api/rooms/create');
+ assert.equal(api.apiRemote(),true);
+ for(const bad of['rooms.example.com','  ','https://','ftp://rooms.example.com','javascript:alert(1)',42,null])
+  {set(bad);assert.equal(api.apiBase(),'',`a host written as ${JSON.stringify(bad)} must fall back to this origin, not build a broken URL`);}
+ set(undefined);globalThis.document={querySelector:selector=>selector==='meta[name="potatoman-api"]'?{content:'https://meta.example.com'}:null};
+ assert.equal(api.apiBase(),'https://meta.example.com','a meta tag works for hosts that cannot add a script');
+ globalThis.POTATOMAN_API='https://wins.example.com';assert.equal(api.apiBase(),'https://wins.example.com','an explicit setting outranks the tag');
+ delete globalThis.POTATOMAN_API;delete globalThis.document;
+ console.log('PASS the configured service address is validated, normalised and defaults to this origin');
+}

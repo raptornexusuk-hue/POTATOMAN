@@ -1,4 +1,5 @@
 import {ScoreQueue} from './score-queue.js';
+import {apiURL,apiRemote,apiBase} from './api.js';
 import {LEVELS} from './core.js';
 // Ranked maze boards follow the level list rather than a hand-written set of indices, which is
 // what silently stopped four of the six race levels ever recording a time.
@@ -16,13 +17,13 @@ const writeLocal=(key,value)=>{try{localStorage.setItem(key,JSON.stringify(value
 export const playerAccount={player:null,token:null,session:null,onPlayer:null,ready:null,boardRequest:0,sample:null,offline:false,
  async api(path,data={},keepalive=false){
   if(this.offline)throw Object.assign(Error('This copy is running without the game server.'),{offline:true});
-  let response;try{response=await fetch('/api/'+path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({playerToken:this.token,...data}),keepalive,signal:AbortSignal.timeout(7000)});}
+  let response;try{response=await fetch(apiURL(path),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({playerToken:this.token,...data}),keepalive,signal:AbortSignal.timeout(7000)});}
   catch(e){throw Object.assign(Error('Could not reach player services.'),{offline:e.name!=='AbortError'});}
   let value;try{value=await response.json();}catch{throw Object.assign(Error('Player profiles need the Potatoman game server on this host.'),{offline:true});}
   if(!response.ok)throw Object.assign(Error(value.error||'Could not reach player services.'),{status:response.status});return value;},
  goOffline(){if(this.offline)return;this.offline=true;this.token=null;
   const saved=readLocal(LOCAL_PLAYER);if(saved)this.player=saved;
-  $('onlineNote')&&($('onlineNote').textContent='Online rooms need the Potatoman game server. This copy is hosted as plain files, so solo and local split-screen work and scores are kept on this device.');
+  $('onlineNote')&&($('onlineNote').textContent=apiRemote()?'The room and score server at '+apiBase()+' could not be reached. Solo and local split-screen work; scores are kept on this device meanwhile.':'Online rooms need the Potatoman game server. This copy is hosted as plain files, so solo and local split-screen work and scores are kept on this device. See config.js to point it at one.');
   if(this.player)this.showPlayer();},
  saveLocal(name,motto){this.player={id:'local',name:String(name||'PLAYER').slice(0,24),motto:String(motto||'').slice(0,60)};writeLocal(LOCAL_PLAYER,this.player);this.showPlayer();},
  localScores(){return readLocal(LOCAL_SCORES)||{best:0,points:0,rounds:0,wins:0,knockouts:0,times:{}};},

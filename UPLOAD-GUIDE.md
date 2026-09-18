@@ -18,6 +18,9 @@ What plain hosting cannot do is run the small API the game uses for **online roo
 it asks for your name as usual, keeps that player and your best scores in the browser on that
 device, says so plainly, and carries on. Nothing is blocked and nothing errors.
 
+You do not have to choose between the two. The game can stay on plain hosting and call a room and
+score server running somewhere else — see **Option C** below.
+
 `build/web/.htaccess` is included for Apache-based hosting like IONOS webspace. It sets the media
 types for `.js` and `.mp3`, enables compression, caches images and audio for a day and revalidates
 the code on every load, so a re-upload reaches visitors immediately. Delete it if your host is not
@@ -31,11 +34,34 @@ Your host needs a Node.js application service supporting **Node 22.13 or newer**
 2. Choose this extracted directory as the application's working directory.
 3. Use `npm start` as the start command. The underlying entry point is `server/node.mjs`; no third-party runtime dependencies or frontend build are needed for this Node deployment.
 4. Set `POTATOMAN_PUBLIC_ORIGIN` to your actual HTTPS origin, such as `https://play.yourdomain.com` (with your own domain, without a trailing path).
-5. Set `POTATOMAN_DATA_DIR` to a persistent writable directory outside `dist/`, using an absolute path. The server creates `rooms.sqlite` there and applies the included database migrations automatically. Back up this directory; replacing application files must not delete it.
-6. Use the host's assigned `PORT` if required; otherwise the server listens on port 3000. Route your HTTPS domain to this Node application, including `/api/*` requests. Hostnames must be served at the domain or subdomain root for this package.
-7. Keep one application instance running. This SQLite adapter is not configured for multiple independent replicas. Start a room on one device, join from another and verify a saved player score before opening it to others.
+5. To let a copy of the game hosted elsewhere use this server, set `POTATOMAN_ALLOWED_ORIGINS` to
+   that site's address (comma-separated for several). Leave it unset when the server also serves the
+   game.
+6. Set `POTATOMAN_DATA_DIR` to a persistent writable directory outside `dist/`, using an absolute path. The server creates `rooms.sqlite` there and applies the included database migrations automatically. Back up this directory; replacing application files must not delete it.
+7. Use the host's assigned `PORT` if required; otherwise the server listens on port 3000. Route your HTTPS domain to this Node application, including `/api/*` requests. Hostnames must be served at the domain or subdomain root for this package.
+8. Keep one application instance running. This SQLite adapter is not configured for multiple independent replicas. Start a room on one device, join from another and verify a saved player score before opening it to others.
 
 Where a host asks for an installation command, `npm ci` is compatible with the supplied lockfile, but the Node runtime itself does not require the development dependencies. A host offering only a file manager/FTP upload, with no Node application or persistent storage, needs a different deployment route.
+
+## Option C — plain hosting for the game, a small Node host for rooms and scores
+
+Everybody's scores are remembered in one place, and online rooms work, while the game itself stays
+on the webspace you already have. The service is the same Node server as Option B; it just does not
+have to serve the game files.
+
+1. Deploy Option B somewhere that runs Node 22.13+ with a persistent disk — an IONOS VPS or Cloud
+   Server, or any Node application host. Give it its own HTTPS address, such as
+   `https://rooms.yourdomain.com`.
+2. On that host, set `POTATOMAN_ALLOWED_ORIGINS` to the address the game is served from, exactly as
+   a browser writes it and with no trailing slash — for example `https://potatoman.co.uk`. Several
+   are allowed, separated by commas. Without this the service refuses requests from other sites,
+   which is what stops anyone else's page driving your rooms.
+3. In the uploaded game, edit `config.js` and uncomment the last line, pointing it at that address:
+   `window.POTATOMAN_API='https://rooms.yourdomain.com';`
+4. Reload the game over HTTPS. Both addresses must be HTTPS, or the browser blocks the request.
+
+If the service is unreachable or the origin is not allowed, the game says so and falls back to
+keeping scores on the device — it never breaks the round you are playing.
 
 ## IONOS specifically
 
@@ -44,9 +70,10 @@ Where a host asks for an installation command, `npm ci` is compatible with the s
   unless you specifically need online rooms.
 - **IONOS Deploy Now** serves static sites and PHP. It does not provide a Node runtime for the
   server in Option B; selecting a Node build template does not add one. Use it for Option A only.
-- **Online rooms and shared leaderboards need Option B**, which means a plan that runs a Node 22.13+
-  process and keeps a writable disk between deploys — an IONOS VPS or Cloud Server, or another Node
-  application host. A webspace-only plan cannot run it, whatever the control panel offers.
+- **Online rooms and shared leaderboards need a Node 22.13+ process** with a writable disk that
+  survives deploys — an IONOS VPS or Cloud Server, or another Node application host. A webspace-only
+  plan cannot run it, whatever the control panel offers. Either move the whole game there (Option B)
+  or keep it on the webspace and point it at that host (Option C).
 
 Check which plan you have before uploading: if the panel offers only FTP/file management and PHP
 settings, it is Option A.
