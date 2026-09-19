@@ -17,7 +17,6 @@ export function soundRecipe(type,alternate=0){const foot=alternate%2?'b':'a';ret
  shot_peeler:[['metal-heavy',.8,.55],['punch-heavy-a',.9,.6],['metal-click',.3,.5,.05],['wood-plank',.3,.45,.12]],
  shot_fryer:[['slime-'+foot,.6,1.5],['whoosh-a',.4,1.7],['metal-click',.2,1.9,.015]],
  shot_sticky:[['slime-b',.75,.85],['cloth-b',.5,.95],['metal-pot',.25,1.2,.04]],
- shot_mortar:[['wood-heavy',.7,.5],['metal-pot',.75,.55],['whoosh-b',.45,.7,.05]],
  explosion:[['wood-heavy',.85,.42],['punch-heavy-a',.95,.45],['metal-heavy',.65,.50,.04],['splash-b',.45,.55,.09],['wood-plank',.5,.75,.18]],
  step:[['step-wood-'+foot,.72,.95],['cloth-'+foot,.12,1]],
  land:[['step-wood-a',.7,.82],['step-wood-b',.55,.9,.035],['cloth-b',.3,.85]],

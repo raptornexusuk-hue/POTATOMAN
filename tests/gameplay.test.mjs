@@ -117,8 +117,41 @@ console.log('PASS varied finale seeds stay completable at Chill difficulty and t
 a.setOnline(host);a.setDuration(60);a.init(LEVELS.length-1,false,22);const shortRound=a.makeSnapshot(),hostMaze=JSON.stringify(a.snapshot().map.grid);a.setDuration(300);a.getSettings().remix=false;a.becomeGuest(guest);a.receiveRemoteSnapshot(shortRound);await new Promise(setImmediate);assert.equal(JSON.stringify(a.snapshot().map.grid),hostMaze);assert.equal(a.snapshot().remaining,60);a.setOnline(null);a.setDuration(120);a.getSettings().remix=true;
 console.log('PASS guests rebuild the identical remixed maze using host seed and active duration');
 a.init(0);let combat=a.snapshot();combat.players.forEach(p=>p.botDelay=999);let pad=combat.pickups.find(p=>p.kind==='weapon');const padKind=pad.weapon;assert.equal(combat.pickups.filter(p=>p.kind==='weapon').length,1);assert.equal(pad.collected,false);a.setIntro(2.5);const introTime=combat.remaining;for(let i=0;i<300;i++)a.tick(dt);assert.equal(a.snapshot().remaining,introTime);a.clearIntro();const gunner=combat.players[0];Object.assign(gunner,{x:pad.x,z:pad.z});a.tick(dt);assert.equal(gunner.weapon,padKind);assert.equal(gunner.mag,WEAPONS[padKind].ammo);
-combat.map.walls=[];Object.assign(gunner,{x:0,z:0,yaw:-Math.asin(.6/6),pitch:0,throwCD:0,invuln:0});const target=combat.players[1];Object.assign(target,{x:0,z:-6,hp:140,invuln:0});combat.players.slice(2).forEach(p=>Object.assign(p,{x:20,z:20}));a.fire(gunner);for(let i=0;i<60;i++)a.tick(dt);assert.ok(target.respawn>0);assert.equal(gunner.knockouts,1);equipWeapon(target,'scatter');target.respawn=.001;a.tick(dt);assert.equal(target.weapon,'throw');assert.equal(target.reload,0);assert.equal(target.gun,false);
-console.log('PASS one opening shared box, fair intro freeze, RPG direct-hit elimination and base-weapon respawn');
+// The launcher is asked for by name rather than taken from whichever weapon the pad rotation
+// happens to offer: what is under test is that one shell ends a potato, not the rotation order,
+// and the rotation changes whenever the roster does.
+combat.map.walls=[];equipWeapon(gunner,'rpg');Object.assign(gunner,{x:0,z:0,yaw:0,pitch:0,throwCD:0,invuln:0});const target=combat.players[1];Object.assign(target,{x:80,z:80,hp:140,invuln:0});combat.players.slice(2).forEach(p=>Object.assign(p,{x:20,z:20}));
+a.fire(gunner);
+// The target is put where the shell is actually going rather than at a hand-computed lead angle.
+// That lead was derived from where the weapon was held, so it silently stopped pointing at anything
+// the moment the weapon was carried somewhere else, and the test then proved nothing.
+{const shell=a.snapshot().shots.at(-1),flat=Math.hypot(shell.vx,shell.vz),t=6/flat;
+ Object.assign(target,{x:shell.x+shell.vx*t,z:shell.z+shell.vz*t});}
+for(let i=0;i<60;i++)a.tick(dt);assert.ok(target.respawn>0,'one launcher shell is fatal');assert.equal(gunner.knockouts,1);equipWeapon(target,'scatter');target.respawn=.001;a.tick(dt);assert.equal(target.weapon,'throw');assert.equal(target.reload,0);assert.equal(target.gun,false);
+console.log('PASS one opening shared box, fair intro freeze, launcher one-shot elimination and base-weapon respawn');
+// The chip fryer's oil burns out after a fraction of a second, so it is sighted at the distance it
+// can actually cover rather than at rifle range. It used to be aimed sixty metres out while the oil
+// died at seven, so the jets were still fanning apart when they expired and nothing ever arrived
+// where the crosshair was pointing.
+{
+ const fryer=WEAPONS.fryer,oil=fryer.speed*fryer.life;
+ equipWeapon(gunner,'fryer');Object.assign(gunner,{x:0,z:0,yaw:0,pitch:0,throwCD:0,invuln:0,hp:100});
+ combat.players.slice(1).forEach(q=>Object.assign(q,{x:80,z:80}));
+ const before=a.snapshot().shots.length;a.fire(gunner);
+ const jets=a.snapshot().shots.slice(before);
+ assert.equal(jets.length,fryer.pellets);
+ // Every jet is still within the width of a potato when it reaches the end of its own range.
+ const centre=jets[Math.floor(jets.length/2)],flat=Math.hypot(centre.vx,centre.vz),t=Math.min(oil,12)/flat;
+ let widest=0;
+ for(const jet of jets)widest=Math.max(widest,Math.hypot(jet.x+jet.vx*t-(centre.x+centre.vx*t),jet.z+jet.vz*t-(centre.z+centre.vz*t)));
+ assert.ok(widest<1.1,`the fryer's jets are ${widest.toFixed(2)}m apart where the oil runs out, which is wider than the potato they are aimed at`);
+ // Damage is judged on what lands, not on the paper burst. The old cone threw five jets over a
+ // 4m spread at that range, so roughly one of them found a body; three jets inside a potato's width
+ // all land, and each is worth nearly double what one used to be.
+ assert.ok(fryer.damage>=12,`a single jet does ${fryer.damage}, which is not worth the walk into the doorway`);
+ assert.ok(fryer.damage*fryer.pellets/fryer.cooldown>250,'and holding the trigger on a body is lethal quickly');
+ console.log(`PASS the fryer is sighted at the ${oil.toFixed(1)}m its oil reaches, and lands within ${widest.toFixed(2)}m of the crosshair there`);
+}
 
 // Audio snapshots deliver each world event once and never replay muted/paused backlog.
 const {validSnapshot}=await import('../dist/net-state.js');a.setOnline(null);a.init(0);let audioState=a.snapshot();audioState.players.forEach(p=>p.botDelay=999);a.fire(audioState.players[0]);for(let i=0;i<15;i++)a.tick(dt);const packetOne=a.makeSnapshot();assert.ok(validSnapshot(packetOne));assert.ok(packetOne.audioEvents.some(e=>e.type==='shot_throw'));

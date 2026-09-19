@@ -112,7 +112,7 @@ export function makeMap(level,bonus=false){
     void along;void across;}};
   if(family==='shipyard'){
    // Shipment: a yard you can cross in four seconds, packed tight enough that every sightline is
-   // short and nowhere is safe for long. Double-stacked rows are the only cover a mortar must arc.
+   // short and nowhere is safe for long. Double-stacked rows are the only cover a launcher must arc.
    // Boxes lie in rows, not in a heap: every container in a row shares its heading, the rows
    // against the walls are double-stacked, and the single-height inner square leaves four lanes
    // and an open middle where the weapon box lands.

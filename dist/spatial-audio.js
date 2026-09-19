@@ -1,7 +1,7 @@
 import {soundRecipe} from './sound-pack.js';
 import {boxContact3D} from './core.js';
 
-export const SOUND_TYPES=new Set(['boost_run','boost_fire','boost_jump','weaponPickup','weaponDrop','shot_throw','shot_spud','shot_repeater','shot_scatter','shot_masher','shot_rpg','shot_peeler','shot_fryer','shot_sticky','shot_mortar','explosion','hit','catch','dash','jump','land','step','crouch','duckGate','checkpoint','pickup','win','impact']);
+export const SOUND_TYPES=new Set(['boost_run','boost_fire','boost_jump','weaponPickup','weaponDrop','shot_throw','shot_spud','shot_repeater','shot_scatter','shot_masher','shot_rpg','shot_peeler','shot_fryer','shot_sticky','explosion','hit','catch','dash','jump','land','step','crouch','duckGate','checkpoint','pickup','win','impact']);
 const aliases={throw:'shot_spud',gun:'shot_masher'};
 const point=p=>({x:p.x,y:p.y??0,z:p.z});
 export class SpatialAudio {
@@ -46,7 +46,6 @@ export class SpatialAudio {
    case 'shot_peeler':tone(120,34,.34,.55);noise(6200,900,.17,.85);tone(2100,640,.06,.12,.02,'triangle');noise(700,180,.42,.22,.06);break;
    case 'shot_fryer':noise(2600,5200,.13,.34);tone(760,980,.07,.05,0,'sawtooth');break;
    case 'shot_sticky':tone(300,110,.13,.22,0,'triangle');noise(1300,420,.11,.30);tone(880,1180,.06,.07,.05,'sine');break;
-   case 'shot_mortar':tone(96,30,.30,.52);noise(1500,340,.24,.55);tone(420,150,.09,.12,.03,'triangle');break;
    case 'shot_rpg':tone(92,31,.27,.50);noise(2400,4900,.16,.8);noise(900,320,.62,.60,.035);tone(180,70,.4,.12,.05,'sawtooth');break;
    case 'explosion':tone(90,24,.85,.66);noise(5000,950,.14,.9);noise(520,95,.9,.86);for(const d of [.12,.22,.34,.43])noise(1500,280,.12,.22,d);break;
    case 'step':{const side=(this.foot++%2)?1:.84;tone(520*side,270*side,.067,.15,0,'triangle');tone(900*side,470*side,.058,.075,.026,'triangle');noise(1600,650,.045,.18);break;}

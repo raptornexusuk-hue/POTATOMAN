@@ -4,7 +4,8 @@ import * as T from '../dist/assets/three.module.js';
 import {World} from '../dist/world.js';
 import {LEVELS} from '../dist/core.js';
 import {ARM_LENGTHS} from '../dist/character-rig.js';
-import {muzzlePosition,cameraPose,MIN_PITCH,MAX_PITCH} from '../dist/aiming.js';
+import {muzzlePosition,cameraPose,MIN_PITCH,MAX_PITCH,REST_ZOOM,DEFAULT_PITCH} from '../dist/aiming.js';
+import {WEAPONS} from '../dist/weapons.js';
 const ctx=new Proxy({measureText:t=>({width:t.length*31})},{get:(o,k)=>o[k]??(()=>{}),set:(o,k,v)=>(o[k]=v,true)});
 globalThis.document={createElement:()=>({getContext:()=>ctx})};globalThis.innerWidth=1440;globalThis.innerHeight=900;globalThis.devicePixelRatio=1;
 const renderer={shadowMap:{},capabilities:{getMaxAnisotropy:()=>4},setPixelRatio(){},setSize(){}};
@@ -27,7 +28,7 @@ function meshPoints(mesh){const arr=mesh.geometry.attributes.position,keys=new S
 function metric(tree,meshes){let points=0,penetrating=0,deepPenetrating=0,maxDepth=0,deepest=null;for(const mesh of meshes){for(const v of meshPoints(mesh)){points++;if(inside(tree,v)){penetrating++;const near=closest(tree,v);if(near.distance>.0200001)deepPenetrating++;if(near.distance>maxDepth){maxDepth=near.distance;deepest=v;}}}}return{points,penetrating,deepPenetrating,maxDepth:n(maxDepth),deepest:deepest?vec(deepest):null};}
 function pose(opts,withTree=true){Object.assign(p,initial,opts);m.crouchBlend=opts.crouchBlend??(p.crouching?1:0);m.walk=opts.walk??0;m.stride=opts.stride??0;m.gaitX=opts.gaitX??0;m.gaitZ=opts.gaitZ??1;m.lastX=p.x;m.lastZ=p.z;w.updatePlayers([p],0,0);w.root.updateMatrixWorld(true);return withTree?bvh(triList(body)):null;}
 
-const GUNS=['spud','repeater','scatter','masher','rpg','peeler','fryer','sticky','mortar'];
+const GUNS=Object.keys(WEAPONS).filter(k=>k!=='throw');
 const cases=[];
 for(const crouching of[false,true]){
  for(const elapsed of[0,.035,.068,.095,.12,.20,.27,.37,.46])cases.push({weapon:'throw',crouching,shotAnim:elapsed===.46?0:.46-elapsed});
@@ -94,6 +95,39 @@ for(const opts of cases){pose(opts,false);for(const arm of m.arms){const {upper,
  for(const mesh of[upper,lower]){const {position,normal:n}=mesh.geometry.attributes,ix=mesh.geometry.index;for(let i=0;i<ix.count;i+=3){pa.fromBufferAttribute(position,ix.getX(i));pb.fromBufferAttribute(position,ix.getX(i+1));pc.fromBufferAttribute(position,ix.getX(i+2));surface.copy(pb).sub(pa).cross(pc.sub(pa));if(surface.lengthSq()<1e-10)continue;normal.fromBufferAttribute(n,ix.getX(i));assert.ok(surface.normalize().dot(normal)>.1,'arm triangles must face outward, not expose the inside of a hollow sleeve');}}
 }}
 console.log('PASS potato carried at the side clear of its own face, and continuous outward-facing rounded arm surfaces');
+// The weapon hand belongs at the potato's side, not up by its eye. Carrying a gun out in front at
+// chest height put the hand level with the eyes, and from a camera over that same shoulder the arm
+// read as being across the face. This is the second time that has happened, so it is measured here
+// rather than left to the carry numbers looking sensible: for every weapon, in every stance, the
+// hand sits below both eyes and outboard of the shoulder socket.
+{
+ const camera=new T.PerspectiveCamera(70,1.6,.08,180);
+ let checked=0,nearest=Infinity,worstCase=null;
+ for(const weapon of GUNS)for(const crouching of[false,true])for(const pitch of[MIN_PITCH,DEFAULT_PITCH,0,MAX_PITCH]){
+  pose({weapon,crouching,pitch},false);
+  const view=cameraPose(p,{zoom:REST_ZOOM},[]);
+  camera.position.set(view.position.x,view.position.y,view.position.z);camera.lookAt(view.look.x,view.look.y,view.look.z);
+  camera.updateMatrixWorld(true);camera.updateProjectionMatrix();
+  const screen=o=>{const v=o.getWorldPosition(new T.Vector3()).project(camera);return{x:(v.x*.5+.5)*1280,y:(-v.y*.5+.5)*800};};
+  // Where the hand actually is comes first: it hangs below the eyes in every pose, by a real
+  // distance in metres. Screen position is then checked at a resting sight, which is the view the
+  // player spends the round in. At the pitch limits the camera is looking almost straight down or
+  // up and projection alone can put a lower point above a nearer one, which says nothing about
+  // where the arm is, so the screen check does not run there.
+  const handY=m.arms[0].userData.hand.getWorldPosition(new T.Vector3()).y,eyeY=m.eyes[0].getWorldPosition(new T.Vector3()).y;
+  assert.ok(eyeY-handY>.20,`${weapon} at pitch ${pitch.toFixed(2)}${crouching?' crouched':''}: weapon hand is only ${(eyeY-handY).toFixed(2)}m below the eyes`);
+  if(Math.abs(pitch-DEFAULT_PITCH)<1e-9){
+   const hand=screen(m.arms[0].userData.hand),eye=Math.min(screen(m.eyes[0]).y,screen(m.eyes[1]).y),below=hand.y-eye;
+   assert.ok(below>(crouching?24:50),`${weapon}${crouching?' crouched':''}: at a resting sight the weapon hand is only ${below.toFixed(0)}px below the eyes`);
+   if(below<nearest){nearest=below;worstCase=`${weapon}${crouching?' crouched':''}`;}}
+  // And outboard: a hand tucked inside the shoulder line is in front of the chest, not at the side.
+  const socket=m.arms[0].userData.shoulder.getWorldPosition(new T.Vector3()),wrist=m.arms[0].userData.hand.getWorldPosition(new T.Vector3());
+  const across=Math.cos(p.yaw),acrossZ=Math.sin(p.yaw);
+  assert.ok((wrist.x*across+wrist.z*acrossZ)-(socket.x*across+socket.z*acrossZ)>-.02,`${weapon}: weapon hand is inboard of its own shoulder`);
+  checked++;
+ }
+ console.log(`PASS ${checked} armed poses keep the weapon hand at the potato's side, ${nearest.toFixed(0)}px clear of the eyes on screen at worst (${worstCase})`);
+}
 for(const mode of['race','assault']){w.level=LEVELS.find(l=>l.mode===mode);pose({weapon:'throw',walk:1,stride:.7});assert.equal(m.heldSpud.visible,false);for(const arm of m.arms)assert.ok(arm.userData.hand.position.y<arm.userData.shoulder.position.y,'unarmed course runners use a free arm swing, not a raised invisible potato');}
 w.level=LEVELS[0];
 console.log('PASS maze and assault runners keep a free unarmed arm swing');

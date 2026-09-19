@@ -1,5 +1,5 @@
 import * as T from './assets/three.module.js';
-import {muzzlePosition,CAMERA_SHOULDER} from './aiming.js';
+import {muzzlePosition,gunGrip,CAMERA_SHOULDER} from './aiming.js';
 import {THROW_DURATION,THROW_WINDUP} from './weapons.js';
 // A side-on torso puts the shoulder, the throwing hand and the whole receiver in the shoulder view,
 // so the weapon reads as pointing at the crosshair instead of hiding behind the potato.
@@ -132,7 +132,11 @@ export function poseArms(m,p,stride,walk,crouch,canThrow=true){
   if(m.gun.visible&&j===0){
    // Grip where the shorter arm can actually hold: the wide-bodied weapons are gripped at the
    // receiver rather than out along the fore-end, so the upper arm never gets dragged into the ribs.
-   target.set(0,-.10,p.weapon==='rpg'||p.weapon==='scatter'?-.50:-.72).applyMatrix4(m.gun.matrix);hand.quaternion.copy(m.gun.quaternion);curl=1.35;}
+   // The hand goes on the weapon's own grip socket -- the point the aim solver swings the barrel
+   // around -- rather than a guessed distance back down the barrel from the muzzle. Measuring the
+   // hold from the muzzle meant every change to a weapon's length quietly moved the hand, and a
+   // long one dragged it out past where the arm could reach.
+   const socket=gunGrip(p);toLocal(target,socket.x,socket.y,socket.z);hand.quaternion.copy(m.gun.quaternion);curl=1.35;}
   else if(tossing&&j===0){
    // Palm faces the throw, fingers cradle the rear skin; a small wrist cock
    // replaces the old upward/backward-facing palm and under-potato grip.

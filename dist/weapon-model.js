@@ -64,7 +64,7 @@ export function makeSpudGun(w,parent){
   // A cheek rest, not a full stock: anything further back rides inside the potato's chest.
   fit(g,'rounded',walnut,0,.085,-.80,.085,.085,.26);
  }
- {// CHIP FRYER and SPUD MORTAR: a flared mouth that widens toward, but never past, the muzzle.
+ {// CHIP FRYER: a flared mouth that widens toward, but never past, the muzzle.
   const g=attach('funnel');
   for(let i=0;i<4;i++)fit(g,new T.TorusGeometry(.11+i*.035,.016,8,24),steel,0,0,-.20+i*.055);
   for(const side of[-1,1])fit(g,'rounded',brass,side*.16,0,-.30,.02,.14,.16);
@@ -74,11 +74,30 @@ export function makeSpudGun(w,parent){
   const cylinder=fit(g,'cylinder',steel,0,.01,-.36,.18,.22,.18);cylinder.rotation.x=Math.PI/2;
   for(let i=0;i<6;i++){const a=i*Math.PI/3;fit(g,'cylinder',rubber,Math.cos(a)*.10,.01+Math.sin(a)*.10,-.36,.04,.24,.04).rotation.x=Math.PI/2;}
  }
- {// SPUD RPG: a bulbous warhead sitting just behind the launch tube's mouth.
-  const g=attach('warhead');
-  fit(g,'sphere',w.mat(0xd2563d,null,{roughness:.55}),0,0,-.22,.12,.12,.18);
-  fit(g,'cylinder',steel,0,0,-.40,.075,.26,.075).rotation.x=Math.PI/2;
-  for(const side of[-1,1])fit(g,'rounded',w.mat(0xe8e2d2),side*.09,0,-.50,.012,.13,.13);
+ {// SPUD BAZOOKA: a shoulder-mounted tube. What makes it read as shouldered is that the tube sits
+  // above and outboard of the pistol grip and runs back past the hand, so it lies over the shoulder
+  // with a pad at the rear and the blast venturi behind that -- the arm stays down on the grip
+  // rather than being lifted into the potato's face to hold it.
+  // `out` is a narrow window and both walls of it are measured by the rig test. Inboard of this the
+  // tube goes through the ribs; outboard of it the tube lies along the sight line from a camera sat
+  // over that same shoulder and hides the crosshair when aiming steeply down. The tube is slimmer
+  // than a launcher would really be for the same reason: it has to pass between the two.
+  const g=attach('warhead'),out=-.24,high=.34;
+  const tube=fit(g,'cylinder',steel,out,high,-.60,.113,1.00,.113);tube.rotation.x=Math.PI/2;
+  for(const z of[-.16,-.62,-.94])fit(g,new T.TorusGeometry(.117,.0156,8,24),brass,out,high,z);
+  // Warhead at the mouth, sitting inside the tube's own bore rather than past the muzzle.
+  fit(g,'sphere',w.mat(0xd2563d,null,{roughness:.55}),out,high,-.20,.090,.090,.156);
+  fit(g,'cone',w.mat(0xd2563d,null,{roughness:.55}),out,high,-.05,.082,.16,.082).rotation.x=-Math.PI/2;
+  // Flared venturi and a padded rest at the back: the part that lands on the shoulder.
+  fit(g,'cylinder',steel,out,high,-1.06,.144,.16,.144).rotation.x=Math.PI/2;
+  fit(g,'rounded',rubber,out,high-.13,-.95,.100,.065,.18);
+  // The grip column leans inboard as it drops, joining the tube to a hand that sits under the
+  // body's own shoulder rather than out under the tube.
+  const column=fit(g,'rounded',steel,out*.55,.14,-.70,.050,.30,.090);column.rotation.z=-.20;
+  fit(g,'rounded',walnut,0,-.04,-.82,.060,.15,.20);
+  fit(g,'rounded',steel,out,high+.16,-.40,.018,.10,.048);
+  fit(g,new T.TorusGeometry(.038,.009,6,16),silver,out,high+.19,-.40).rotation.y=Math.PI/2;
+  for(const side of[-1,1])fit(g,'rounded',w.mat(0xe8e2d2),out+side*.119,high,-.76,.012,.085,.13);
  }
  {// CHIPPER AUTO: a deep drum magazine slung under the receiver.
   const g=attach('mag');

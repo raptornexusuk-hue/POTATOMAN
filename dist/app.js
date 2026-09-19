@@ -3,7 +3,7 @@ import {MAPS,mapInfo,mapId,nextCircuitSeed} from './map-catalogue.js';
 import {bodyHeight,eyeHeight,updateStance} from './stance.js';
 import {cameraPose,aimPoint,shotVelocity,cylinderContact,weaponAim,cameraHeight,settleBoom,CAMERA_SHOULDER,DEFAULT_PITCH,MIN_PITCH,MAX_PITCH} from './aiming.js';
 import {createWeaponPickup,claimWeapon,useWeaponRound,dropWeapon,rearmWeapon} from './weapon-pickup.js';
-import {THROW_DURATION,THROW_WINDUP,WEAPONS,equipWeapon,weaponConfig,dropFactor} from './weapons.js';
+import {THROW_DURATION,THROW_WINDUP,WEAPONS,equipWeapon,weaponConfig,dropFactor,weaponReach} from './weapons.js';
 import {SOUND_TYPES} from './spatial-audio.js';
 import {GameAudio,permittedVoice} from './game-audio.js';
 import {AI_LEVELS,aiSettings} from './difficulty.js';
@@ -383,7 +383,7 @@ function botInput(p,dt){const ai=aiSettings(settings.difficulty,circuitProgress(
  let moving=l>.3;
  // Engagement range follows the weapon, so a bot holding a burn-out sprayer closes the distance
  // and one holding the rifle opens it instead of every bot fighting at the same 21 metres.
- const reach=weaponConfig(p).life?6.5:p.weapon==='peeler'?34:p.weapon==='mortar'?26:21;
+ const reach=weaponConfig(p).life?weaponReach(weaponConfig(p),34,21):p.weapon==='peeler'?34:p.weapon==='rpg'?30:21;
  let aim=(!bonus&&mode==='smash')?targets.filter(t=>t.hp>0).sort((a,b)=>Math.hypot(a.x-p.x,a.z-p.z)-Math.hypot(b.x-p.x,b.z-p.z))[0]:enemy,canShoot=aim&&Math.hypot(aim.x-p.x,aim.z-p.z)<reach&&clearShot(p,aim,map.walls)&&(!bonus||!p.runner)&&!isTrial(currentLevel());
  if(bonus&&!p.runner&&aim)canShoot=Math.hypot(aim.x-p.x,aim.z-p.z)<Math.max(26,reach)&&clearShot(p,aim,map.walls);
  if(bonus&&p.runner)canShoot=false;

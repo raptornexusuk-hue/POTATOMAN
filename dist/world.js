@@ -37,7 +37,7 @@ const indoorGlow=half=>Math.min(3.4,1.6+half*.045);
 // bulk/length are scales on the shared launcher mesh; kit names an optional attachment group.
 const GUN_SHAPES={spud:{bulk:1,length:.72},repeater:{bulk:1,length:.74,kit:'mag'},scatter:{bulk:1.06,length:.82},
  masher:{bulk:.92,length:.70},rpg:{bulk:1.2,length:.91,kit:'warhead'},peeler:{bulk:.88,length:.92,kit:'scope'},
- fryer:{bulk:1.16,length:.60,kit:'funnel'},sticky:{bulk:1.1,length:.56,kit:'drum'},mortar:{bulk:1.26,length:.74,kit:'funnel'}};
+ fryer:{bulk:1.16,length:.60,kit:'funnel'},sticky:{bulk:1.1,length:.56,kit:'drum'}};
 const footReach=(phase,walk)=>{const cycle=((phase%TAU)+TAU)%TAU;return walk*STEP_REACH*(cycle<Math.PI?-Math.cos(cycle):1-2*(cycle-Math.PI)/Math.PI);};
 
 export class World{

@@ -1,7 +1,23 @@
 import {boxContact3D,THROW_DROP} from './core.js';
 import {bodyHeight,bodyScale,muzzleHeight} from './stance.js';
-import {weaponConfig,dropFactor} from './weapons.js';
-const GUN_TUNING={lightRight:.60,lightLift:.10,heavyRight:.42,heavyForward:.90,heavyLift:0};
+import {weaponConfig,dropFactor,weaponReach,WEAPONS} from './weapons.js';
+// Where a weapon is carried, in the aim frame: `right` outboard of the body's centre line,
+// `lift` measured from the muzzle socket and `forward` out in front of the chest, with `length`
+// the grip-to-muzzle distance the aim solver swings the barrel around.
+// Everything but the launcher is held low and outboard, at the side of the body where a hand
+// actually hangs. Carrying it out at chest height put the hand level with the potato's eyes, and
+// from a camera sat over that same shoulder the whole weapon arm crossed its face -- the one
+// place this view cannot afford to put an arm. The launcher is the exception on purpose: it goes
+// carried the same way, low and outboard, because that is where a launcher's pistol grip is: what
+// makes it shoulder-mounted is the tube above the hand reaching back over the shoulder, which is
+// built into the weapon rather than achieved by lifting the arm into the potato's face.
+export const CARRIES={
+ light:{right:.78,lift:-.30,forward:.54,length:.55},
+ heavy:{right:.72,lift:-.30,forward:.70,length:.62},
+ rifle:{right:.76,lift:-.28,forward:.62,length:.78},
+ shoulder:{right:.70,lift:-.30,forward:.66,length:.69}
+};
+export const carryOf=weapon=>CARRIES[WEAPONS[weapon]?.carry]??(weapon==='peeler'?CARRIES.rifle:['scatter','fryer'].includes(weapon)?CARRIES.heavy:CARRIES.light);
 export const MIN_PITCH=-.85,MAX_PITCH=.70,CAMERA_SHOULDER=1.45,REST_ZOOM=4;
 // The boom pivots above the player's head and out past their shoulder, which is what puts them
 // low and to one side of the sight rather than square behind it. Crouching drops the pivot by the
@@ -14,6 +30,10 @@ export const cameraHeight=p=>(p.crouching?VIEW_PIVOT_CROUCH:VIEW_PIVOT)*bodyScal
 // same angle, which is the REST_ZOOM term.
 export const GUN_RANGE=60,THROW_RANGE=28;
 export const DEFAULT_PITCH=-cameraHeight({})/(GUN_RANGE-REST_ZOOM);
+// The hand's own socket. `weaponAim` swings the barrel around this point and the rig puts the
+// weapon hand on it, so the hold and the ballistics cannot drift apart.
+export function gunGrip(p){const scale=bodyScale(p),c=carryOf(p.weapon),right={x:Math.cos(p.yaw),z:Math.sin(p.yaw)},forward={x:Math.sin(p.yaw),z:-Math.cos(p.yaw)};
+ return{x:p.x+(right.x*c.right+forward.x*c.forward)*scale,y:(p.y??0)+muzzleHeight(p)+c.lift*scale,z:p.z+(right.z*c.right+forward.z*c.forward)*scale};}
 // Socket locations are independent of camera distance and body animation.
 export function muzzlePosition(p,solids=[]){const scale=bodyScale(p),throwing=p.weapon==='throw',right=(throwing?.58:.74)*scale,forward=(throwing?.56:p.weapon==='rpg'?.96:.82)*scale,origin={x:p.x,y:(p.y??0)+(throwing?(p.crouching?1.54:2.04)*scale:muzzleHeight(p)),z:p.z},muzzle={x:p.x+Math.sin(p.yaw)*forward+Math.cos(p.yaw)*right,y:origin.y,z:p.z-Math.cos(p.yaw)*forward+Math.sin(p.yaw)*right};let fraction=1;for(const w of solids)fraction=Math.min(fraction,boxContact3D(origin.x,origin.y,origin.z,muzzle.x,muzzle.y,muzzle.z,w,.18));if(fraction<1)for(const k of ['x','y','z'])muzzle[k]=mix(origin[k],muzzle[k],Math.max(0,fraction-.04));return muzzle;}
 
@@ -52,14 +72,14 @@ export function aimPoint(p,view,players,solids,targets=[],range=28){const camera
  return{x:mix(a.x,b.x,at),y:mix(a.y,b.y,at),z:mix(a.z,b.z,at)};
 }
 // `drop` is a multiplier on THROW_DROP, not a flag: 0 for flat rounds, 1 for a thrown spud, more
-// for a mortar. The launch solver has to use the same number the simulation does or the crosshair
+// for a launcher. The launch solver has to use the same number the simulation does or the crosshair
 // stops meaning anything.
 export function shotVelocity(p,target,speed,drop=1,muzzle=muzzlePosition(p)){const d=Math.max(.05,Math.hypot(target.x-muzzle.x,target.z-muzzle.z)),t=d/speed;return{...muzzle,vx:(target.x-muzzle.x)/d*speed,vz:(target.z-muzzle.z)/d*speed,vy:(target.y-muzzle.y)/t+drop*THROW_DROP*t};}
 
-export function weaponAim(p,players,solids,targets=[],speed=weaponConfig(p).speed){const w=weaponConfig(p),view=cameraPose(p,{zoom:p.cameraDistance},solids),target=aimPoint(p,view,players,solids,targets,w.gun?GUN_RANGE:THROW_RANGE),scale=bodyScale(p),origin={x:p.x,y:(p.y??0)+muzzleHeight(p),z:p.z};let muzzle=muzzlePosition(p),velocity,nearTarget=false;
+export function weaponAim(p,players,solids,targets=[],speed=weaponConfig(p).speed){const w=weaponConfig(p),view=cameraPose(p,{zoom:p.cameraDistance},solids),target=aimPoint(p,view,players,solids,targets,weaponReach(w,GUN_RANGE,THROW_RANGE)),scale=bodyScale(p),origin={x:p.x,y:(p.y??0)+muzzleHeight(p),z:p.z};let muzzle=muzzlePosition(p),velocity,nearTarget=false;
  if(p.weapon!=='throw'){
   // Aim around a shoulder grip, rather than swinging the stock around a fixed muzzle.
-  const twoHanded=['scatter','rpg','mortar','fryer'].includes(p.weapon),gripRight=twoHanded?GUN_TUNING.heavyRight:GUN_TUNING.lightRight,gripForward=twoHanded?GUN_TUNING.heavyForward:.64,grip={x:p.x+Math.cos(p.yaw)*gripRight*scale+Math.sin(p.yaw)*gripForward*scale,y:origin.y+(twoHanded?GUN_TUNING.heavyLift:GUN_TUNING.lightLift),z:p.z+Math.sin(p.yaw)*gripRight*scale-Math.cos(p.yaw)*gripForward*scale},length=(p.weapon==='rpg'?.69:p.weapon==='peeler'?.78:p.weapon==='scatter'?.62:.55)*scale;
+  const carry=carryOf(p.weapon),grip=gunGrip(p),length=carry.length*scale;
   nearTarget=Math.hypot(target.x-grip.x,target.y-grip.y,target.z-grip.z)<length+.12;
   velocity=shotVelocity(p,target,speed,dropFactor(w),grip);
   for(let i=0;i<5;i++){const norm=Math.hypot(velocity.vx,velocity.vy,velocity.vz);muzzle={x:grip.x+velocity.vx/norm*length,y:grip.y+velocity.vy/norm*length,z:grip.z+velocity.vz/norm*length};if(!nearTarget)velocity=shotVelocity(p,target,speed,dropFactor(w),muzzle);}
