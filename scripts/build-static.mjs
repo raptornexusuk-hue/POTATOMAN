@@ -15,6 +15,12 @@ for(const entry of await readdir('dist',{withFileTypes:true})){
  if(entry.name==='client')continue;
  if(entry.isDirectory()?entry.name==='assets':/\.(html|js|css)$/.test(entry.name))await cp(join('dist',entry.name),join(OUT,entry.name),{recursive:true,filter:src=>!SUPERSEDED.has(src.split('/').pop())});
 }
+// The API, for hosting that runs PHP and MySQL. It is inert until somebody creates config.php on
+// the server, so shipping it costs a static-only site four small files and nothing else; with it
+// filled in, the same web space that serves the game also keeps the leaderboard and runs the rooms.
+await mkdir(join(OUT,'api'),{recursive:true});
+for(const entry of await readdir('php',{withFileTypes:true}))if(entry.isFile()&&entry.name!=='config.php')await cp(join('php',entry.name),join(OUT,'api',entry.name));
+
 // Long-lived caching for the fingerprint-free asset folder would strand visitors on a stale build,
 // so assets are cached for a day and the code is revalidated every load.
 await writeFile(join(OUT,'.htaccess'),`# Potatoman — plain web hosting

@@ -1,1 +1,4 @@
 build/
+
+# The API config holds a database password. It is created on the server, never here.
+php/config.php

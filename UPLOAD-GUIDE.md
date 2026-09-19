@@ -13,20 +13,56 @@ This gives you the complete game: every world, every mode, solo against bots and
 split-screen on one device. There is no build step to run on the server and no Node runtime
 needed — the browser loads the game as ES modules straight from the files you uploaded.
 
-What plain hosting cannot do is run the small API the game uses for **online rooms** and for
-**shared high scores across devices**. The game detects that on its own the first time it tries:
-it asks for your name as usual, keeps that player and your best scores in the browser on that
-device, says so plainly, and carries on. Nothing is blocked and nothing errors.
+Uploaded on its own, this keeps each player's scores in their own browser on their own device.
+**Option A+ below turns on the shared leaderboard and online rooms using the same hosting** — an
+IONOS Web Hosting package runs PHP and MySQL, and that is all the API needs.
 
-You do not have to choose between the two. The game can stay on plain hosting and call a room and
-score server running somewhere else — see **Option C** below.
+If you skip that step, the game detects it on its own the first time it tries: it asks for your name
+as usual, keeps that player and your best scores in the browser on that device, says so plainly, and
+carries on. Nothing is blocked and nothing errors.
+
+## Option A+ — the same IONOS hosting, plus the leaderboard and online rooms
+
+The `api/` folder in `build/web/` is a complete PHP version of the service. It needs PHP 8 and one
+MySQL database, both of which an IONOS Web Hosting package includes. There is nothing to install and
+no second host to pay for.
+
+1. **Make a database.** In the IONOS control panel: *Hosting → Databases → New database* (MySQL).
+   When it is created the panel shows four things you need: the **host name** (something like
+   `db1234567890.hosting-data.io` — not `localhost`), the **database name**, the **user name** and
+   the **password** you chose.
+2. **Fill in the config.** In `api/`, copy `config.sample.php` to `config.php` and put those four
+   values in. Set `mail_from` to a mailbox on your own domain (e.g. `potatoman@yourdomain.com`);
+   confirmation emails are sent from it, and mail claiming to be from a domain you do not own is
+   thrown away by the receiving server.
+3. **Upload** the whole of `build/web/` as in Option A. The `api/` folder goes with it.
+4. **Open the game.** That is all — the tables are created the first time somebody registers. Choose
+   PLAYER DETAILS, enter a name and an email address, and click the link in the email.
+
+Only confirmed addresses appear on the board. Unconfirmed players still play and their scores are
+still kept; they just are not ranked, which is what stops one person filling the board with invented
+names.
+
+A few things worth knowing:
+
+- `api/.htaccess` routes the API and blocks `config.php` from being fetched over the web. If your
+  host is not Apache you will need the equivalent; on IONOS it works as shipped.
+- Online rooms are three players, each on their own device, each signed in as themselves. All three
+  players' scores are recorded, by their own browsers.
+- Local two-player split-screen records the score of the player who is signed in on that device.
+  Player two has no account there, so their score is not ranked.
+- Nothing about the PHP service is required. Leave `config.php` out and the files sit there inert;
+  the game behaves exactly as in Option A.
+
+You do not have to use it, either: the game can stay on plain hosting and call a room and score
+server running somewhere else — see **Option C** below.
 
 `build/web/.htaccess` is included for Apache-based hosting like IONOS webspace. It sets the media
 types for `.js` and `.mp3`, enables compression, caches images and audio for a day and revalidates
 the code on every load, so a re-upload reaches visitors immediately. Delete it if your host is not
 Apache.
 
-## Option B — Node hosting: adds online rooms and shared leaderboards
+## Option B — Node hosting: the same API, for hosts that run Node rather than PHP
 
 Your host needs a Node.js application service supporting **Node 22.13 or newer**, an HTTPS domain and a **persistent writable disk**. Ordinary PHP-only or static-only hosting cannot run this server.
 

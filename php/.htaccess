@@ -1,0 +1,14 @@
+# Everything under /api/ is handled by one script. The game asks for paths like /api/scores/save
+# that are not files on disk, so Apache is told to stop looking for them.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteRule ^ index.php [QSA,L]
+</IfModule>
+# config.php holds the database password. Nothing should ever be able to fetch it over the web.
+<Files "config.php">
+  Require all denied
+</Files>
+<Files "config.sample.php">
+  Require all denied
+</Files>
