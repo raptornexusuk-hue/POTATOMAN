@@ -58,9 +58,11 @@ export class World{
  async loadPBR(loader,timeoutMs){await Promise.all([['paving','cobblestone_floor_08','2k'],['oak','oak_veneer_02','1k']].map(async([key,name,size])=>{const loaded=await Promise.all(['diff','nor_gl','rough'].map(type=>new Promise(resolve=>{let done=false;const finish=t=>{if(done){t?.dispose();return;}done=true;clearTimeout(timer);resolve(t);};const timer=setTimeout(()=>finish(null),timeoutMs);try{loader.loadAsync('assets/'+name+'_'+type+'_'+size+'.jpg').then(finish,()=>finish(null));}catch{finish(null);}})));if(loaded.some(t=>!t)){loaded.forEach(t=>t?.dispose());this.materialFallbacks.push(key);return;}loaded.forEach((t,i)=>{t.wrapS=t.wrapT=T.RepeatWrapping;t.colorSpace=i===0?T.SRGBColorSpace:T.NoColorSpace;t.anisotropy=Math.min(8,this.renderer.capabilities.getMaxAnisotropy());});this.pbr[key]=loaded;}));}
  groundMaterial(size,night,tint=null){if(!this.pbr?.paving)return this.mat(tint??0xf0eee0,'stone');const key='ground:'+size+':'+night+':'+tint;if(!this.materials.has(key)){const maps=this.pbr.paving.map(t=>{const clone=t.clone();clone.repeat.set(size/2,size/2);return clone;});this.groundMaps??=[];this.groundMaps.push(...maps);this.materials.set(key,new T.MeshStandardMaterial({color:tint??(night?0xa7b8c1:0xe8e7db),map:maps[0],normalMap:maps[1],normalScale:new T.Vector2(.7,.7),roughnessMap:maps[2],roughness:night?.65:.95}));}return this.materials.get(key);}
 
- // `physical:true` asks for a clear-coated material — paint, varnish, glaze — rather than the plain
- // standard one. Asking for clearcoat without it silently does nothing but print a warning.
- mat(c,texture=null,opts={}){const key=c+':'+texture+':'+JSON.stringify(opts);if(!this.materials.has(key)){const projected=['stone','brick','hedge'].includes(texture);const {physical,...rest}=opts;const m=new (physical?T.MeshPhysicalMaterial:T.MeshStandardMaterial)({color:c,roughness:.8,...(texture?{map:this.textures[texture],bumpMap:this.textures[texture],bumpScale:projected?.13:.028}:{}),...rest});if(texture==='wood'&&this.pbr?.oak){m.map=this.pbr.oak[0];m.normalMap=this.pbr.oak[1];m.normalScale.set(.32,.32);m.roughnessMap=this.pbr.oak[2];m.bumpMap=null;}if(projected)applyWorldUV(m,texture==='brick'?.58:texture==='stone'?.40:.85);this.materials.set(key,m);}return this.materials.get(key);}
+ // Anything that only a physical material can do — a clear coat on paint, the sheen of wool, glass
+ // that bends light — builds a physical material. Asking for those on a standard one silently did
+ // nothing but print a warning, so the request itself is what decides now.
+ static PHYSICAL=['clearcoat','clearcoatRoughness','sheen','sheenColor','sheenRoughness','transmission','thickness','iridescence','specularIntensity'];
+ mat(c,texture=null,opts={}){const key=c+':'+texture+':'+JSON.stringify(opts);if(!this.materials.has(key)){const projected=['stone','brick','hedge'].includes(texture);const {physical,...rest}=opts,wants=physical||World.PHYSICAL.some(k=>k in rest);const m=new (wants?T.MeshPhysicalMaterial:T.MeshStandardMaterial)({color:c,roughness:.8,...(texture?{map:this.textures[texture],bumpMap:this.textures[texture],bumpScale:projected?.13:.028}:{}),...rest});if(texture==='wood'&&this.pbr?.oak){m.map=this.pbr.oak[0];m.normalMap=this.pbr.oak[1];m.normalScale.set(.32,.32);m.roughnessMap=this.pbr.oak[2];m.bumpMap=null;}if(projected)applyWorldUV(m,texture==='brick'?.58:texture==='stone'?.40:.85);this.materials.set(key,m);}return this.materials.get(key);}
  mesh(geo,mat,parent,x=0,y=0,z=0,sx=1,sy=1,sz=1){const m=new T.Mesh(geo==='sphere'&&Math.max(sx,sy,sz)<.2?this.geo.smallSphere:this.geo[geo]??geo,mat);m.position.set(x,y,z);m.scale.set(sx,sy,sz);m.castShadow=true;m.receiveShadow=true;parent.add(m);return m;}
  texture(type){const c=document.createElement('canvas');c.width=c.height=256;const ctx=c.getContext('2d'),r=rng(551+type.length);let base={skin:'#d3a565',brick:'#c1a48b',stone:'#b4b8b4',wood:'#dac088',hedge:'#719768'}[type];ctx.fillStyle=base;ctx.fillRect(0,0,256,256);
   for(let i=0;i<7000;i++){ctx.globalAlpha=r()*.23;ctx.fillStyle=r()>.5?'#fff':'#201d10';const x=r()*256,y=r()*256,s=r()*2.5+.4;ctx.fillRect(x,y,type==='wood'?s*20:s,s);}ctx.globalAlpha=1;
@@ -79,8 +81,10 @@ export class World{
 
  dispose(){this.characters.forEach(m=>m.label.dispose());this.root?.traverse(o=>{if(o.isInstancedMesh)o.dispose();if(o.isLight&&o.shadow)o.shadow.dispose();if(o.userData.ownGeometry)o.geometry.dispose();if(o.userData.ownMaterial)o.material.dispose();o.userData.ownTexture?.dispose();});Object.values(this.geo).forEach(g=>g.dispose());this.materials.forEach(m=>m.dispose());Object.values(this.textures).forEach(t=>t.dispose());Object.values(this.pbr??{}).flat().forEach(t=>t.dispose());this.groundMaps?.forEach(t=>t.dispose());this.environmentMaps?.forEach(t=>t.dispose());this.contactTexture?.dispose();this.renderer.dispose();}
  environment(night){if(!this.renderer.isWebGLRenderer)return;this.environmentMaps??=new Map();if(!this.environmentMaps.has(night)){
-  const c=document.createElement('canvas');c.width=512;c.height=256;const ctx=c.getContext('2d'),gradient=ctx.createLinearGradient(0,0,0,256);gradient.addColorStop(0,night?'#101d37':'#6ea3c5');gradient.addColorStop(.47,night?'#8492b0':'#e9d7b3');gradient.addColorStop(.53,night?'#353c42':'#998e74');gradient.addColorStop(1,'#30342e');ctx.fillStyle=gradient;ctx.fillRect(0,0,512,256);const glow=ctx.createRadialGradient(340,65,1,340,65,40);glow.addColorStop(0,'#ffffff');glow.addColorStop(.10,night?'#bbd4f5':'#fff3d2');glow.addColorStop(1,'#ffffff00');ctx.fillStyle=glow;ctx.fillRect(295,20,90,90);const texture=new T.CanvasTexture(c);texture.colorSpace=T.SRGBColorSpace;texture.mapping=T.EquirectangularReflectionMapping;this.environmentMaps.set(night,texture);
- }this.scene.environment=this.environmentMaps.get(night);this.scene.environmentIntensity=night?.4:.65;}
+  const c=document.createElement('canvas');c.width=512;c.height=256;const ctx=c.getContext('2d'),gradient=ctx.createLinearGradient(0,0,0,256);gradient.addColorStop(0,night?'#101d37':'#6ea3c5');gradient.addColorStop(.47,night?'#8492b0':'#e9d7b3');gradient.addColorStop(.53,night?'#353c42':'#998e74');gradient.addColorStop(1,'#30342e');ctx.fillStyle=gradient;ctx.fillRect(0,0,512,256);const glow=ctx.createRadialGradient(340,65,1,340,65,44);glow.addColorStop(0,'#ffffff');glow.addColorStop(.06,'#ffffff');glow.addColorStop(.16,night?'#c6dcfa':'#fff6dd');glow.addColorStop(1,'#ffffff00');ctx.fillStyle=glow;ctx.fillRect(291,16,98,98);const texture=new T.CanvasTexture(c);texture.colorSpace=T.SRGBColorSpace;texture.mapping=T.EquirectangularReflectionMapping;this.environmentMaps.set(night,texture);
+ }this.scene.environment=this.environmentMaps.get(night);
+  // Metal and clear coat need something to reflect. The sky this builds is all these worlds have.
+  this.scene.environmentIntensity=night?.58:.95;}
  resize(){this.w=innerWidth;this.h=innerHeight;this.renderer.setSize(this.w,this.h,false);}
  build(map,level,players,bonus){
   this.characters.forEach(m=>m.label.dispose());
@@ -288,13 +292,13 @@ export class World{
  headwear(kind,hat,skull,colour){
   if(kind==='cap'){
    // A flat cap: crown, a peak over the brow and a button on top.
-   const wool=this.mat(colour,'wood',{roughness:.95}),at=1.775,fit=skull(at);
+   const wool=this.mat(colour,'wood',{roughness:.95,sheen:.6,sheenRoughness:.75,sheenColor:0xffffff}),at=1.775,fit=skull(at);
    this.mesh(this.geo.sphere,wool,hat,0,at,-.01,fit.x*1.16,.20,fit.z*1.16);
    const peak=this.mesh(this.geo.sphere,wool,hat,0,at-.04,fit.z*1.05,fit.x*.82,.035,fit.z*.70);peak.rotation.x=-.14;
    this.mesh(this.geo.smallSphere,wool,hat,0,at+.19,-.01,.065,.05,.065);
   }else if(kind==='headscarf'){
    // A knotted headscarf, with the knot and both tails hanging off the back of the head.
-   const cloth=this.mat(colour,'wood',{roughness:.9}),at=1.74,fit=skull(at);
+   const cloth=this.mat(colour,'wood',{roughness:.9,sheen:.5,sheenRoughness:.7,sheenColor:0xffffff}),at=1.74,fit=skull(at);
    this.mesh(this.geo.sphere,cloth,hat,0,at,-.01,fit.x*1.14,.18,fit.z*1.14);
    this.mesh(this.geo.smallSphere,cloth,hat,fit.x*.55,at-.05,-fit.z*1.05,.10,.09,.10);
    for(const side of[-1,1]){const tail=this.mesh(this.geo.sphere,cloth,hat,fit.x*.55+side*.05,at-.19,-fit.z*1.18,.05,.14,.045);tail.rotation.x=.38;tail.rotation.z=side*.28;}
@@ -308,18 +312,18 @@ export class World{
    this.mesh('rounded',brass,hat,0,at+.02,fit.z*.86,fit.x*.5,.03,.045);
   }else if(kind==='bucket'){
    // A soft crown with an all-round brim that turns down towards the back.
-   const cloth=this.mat(colour,'wood',{roughness:.93}),at=1.80,fit=skull(at),brim=skull(1.70);
+   const cloth=this.mat(colour,'wood',{roughness:.93,sheen:.55,sheenRoughness:.75,sheenColor:0xffffff}),at=1.80,fit=skull(at),brim=skull(1.70);
    this.mesh(this.geo.sphere,cloth,hat,0,at-.03,-.01,fit.x*1.12,.19,fit.z*1.12);
    const ring=this.mesh('cylinder',cloth,hat,0,1.685,-.01,brim.x*1.62,.028,brim.z*1.62);ring.rotation.x=-.07;
   }else if(kind==='beanie'){
    // A knitted dome, a rolled band at the brow and a bobble on top.
-   const wool=this.mat(colour,'wood',{roughness:.98}),at=1.79,fit=skull(at),band=skull(1.68);
+   const wool=this.mat(colour,'wood',{roughness:.98,sheen:.75,sheenRoughness:.85,sheenColor:0xfff4e4}),at=1.79,fit=skull(at),band=skull(1.68);
    this.mesh(this.geo.sphere,wool,hat,0,at-.05,-.01,fit.x*1.13,.24,fit.z*1.13);
    this.mesh('cylinder',wool,hat,0,1.675,-.01,band.x*1.19,.075,band.z*1.19);
    this.mesh(this.geo.smallSphere,wool,hat,0,at+.20,-.01,.095,.09,.095);
   }else if(kind==='tophat'){
    // Absurd on a potato, which is the point. Straight sides, flat brim, ribbon at the base.
-   const felt=this.mat(colour,'wood',{roughness:.62}),ribbon=this.mat(0x1d1a17,null,{roughness:.5}),fit=skull(1.76);
+   const felt=this.mat(colour,'wood',{roughness:.62,sheen:.45,sheenRoughness:.5,sheenColor:0xffffff}),ribbon=this.mat(0x1d1a17,null,{roughness:.5}),fit=skull(1.76);
    this.mesh('cylinder',felt,hat,0,2.05,-.01,fit.x*.86,.20,fit.z*.96);
    this.mesh('cylinder',ribbon,hat,0,1.875,-.01,fit.x*.88,.035,fit.z*.98);
    this.mesh('cylinder',felt,hat,0,1.845,-.01,fit.x*1.42,.022,fit.z*1.52);
@@ -373,7 +377,7 @@ export class World{
  }
  neckwear(kind,group,skull,colour){
   if(kind==='none')return;
-  const at=1.16,fit=skull(at),cloth=this.mat(colour,'wood',{roughness:.95});
+  const at=1.16,fit=skull(at),cloth=this.mat(colour,'wood',{roughness:.95,sheen:.7,sheenRoughness:.8,sheenColor:0xfff6ea});
   if(kind==='scarf'){
    // Wool: three offset wraps with a ribbed edge, and two tails hanging down the front.
    for(let j=0;j<3;j++){const wrap=this.mesh('cylinder',cloth,group,0,at+.055-j*.055,0,fit.x*(1.06+j*.015),.062,fit.z*(1.11+j*.015));wrap.rotation.y=j*.22;}
@@ -487,7 +491,7 @@ export class World{
    leg.userData={thigh,shin,knee,foot};legs.push(leg);
   }
   const capeGeo=new T.PlaneGeometry(1.36,1.30,20,22),cp=capeGeo.attributes.position;for(let i=0;i<cp.count;i++){const y=cp.getY(i),t=(.65-y)/1.3;cp.setX(i,cp.getX(i)*(.47+t*.60));cp.setZ(i,Math.sin(cp.getX(i)*16)*.022*t);}capeGeo.computeVertexNormals();
-  const cape=new T.Mesh(capeGeo,this.mat(id===0?0xaa252c:colors[id],null,{side:T.DoubleSide,roughness:.72}));cape.position.set(0,1.00,-.38);cape.rotation.x=.22;cape.castShadow=true;cape.receiveShadow=true;cape.userData.ownGeometry=true;bob.add(cape);const capeBase=capeGeo.attributes.position.array.slice();
+  const cape=new T.Mesh(capeGeo,this.mat(id===0?0xaa252c:colors[id],null,{side:T.DoubleSide,roughness:.72,sheen:.85,sheenRoughness:.55,sheenColor:0xffe9d6}));cape.position.set(0,1.00,-.38);cape.rotation.x=.22;cape.castShadow=true;cape.receiveShadow=true;cape.userData.ownGeometry=true;bob.add(cape);const capeBase=capeGeo.attributes.position.array.slice();
   const clasp=this.mesh('sphere',this.mat(0xf0c865,null,{metalness:.75,roughness:.28}),bob,0,1.65,.28,.09,.055,.045);
   const badge=this.mesh(new T.TorusGeometry(.65,.018,8,48),this.mat(colors[id],null,{emissive:colors[id],emissiveIntensity:.35}),g,0,.035,0);badge.rotation.x=Math.PI/2;badge.userData.ownGeometry=true;
   const gun=makeSpudGun(this,g);

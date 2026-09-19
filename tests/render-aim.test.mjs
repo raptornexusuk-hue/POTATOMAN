@@ -73,6 +73,23 @@ console.log('PASS clear shoulder view, opaque bodies, close-cover clearance and 
 Object.assign(p,{weapon:'throw',shotAnim:0,runner:false,roundWins:2});w.updatePlayers(players,10,1/60);const ready=m.arms[0].userData.hand.position.clone();assert.equal(m.heldSpud.visible,true);assert.equal(m.gun.visible,false);assert.equal(m.cape.visible,false);assert.equal(m.crown.visible,false);
 p.shotAnim=.2;w.updatePlayers(players,10.14,1/60);assert.ok(m.arms[0].userData.hand.position.distanceTo(ready)>.1);assert.equal(m.heldSpud.visible,false);
 Object.assign(p,{runner:true,roundWins:3});w.updatePlayers(players,11,1/60);assert.equal(m.cape.visible,true);assert.equal(m.crown.visible,true);assert.ok(m.legs.every(l=>l.userData.foot.rotation.y*l.position.x>0),'both clog toes point outward');
+// Asking a standard material for a clear coat or a sheen used to do nothing but print a warning, so
+// the request is what decides which material gets built. Wool that reads as wool and paint that
+// reads as paint is most of what separates the kit from the photoreal potato wearing it.
+{
+ const cloth=w.mat(0x884422,null,{roughness:.9,sheen:.6,sheenRoughness:.7});
+ assert.equal(cloth.type,'MeshPhysicalMaterial','asking for sheen builds a material that has sheen');
+ assert.equal(cloth.sheen,.6);
+ const varnish=w.mat(0x884422,null,{roughness:.4,clearcoat:.7});
+ assert.equal(varnish.type,'MeshPhysicalMaterial');assert.equal(varnish.clearcoat,.7);
+ assert.equal(w.mat(0x884422,null,{roughness:.9}).type,'MeshStandardMaterial','and plain surfaces stay cheap');
+ let sheened=0;for(const piece of['cap','bucket','beanie','tophat','headscarf']){const hat=new T.Group();w.headwear(piece,hat,h=>({x:.6,z:.45}),0x884422);
+  hat.traverse(o=>{if(o.isMesh&&(o.material.sheen??0)>0)sheened++;});}
+ assert.ok(sheened>=5,`every soft piece of headgear is cloth rather than plastic: ${sheened}`);
+ const neck=new T.Group();w.neckwear('scarf',neck,()=>({x:.6,z:.45}),0x884422);
+ assert.ok([...neck.children].every(o=>(o.material.sheen??0)>0),'and so is the scarf');
+ assert.ok(w.scene.environmentIntensity>.8,'metal and clear coat have a sky to reflect');
+}
 // The crown is the reward for three round wins, so it has to look like one: bright metal, points
 // with finials, and stones in more than one colour rather than a plain hoop.
 {
