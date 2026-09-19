@@ -58,7 +58,9 @@ export class World{
  async loadPBR(loader,timeoutMs){await Promise.all([['paving','cobblestone_floor_08','2k'],['oak','oak_veneer_02','1k']].map(async([key,name,size])=>{const loaded=await Promise.all(['diff','nor_gl','rough'].map(type=>new Promise(resolve=>{let done=false;const finish=t=>{if(done){t?.dispose();return;}done=true;clearTimeout(timer);resolve(t);};const timer=setTimeout(()=>finish(null),timeoutMs);try{loader.loadAsync('assets/'+name+'_'+type+'_'+size+'.jpg').then(finish,()=>finish(null));}catch{finish(null);}})));if(loaded.some(t=>!t)){loaded.forEach(t=>t?.dispose());this.materialFallbacks.push(key);return;}loaded.forEach((t,i)=>{t.wrapS=t.wrapT=T.RepeatWrapping;t.colorSpace=i===0?T.SRGBColorSpace:T.NoColorSpace;t.anisotropy=Math.min(8,this.renderer.capabilities.getMaxAnisotropy());});this.pbr[key]=loaded;}));}
  groundMaterial(size,night,tint=null){if(!this.pbr?.paving)return this.mat(tint??0xf0eee0,'stone');const key='ground:'+size+':'+night+':'+tint;if(!this.materials.has(key)){const maps=this.pbr.paving.map(t=>{const clone=t.clone();clone.repeat.set(size/2,size/2);return clone;});this.groundMaps??=[];this.groundMaps.push(...maps);this.materials.set(key,new T.MeshStandardMaterial({color:tint??(night?0xa7b8c1:0xe8e7db),map:maps[0],normalMap:maps[1],normalScale:new T.Vector2(.7,.7),roughnessMap:maps[2],roughness:night?.65:.95}));}return this.materials.get(key);}
 
- mat(c,texture=null,opts={}){const key=c+':'+texture+':'+JSON.stringify(opts);if(!this.materials.has(key)){const projected=['stone','brick','hedge'].includes(texture);const m=new T.MeshStandardMaterial({color:c,roughness:.8,...(texture?{map:this.textures[texture],bumpMap:this.textures[texture],bumpScale:projected?.13:.028}:{}),...opts});if(texture==='wood'&&this.pbr?.oak){m.map=this.pbr.oak[0];m.normalMap=this.pbr.oak[1];m.normalScale.set(.32,.32);m.roughnessMap=this.pbr.oak[2];m.bumpMap=null;}if(projected)applyWorldUV(m,texture==='brick'?.58:texture==='stone'?.40:.85);this.materials.set(key,m);}return this.materials.get(key);}
+ // `physical:true` asks for a clear-coated material — paint, varnish, glaze — rather than the plain
+ // standard one. Asking for clearcoat without it silently does nothing but print a warning.
+ mat(c,texture=null,opts={}){const key=c+':'+texture+':'+JSON.stringify(opts);if(!this.materials.has(key)){const projected=['stone','brick','hedge'].includes(texture);const {physical,...rest}=opts;const m=new (physical?T.MeshPhysicalMaterial:T.MeshStandardMaterial)({color:c,roughness:.8,...(texture?{map:this.textures[texture],bumpMap:this.textures[texture],bumpScale:projected?.13:.028}:{}),...rest});if(texture==='wood'&&this.pbr?.oak){m.map=this.pbr.oak[0];m.normalMap=this.pbr.oak[1];m.normalScale.set(.32,.32);m.roughnessMap=this.pbr.oak[2];m.bumpMap=null;}if(projected)applyWorldUV(m,texture==='brick'?.58:texture==='stone'?.40:.85);this.materials.set(key,m);}return this.materials.get(key);}
  mesh(geo,mat,parent,x=0,y=0,z=0,sx=1,sy=1,sz=1){const m=new T.Mesh(geo==='sphere'&&Math.max(sx,sy,sz)<.2?this.geo.smallSphere:this.geo[geo]??geo,mat);m.position.set(x,y,z);m.scale.set(sx,sy,sz);m.castShadow=true;m.receiveShadow=true;parent.add(m);return m;}
  texture(type){const c=document.createElement('canvas');c.width=c.height=256;const ctx=c.getContext('2d'),r=rng(551+type.length);let base={skin:'#d3a565',brick:'#c1a48b',stone:'#b4b8b4',wood:'#dac088',hedge:'#719768'}[type];ctx.fillStyle=base;ctx.fillRect(0,0,256,256);
   for(let i=0;i<7000;i++){ctx.globalAlpha=r()*.23;ctx.fillStyle=r()>.5?'#fff':'#201d10';const x=r()*256,y=r()*256,s=r()*2.5+.4;ctx.fillRect(x,y,type==='wood'?s*20:s,s);}ctx.globalAlpha=1;
@@ -415,7 +417,7 @@ export class World{
   this.headwear(kit.head,hat,skull,tintColor(kit));this.eyewear(kit.eyes,kitGroup,skull,tintColor(kit));this.neckwear(kit.neck,kitGroup,skull,tintColor(kit));
   const arms=[],forearms=[],legs=[];
   for(const sign of[-1,1]){const arm=makeArm(this,g,limb,sign);arms.push(arm);forearms.push(arm.userData.lower);
-   const leg=new T.Group();leg.position.x=sign*.38;g.add(leg);const thigh=this.mesh('sphere',limb,leg,0,.69,0,.115,.22,.12),shin=this.mesh('sphere',limb,leg,0,.40,0,.125,.21,.135),knee=this.mesh('sphere',limb,leg,0,.53,.08,.13,.13,.13),foot=new T.Group();leg.add(foot);foot.position.y=.09;foot.rotation.y=sign*.32;foot.scale.set(.56,.76,.56);
+   const leg=new T.Group();leg.position.x=sign*.38;g.add(leg);const thigh=this.mesh('sphere',limb,leg,0,.69,0,.115,.22,.12),shin=this.mesh('sphere',limb,leg,0,.40,0,.125,.21,.135),knee=this.mesh('sphere',limb,leg,0,.53,.08,.13,.13,.13),foot=new T.Group();leg.add(foot);foot.position.y=.09;foot.rotation.y=sign*.32;foot.scale.set(.49,.70,.49);
    this.mesh('clog',wood,foot,0,0,.04,1.13,1,1.13);
    // The reshaped klomp sits a little taller, so opening and carving ride on one lifted trim group.
    const trim=new T.Group();trim.position.y=.028;foot.add(trim);
@@ -445,6 +447,15 @@ export class World{
    for(const side of[-1,1])carve([[0,.297,.33],[side*.055,.305,.355],[side*.075,.298,.40]],.0045);
    carve([[-.085,.295,.56],[0,.335,.615],[.085,.295,.56]],.008,inlay);
    this.mesh(this.geo.smallSphere,inlay,trim,0,.325,.50,.028,.020,.028);
+   // Painted work on the side walls, where a klomp actually carries it: a white band under the
+   // beading, a red heart on the outer wall and brass nail heads along the sole seam.
+   const paint=this.mat(0xfdf4e2,null,{physical:true,roughness:.42,clearcoat:.5,clearcoatRoughness:.3}),heartPaint=this.mat(0xc22b33,null,{physical:true,roughness:.36,clearcoat:.65,clearcoatRoughness:.2}),brass=this.mat(0xc79a3f,null,{metalness:.8,roughness:.3});
+   for(const side of[-1,1]){
+    carve([[side*.215,.075,-.13],[side*.225,.09,.22],[side*.135,.145,.60],[side*.02,.225,.80]],.010,paint);
+    for(const lobe of[-1,1])this.mesh(this.geo.smallSphere,heartPaint,trim,side*.198,.168+lobe*.020,.175+lobe*.032,.020,.030,.030);
+    this.mesh(this.geo.smallSphere,heartPaint,trim,side*.196,.130,.182,.017,.028,.028);
+    for(let j=0;j<3;j++)this.mesh(this.geo.smallSphere,brass,trim,side*(.212-j*.036),.042,-.14+j*.32,.014,.011,.014);
+   }
    leg.userData={thigh,shin,knee,foot};legs.push(leg);
   }
   const capeGeo=new T.PlaneGeometry(1.36,1.30,20,22),cp=capeGeo.attributes.position;for(let i=0;i<cp.count;i++){const y=cp.getY(i),t=(.65-y)/1.3;cp.setX(i,cp.getX(i)*(.47+t*.60));cp.setZ(i,Math.sin(cp.getX(i)*16)*.022*t);}capeGeo.computeVertexNormals();
@@ -453,7 +464,21 @@ export class World{
   const badge=this.mesh(new T.TorusGeometry(.65,.018,8,48),this.mat(colors[id],null,{emissive:colors[id],emissiveIntensity:.35}),g,0,.035,0);badge.rotation.x=Math.PI/2;badge.userData.ownGeometry=true;
   const gun=makeSpudGun(this,g);
   const heldSpud=this.mesh('potato',skin,g,0,0,0,.17,.19,.17);
-  const crown=new T.Group();crown.position.set(0,1.95,0);bob.add(crown);const gold=this.mat(0xffd365,null,{metalness:.85,roughness:.25});const band=this.mesh(new T.CylinderGeometry(.38,.35,.16,32,1,true),gold,crown,0,.02,0);band.userData.ownGeometry=true;for(let j=0;j<5;j++){const a=j*Math.PI*2/5;const point=this.mesh(new T.ConeGeometry(.10,.31,8),gold,crown,Math.sin(a)*.32,.23,Math.cos(a)*.32);point.userData.ownGeometry=true;this.mesh('sphere',this.mat(0xb52737,null,{metalness:.3,roughness:.18}),crown,Math.sin(a)*.37,.04,Math.cos(a)*.37,.045,.055,.03);}crown.visible=false;
+  // A crown worth three round wins: a rimmed band, eight tapered points with ball finials, and
+  // faceted stones set round it in three colours. Nothing here is post-processed, so the gold is
+  // bright metal with a warm emissive floor and the stones glow a little on their own.
+  const crown=new T.Group();crown.position.set(0,1.95,0);bob.add(crown);
+  const gold=this.mat(0xffd84a,null,{metalness:.96,roughness:.13,emissive:0x6d4d00,emissiveIntensity:.34}),bright=this.mat(0xfff0a6,null,{metalness:.92,roughness:.09,emissive:0x7d5e08,emissiveIntensity:.42});
+  const own=mesh=>{mesh.userData.ownGeometry=true;return mesh;};
+  own(this.mesh(new T.CylinderGeometry(.375,.35,.17,36,1,true),gold,crown,0,.02,0));
+  for(const [y,radius]of[[-.065,.355],[.105,.378]]){const hoop=own(this.mesh(new T.TorusGeometry(radius,.026,10,36),bright,crown,0,y,0));hoop.rotation.x=Math.PI/2;}
+  const stones=[this.mat(0xd5203a,null,{metalness:.35,roughness:.06,emissive:0x5c0713,emissiveIntensity:.5}),this.mat(0x1f9d63,null,{metalness:.35,roughness:.06,emissive:0x05341f,emissiveIntensity:.5}),this.mat(0x2f6fd0,null,{metalness:.35,roughness:.06,emissive:0x061f47,emissiveIntensity:.5})];
+  for(let j=0;j<8;j++){const a=j*Math.PI*2/8,sin=Math.sin(a),cos=Math.cos(a);
+   const point=own(this.mesh(new T.ConeGeometry(.072,.34,6),gold,crown,sin*.335,.27,cos*.335));point.rotation.set(cos*.12,0,-sin*.12);
+   own(this.mesh(this.geo.smallSphere,bright,crown,sin*.335,.45,cos*.335,.052,.052,.052));
+   const gem=own(this.mesh(new T.OctahedronGeometry(.055,0),stones[j%3],crown,sin*.385,.02,cos*.385));gem.rotation.y=a;gem.scale.set(1,1.25,.55);
+   own(this.mesh(new T.TorusGeometry(.052,.013,6,12),bright,crown,sin*.372,.02,cos*.372)).lookAt(sin*2,.02,cos*2);}
+  crown.visible=false;
   const label=new PlayerLabel(colors[id]);this.root.add(label.sprite);
   const fadeMaterials=[];g.traverse(o=>{if(o.isMesh){o.material=o.material.clone();o.material.transparent=false;o.userData.ownMaterial=true;fadeMaterials.push(o.material);}});
   return{g,shadow,label,fadeMaterials,crouchBlend:0,bob,hat,kit:kitGroup,arms,forearms,legs,cape,capeBase,clasp,crown,heldSpud,gun,eyes,brows,cheeks,pupils,lids,smile,mouth,lip,hurt:0,joy:0,gaze:0,lastHP:null,stride:0,walk:0,lastX:null,lastZ:null,blinkAt:2.5+id*.7};

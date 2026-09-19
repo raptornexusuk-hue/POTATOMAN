@@ -42,6 +42,17 @@ for(let f=0;f<120;f++){p.x+=.1;w.updatePlayers(players,5+f/60,1/60);w.root.updat
 assert.ok((m.stride-stride)/(Math.PI*4)>4.5&&(m.stride-stride)/(Math.PI*4)<5.2,'running gait stays between 4.5 and 5.2 cycles/second');
 assert.ok(slip/steps<.025,`planted foot must grip the ground rather than skate: ${(slip/steps/.1*100).toFixed(0)}% of body travel`);
 assert.ok(lift<.18,'foot lift stays restrained');
+// The klomp is the one thing every Potatoman has in common, so it stays yellow and unpainted-over;
+// what it carries is painted decoration in more than one colour, and it stays small enough to be a
+// clog rather than a boat.
+{
+ const foot=m.legs[0].userData.foot,shoe=foot.children[0];shoe.geometry.computeBoundingBox();
+ const size=shoe.geometry.boundingBox.getSize(new T.Vector3()).multiply(shoe.scale).multiply(foot.scale);
+ assert.ok(size.z<.80&&size.x<.32,`a klomp is a shoe, not a punt: ${size.toArray().map(v=>v.toFixed(2)).join('x')}`);
+ const painted=new Set();foot.traverse(o=>{if(o.isMesh&&o!==shoe)painted.add(o.material.color.getHex());});
+ assert.ok(painted.size>=5,`decorated in ${painted.size} colours`);
+ assert.ok([...painted].some(c=>c===0xfdf4e2)&&[...painted].some(c=>c===0xc22b33),'white banding and a red heart are the klomp motif');
+}
 const shoe=m.legs[0].userData.foot.children[0];assert.equal(shoe.material.color.getHex(),0xffc522);assert.equal(shoe.material.map,null);const pos=shoe.geometry.attributes.position;let midWidth=0,tipWidth=0,tipTop=0;for(let i=0;i<pos.count;i++){const x=Math.abs(pos.getX(i)),z=pos.getZ(i);if(z>.3&&z<.45)midWidth=Math.max(midWidth,x);if(z>.75){tipWidth=Math.max(tipWidth,x);tipTop=Math.max(tipTop,pos.getY(i));}}assert.ok(tipWidth<midWidth*.65);assert.ok(tipTop>.3);
 console.log('PASS lively gait, restrained foot lift and bright yellow upturned pointed clogs');
 
@@ -62,7 +73,17 @@ console.log('PASS clear shoulder view, opaque bodies, close-cover clearance and 
 Object.assign(p,{weapon:'throw',shotAnim:0,runner:false,roundWins:2});w.updatePlayers(players,10,1/60);const ready=m.arms[0].userData.hand.position.clone();assert.equal(m.heldSpud.visible,true);assert.equal(m.gun.visible,false);assert.equal(m.cape.visible,false);assert.equal(m.crown.visible,false);
 p.shotAnim=.2;w.updatePlayers(players,10.14,1/60);assert.ok(m.arms[0].userData.hand.position.distanceTo(ready)>.1);assert.equal(m.heldSpud.visible,false);
 Object.assign(p,{runner:true,roundWins:3});w.updatePlayers(players,11,1/60);assert.equal(m.cape.visible,true);assert.equal(m.crown.visible,true);assert.ok(m.legs.every(l=>l.userData.foot.rotation.y*l.position.x>0),'both clog toes point outward');
-console.log('PASS hand throwing motion, weapon visibility, Potatoman cape, three-win crown and outward clog toes');
+// The crown is the reward for three round wins, so it has to look like one: bright metal, points
+// with finials, and stones in more than one colour rather than a plain hoop.
+{
+ let metal=0,polish=1,stones=new Set(),parts=0;
+ m.crown.traverse(o=>{if(!o.isMesh)return;parts++;metal=Math.max(metal,o.material.metalness??0);polish=Math.min(polish,o.material.roughness??1);
+  if((o.material.emissiveIntensity??0)>.45)stones.add(o.material.color.getHex());});
+ assert.ok(parts>=24,`a jewelled crown is more than a band and five spikes: ${parts} pieces`);
+ assert.ok(metal>.9&&polish<.15,`and it is bright gold: metalness ${metal}, roughness ${polish}`);
+ assert.ok(stones.size>=3,`set with stones in ${stones.size} colours`);
+}
+console.log('PASS hand throwing motion, weapon visibility, Potatoman cape, three-win jewelled crown and outward decorated clogs');
 
 // Regression: the sight must remain clear of the actual hands, arms, weapons and torso.
 const isDrawn=object=>{for(let o=object;o;o=o.parent)if(!o.visible)return false;return true;};
