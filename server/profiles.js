@@ -4,13 +4,13 @@ const number=(v,min,max)=>Number.isInteger(v)&&v>=min&&v<=max;
 // Level index -> maze grid size, for the ranked escape boards. The server cannot import the game's
 // level table, so this is checked against it by tests/profiles.test.mjs; a maze added to the game
 // without a line here fails that test rather than silently rejecting every time players set on it.
-export const MAZE_LEVELS={1:15,4:19,7:21,11:23,14:25,19:27};
+export const MAZE_LEVELS={1:15,4:19,7:21,12:23,15:25,20:27};
 // Everything the server bounds about a circuit follows from how many levels there are: the highest
 // level a run may start on, how many rounds it may report, and the most circuit points a player can
 // come away with (three for winning each main round, one for each hunt between them). These were
 // written out as 9, 10 and 39 for a ten-level circuit and quietly rejected every save once the
 // circuit grew. tests/profiles.test.mjs checks LEVEL_COUNT against the game's level list.
-export const LEVEL_COUNT=21;
+export const LEVEL_COUNT=22;
 const MAX_TOTAL=LEVEL_COUNT*3+(LEVEL_COUNT-1);
 const isMaze=level=>Object.hasOwn(MAZE_LEVELS,level);
 export async function profileAPI(path,body,db){if(!path.startsWith('/api/player/')&&!path.startsWith('/api/scores/'))return null;

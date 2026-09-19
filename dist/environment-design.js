@@ -153,6 +153,21 @@ export function dressWorld(w,map,level,night,r){
    for(let i=0;i<4;i++){const barrel=w.mesh('cylinder',w.mat(0x7a4f2c,'wood'),root,side*(half+2.4),.42,(i-1.5)*1.5,.36,.85,.36);}
   }
   plaque('CIDER ORCHARD',0,3.4,-half-3.4,5);
+ }else if(family==='polder'){
+  // Flat reclaimed land under a big sky: a working mill on the seaward bank, drainage ditches
+  // running out to the horizon, and the water sitting higher than the ground you are standing on.
+  w.scene.fog.color.set(0xc6d3cf);box(w.mat(0x88a066),0,-.12,0,half*2+60,.10,half*2+60);
+  for(const side of[-1,1]){box(w.mat(0x6d5a3e,'stone'),side*(half+3.2),.55,0,3.4,1.1,half*2+8);box(w.mat(0x7c9a52,'hedge'),side*(half+3.2),1.12,0,3.1,.14,half*2+7);}
+  for(const side of[-1,1])for(const z of slots(6,5))box(w.mat(0x4f7d86,null,{metalness:.25,roughness:.25}),side*(half+12),-.06,z,5,.06,(half*2-10)/6);
+  const mx=-half-13,mz=-half-11,stoneMat=w.mat(0x8d7f6a,'stone');
+  w.mesh('cylinder',stoneMat,root,mx,5.4,mz,3.1,10.8,3.1);
+  w.mesh('cylinder',w.mat(0x4a3b2c,'wood'),root,mx,11.3,mz,3.4,1.4,3.4);
+  w.mesh(new T.ConeGeometry(3.6,3.4,16),w.mat(0x5a4b38),root,mx,13.1,mz).userData.ownGeometry=true;
+  for(let arm=0;arm<4;arm++){const sail=new T.Group();sail.position.set(mx,10.4,mz+3.2);sail.rotation.z=arm*Math.PI/2+.35;root.add(sail);
+   w.mesh('rounded',wood,sail,0,4.2,0,.26,8.4,.18);
+   for(let j=0;j<9;j++)w.mesh('rounded',w.mat(0xe0d6b4),sail,.75,1.3+j*.8,0,1.7,.11,.05);}
+  for(const side of[-1,1])for(let i=0;i<4;i++)box(w.mat(0x4a3a28,'stone'),side*(half+7),.5+i*.02,(i-1.5)*3.4,1.8,1.0,2.4);
+  plaque('BENEDEN ZEENIVEAU',0,3.2,-half-3.4,6);
  }else{
   fence(half+1.2);fence(-half-1.2);
   for(const side of[-1,1]){box(w.mat(0x67553b,'stone'),side*(half+9),-.025,0,12,.10,half*2-4);const field=w.mat(0x8d9b4f);for(const z of slots(12,3))box(field,side*(half+9),.10,z,12,.20,(half*2-6)/11*.55);for(const [i,x]of slots(3,7).entries()){const z=side*(half+7);if(side===-1&&i===1)backdrop(x,z,8,6,6);else{const g=barn(w,{x,z,w:8,d:6,h:4.5});g.userData.backdrop=true;}box(stone,x,.015,side*(half+2.8),4,.06,3.2);}}
@@ -242,6 +257,32 @@ export function dressWorld(w,map,level,night,r){
     }
     for(const corner of[-1,1])for(const end of[-1,1])box(trim,prop.x+(alongX?end*prop.w/2:corner*prop.w/2),y,prop.z+(alongX?corner*prop.d/2:end*prop.d/2),.14,2.46,.14);
    }
+  }
+  else if(prop.prop==='dyke'){
+   // An earth bank: stone facing to the weather side, packed clay core and a grassed top you run
+   // along. Low enough to jump onto, which is the whole point of the polder.
+   const alongX=prop.w>prop.d,clay=w.mat(0x6d5a3e,'stone',{roughness:.95}),grass=w.mat(0x7c9a52,'hedge',{roughness:.92}),facing=w.mat(0xa9a89a,'stone',{roughness:.88});
+   box(clay,prop.x,prop.h*.45,prop.z,prop.w,prop.h*.9,prop.d);
+   box(grass,prop.x,prop.h-.06,prop.z,prop.w*.94,.16,prop.d*.94);
+   for(const side of[-1,1])box(facing,prop.x+(alongX?0:side*prop.w/2),prop.h*.38,prop.z+(alongX?side*prop.d/2:0),alongX?prop.w:.10,prop.h*.76,alongX?.10:prop.d);
+   for(let i=0;i<3;i++){const t=(i-1)*(alongX?prop.w:prop.d)*.3;w.mesh('cylinder',wood,root,prop.x+(alongX?t:prop.w*.32),prop.h+.22,prop.z+(alongX?prop.d*.32:t),.05,.5,.05);}
+  }
+  else if(prop.prop==='sluice'){
+   // A gate in the bank: two posts, a cross beam, a paddle board and the winding gear over it.
+   const iron2=w.mat(0x4c5359,null,{metalness:.7,roughness:.38}),board=w.mat(0x6a4f30,'wood',{roughness:.86});
+   for(const side of[-1,1])box(wood,prop.x+side*(prop.w/2-.14),prop.h/2,prop.z,.26,prop.h,.30);
+   box(wood,prop.x,prop.h-.16,prop.z,prop.w,.28,.34);
+   box(board,prop.x,prop.h*.36,prop.z,prop.w-.5,prop.h*.7,.14);
+   w.mesh('cylinder',iron2,root,prop.x,prop.h+.20,prop.z,.07,.55,.07);
+   const wheel=w.mesh(new T.TorusGeometry(.26,.035,8,18),iron2,root,prop.x,prop.h+.46,prop.z);wheel.userData.ownGeometry=true;
+   for(let j=0;j<4;j++){const a=j*Math.PI/2;box(iron2,prop.x+Math.cos(a)*.13,prop.h+.46,prop.z+Math.sin(a)*.13,.28,.035,.035);}
+  }
+  else if(prop.prop==='peat'){
+   // Cut turves stacked to dry: courses laid crosswise so air runs through the middle.
+   const turf=w.mat(0x4a3a28,'stone',{roughness:.98});
+   for(let level=0;level<4;level++){const across=level%2===0;
+    for(let j=0;j<3;j++){const t=(j-1)*.62;box(turf,prop.x+(across?t:0),.17+level*.30,prop.z+(across?0:t),across?.56:1.9,.28,across?1.9:.56);}}
+   box(w.mat(0x6f5b3d,'wood'),prop.x,.04,prop.z,2.2,.08,2.2);
   }
   else if(prop.prop==='groyne'){
    // A timber breakwater: posts sunk into the sand with weathered boards bolted across them.

@@ -4,12 +4,13 @@ import {LEVELS,roundLevel,circuitLevels,makeMap,route,slideMove} from '../dist/c
 import {lastPlaceLine,awardRoundWins} from '../dist/progression.js';
 import {preferredVoice,GameAudio} from '../dist/game-audio.js';
 
-assert.equal(MAPS.length,9);assert.equal(new Set(LEVELS.map(mapId)).size,9);
+// Every world in the catalogue is visited by the circuit, and every level belongs to one.
+assert.ok(MAPS.length>=9);assert.equal(new Set(LEVELS.map(mapId)).size,MAPS.length);
 for(const previous of MAPS.map(m=>m.id))for(let trial=0;trial<100;trial++){
  const seed=nextCircuitSeed(previous,trial*973,seed=>roundLevel(0,seed));
  assert.notEqual(mapId(roundLevel(0,seed)),previous);
  const circuit=circuitLevels(seed);assert.equal(new Set(circuit).size,LEVELS.length);assert.equal(circuit.at(-1),LEVELS.length-1);
- assert.equal(new Set(circuit.map(i=>mapId(LEVELS[i]))).size,9);
+ assert.equal(new Set(circuit.map(i=>mapId(LEVELS[i]))).size,MAPS.length);
 }
 // The shape of the circuit, rather than the levels in it: consecutive rounds have to be a change of
 // place and a change of job, the mazes have to arrive in order of size because that is the ramp a
@@ -93,7 +94,7 @@ for(const i of LEVELS.map((l,i)=>i).filter(i=>!['race','assault'].includes(LEVEL
  const boxes=map.props.filter(p=>p.prop==='container').length;
  if(boxes>3)assert.ok(boxes>=rows.size*1.5,`containers are scattered across ${rows.size} lines rather than laid in rows: ${boxes} boxes`);
 }
-console.log('PASS nine world families, every round, 600 non-repeating openings, authored routes and colliders, walkable arenas and containers in rows');
+console.log(`PASS ${MAPS.length} world families, every round, 600 non-repeating openings, authored routes and colliders, walkable arenas and containers in rows`);
 
 const players=[{id:0,name:'MACCA',score:0,best:Infinity},{id:1,name:'JAMIE',score:8,best:40},{id:2,name:'SAM',score:4,best:70}];
 for(let i=0;i<10;i++){assert.ok(lastPlaceLine(players,false,i).includes('MACCA'));assert.ok(lastPlaceLine(players,true,i).includes('MACCA'));}

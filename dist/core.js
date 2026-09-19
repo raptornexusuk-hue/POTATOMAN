@@ -20,6 +20,7 @@ export const LEVELS=[
  {name:'Quarry Quarrel',tag:'CHALK QUARRY • OVERCAST',mode:'battle',size:19,theme:'quarry',seed:157,detail:'Fight across the cutting floor. Stone blocks give cover; the gantry lane is the fast flank.',skill:'Use hard cover'},
  {name:'The Butter Run',tag:'HARBOUR ASSAULT COURSE • SUNSET',mode:'assault',size:21,theme:'course',seed:114,detail:'Jump onto each numbered platform, duck through the three low gates, then reach the exit. Fastest completed run wins.',skill:'Jump · land · keep momentum'},
  {name:'Butterscotch Bay',tag:'BEACH • MIDDAY',mode:'battle',size:17,theme:'beach',seed:77,detail:'Fight across open sand between timber groynes and beach huts. The tide takes anyone who backs up too far.',skill:'Use what little cover there is'},
+ {name:'Below Sea Level',tag:'WINDMILL POLDER • BREEZY',mode:'capture',size:19,theme:'polder',seed:233,detail:'Reclaimed flats with raised dykes to run along, sluice gates in the gaps and stacked peat for cover. Hold the zone from the top of a bank if you can hold the bank.',skill:'Take the high ground, then keep it'},
  {name:'The Midnight Maze',tag:'OLD TOWN • NIGHT',mode:'race',size:23,theme:'night',seed:129,detail:'Twisting brick alleys and longer routes. Fastest complete escape wins.',skill:'Navigate under pressure'},
  {name:'Orchard Ambush',tag:'CIDER ORCHARD • GOLDEN HOUR',mode:'capture',size:21,theme:'orchard',seed:194,detail:'Hold the pressing yard while rivals close in through the fruit rows.',skill:'Hold and rotate'},
  {name:'Stone Cold Smash',tag:'CUTTING FLOOR • AFTERNOON',mode:'smash',size:19,theme:'pit',seed:181,detail:'Break the marked blocks stacked around the cutting floor before your rivals do.',skill:'Pick your target'},
@@ -66,7 +67,10 @@ export function makeMap(level,bonus=false){
   else if(level.theme==='shop'){for(let z=4;z<n-4;z+=3)for(let x=3;x<n-3;x++)if(x%6!==0&&x%6!==1)put(x,z);}
   else if(level.theme==='fair'){for(const [dx,dz]of[[-4,-4],[0,-4],[4,-4],[-4,0],[4,0],[-4,4],[0,4],[4,4]]){put(m+dx,m+dz);if(dx)put(m+dx,m+dz+1);}}
   else for(let z=3;z<n-3;z+=3)for(let x=3;x<n-3;x+=3)if(r()<.76){put(x,z);if(r()<.5)put(x+1,z);}
-  if(level.remix&&!bonus&&level.mode!=='assault'&&!['market','canal','garden'].includes(level.theme))for(let k=0;k<n/2;k++){const x=3+Math.floor(r()*(n-6)),z=3+Math.floor(r()*(n-6));put(x,z);}
+  // A remixed circuit used to scatter extra blocks through this grid. On a combat map the grid is
+  // wiped again below and rebuilt from authored props, so the scatter never reached the arena; on
+  // the tower it was not wiped, and dropping blocks at random around the foot of a climb is how a
+  // remixed finale ended up walling its own climbers in on their spawn.
   const mid=Math.floor(n/2);for(let i=1;i<n-1;i++){grid[mid][i]=0;grid[i][mid]=0;}
  }
  if(level.mode!=='race'||bonus)for(const [cx,cz]of[[2,2],[n-3,n-3],[n-3,2],[2,n-3]])for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++)grid[cz+dz][cx+dx]=0;
@@ -130,6 +134,16 @@ export function makeMap(level,bonus=false){
      if(gx>1&&gz>1&&gx<n-2&&gz<n-2)addProp(gx,gz,'groyne',1.15,alongZ?.7:CELL*.94,alongZ?CELL*.94:.7);}});
    for(const [x,z]of[[mid-3,mid],[mid+3,mid],[mid,mid-3],[mid,mid+3]])addProp(x,z,'beachHut',2.5,2.6);
    for(const [x,z]of[[mid-2,mid-2],[mid+2,mid+2],[mid-2,mid+2],[mid+2,mid-2]])addProp(x,z,'rock',1.35,2.2,2,{});
+   for(let x=3;x<n-3;x++){grid[1][x]=2;waterCells.push(toWorld(x,1));}
+  }
+  else if(family==='polder'){
+   // Land below the water line. Raised dykes you jump onto and run along, sluice gates standing in
+   // the gaps between them and stacked peat for cover: the fight here is about height rather than
+   // corners, which no other world on the circuit asks for.
+   spin(3,mid-2,(x,z,k)=>{const [dx,dz]=TURNS[k];
+    for(let i=0;i<5;i++){const cx=x+dx*i,cz=z+dz*i;if(cx>1&&cz>1&&cx<n-2&&cz<n-2&&grid[cz][cx]===0)addProp(cx,cz,'dyke',1.15,dx?CELL:1.6,dz?CELL:1.6);}});
+   spin(mid,3,(x,z)=>{if(grid[z]?.[x]===0)addProp(x,z,'sluice',2.4,2.7,1.15);});
+   spin(mid-3,mid-3,(x,z)=>{if(grid[z]?.[x]===0)addProp(x,z,'peat',1.35,2.3);});
    for(let x=3;x<n-3;x++){grid[1][x]=2;waterCells.push(toWorld(x,1));}
   }
   else if(family==='interior'){
@@ -209,7 +223,7 @@ export function makeMap(level,bonus=false){
  const walls=[...buildings,...props.filter(p=>!p.open),...hollow];let cover=0;for(let z=0;z<n;z++)for(let x=0;x<n;x++)if(grid[z][x]===1){const p=toWorld(x,z);if(claimed.has(x+','+z))continue;if(fountain&&p.x===fountain.x&&p.z===fountain.z){walls.push(fountain);continue;}if(buildings.some(b=>Math.abs(p.x-b.x)<b.w/2&&Math.abs(p.z-b.z)<b.d/2))continue;const interior=x>1&&x<n-2&&z>1&&z<n-2,w={...p,w:CELL,d:CELL,h:2.65};
   // The seaward edge of a beach is a low sea wall, not a boundary you cannot see over. It still
   // stops bodies; it just does not wall the bay off from its own sea.
-  if(family==='coast'&&z===0)w.h=.42;if(interior&&!isTrial(level)&&!bonus&&!['garden','market','canal','factory','cannery','shipment','gantry','beach'].includes(level.theme)){w.h=1.65;if(cover++%3===0)Object.assign(w,{prop:'bin',w:1.1,d:1.1,h:1.45});}else if(interior&&family==='estate')w.h=1.8;walls.push(w);}
+  if((family==='coast'||family==='polder')&&z===0)w.h=.42;if(interior&&!isTrial(level)&&!bonus&&!['garden','market','canal','factory','cannery','shipment','gantry','beach'].includes(level.theme)){w.h=1.65;if(cover++%3===0)Object.assign(w,{prop:'bin',w:1.1,d:1.1,h:1.45});}else if(interior&&family==='estate')w.h=1.8;walls.push(w);}
  // The visible bridge handrails block bodies, while shots can pass underneath.
  // Handrails belong to the harbour's three bridges. Any map with water at all used to get them,
  // which put invisible rails across the beach where there is no bridge to hold.
