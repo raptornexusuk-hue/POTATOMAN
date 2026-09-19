@@ -96,14 +96,13 @@ function renderBindings(){
  $('padBindings').innerHTML=`<table class="binding-table"><thead><tr><th>Action</th><th>Player 1</th><th>Player 2</th></tr></thead><tbody>${PAD_ACTIONS.map(([a,label])=>`<tr><td>${label}</td>${[0,1].map(i=>`<td><select data-pad-player="${i}" data-pad-action="${a}" aria-label="Player ${i+1} controller ${label}">${PAD_BUTTONS.map(([v,l])=>`<option value="${v}" ${settings.pad[i][a]===v?'selected':''}>${l}</option>`).join('')}</select></td>`).join('')}</tr>`).join('')}</tbody></table>`;
 }
 function cameraValues(){$('fovValue').textContent=settings.fov+'°';$('zoomValue').textContent=Number(settings.zoom).toFixed(1)+'m';}
-function renderSettings(){cameraValues();$('mouseFire').value=settings.mouse.fire;for(const id of['quality','sensitivity','panSensitivity','difficulty','musicVolume','voiceVolume','fov','zoom'])$(id).value=settings[id];for(const id of['sound','voice','music','invertY','trail'])$(id).checked=settings[id];$('roundMinutes').value=settings.roundSeconds/60;renderBindings();renderVoices();refreshDifficulty();refreshDuration();}
-function openSettings(){releaseMouse();bindingCapture=null;clearInput();// The circuit's own size, rather than a number typed into the page that goes stale the moment a
-// world or a round is added.
-{const words=["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen", "Twenty", "Twenty-one", "Twenty-two", "Twenty-three", "Twenty-four", "Twenty-five"];
- const spell=n=>words[n]??String(n);
- $('circuitCount').textContent=`${MAPS.length} / ${LEVELS.length}`;
- $('introCounts').textContent=`${spell(MAPS.length)} worlds. ${spell(LEVELS.length)} rounds. ${spell(Object.keys(WEAPONS).length)} weapons.`;}
-renderSettings();dialog('settingsDialog');}
+// The circuit's own size, rather than numbers typed into the page that go stale the moment a world,
+// a round or a weapon is added. The menu shows them before anything has been opened, so they are set
+// from renderSettings, which also runs once at startup.
+const NUMBER_WORDS='Zero One Two Three Four Five Six Seven Eight Nine Ten Eleven Twelve Thirteen Fourteen Fifteen Sixteen Seventeen Eighteen Nineteen Twenty Twenty-one Twenty-two Twenty-three Twenty-four Twenty-five'.split(' ');
+function refreshCounts(){const spell=n=>NUMBER_WORDS[n]??String(n);$('circuitCount').textContent=`${MAPS.length} / ${LEVELS.length}`;$('introCounts').textContent=`${spell(MAPS.length)} worlds. ${spell(LEVELS.length)} rounds. ${spell(Object.keys(WEAPONS).length)} weapons.`;}
+function renderSettings(){refreshCounts();cameraValues();$('mouseFire').value=settings.mouse.fire;for(const id of['quality','sensitivity','panSensitivity','difficulty','musicVolume','voiceVolume','fov','zoom'])$(id).value=settings[id];for(const id of['sound','voice','music','invertY','trail'])$(id).checked=settings[id];$('roundMinutes').value=settings.roundSeconds/60;renderBindings();renderVoices();refreshDifficulty();refreshDuration();}
+function openSettings(){releaseMouse();bindingCapture=null;clearInput();renderSettings();dialog('settingsDialog');}
 function closeSettings(){musicPreviewUntil=0;syncAudio();bindingCapture=null;clearInput();$('settingsDialog').close();if(paused)$('resume').focus();}
 $('pauseSettings').onclick=openSettings;$('doneSettings').onclick=closeSettings;$('settingsDialog').addEventListener('cancel',e=>{e.preventDefault();if(bindingCapture){bindingCapture=null;renderBindings();$('bindingStatus').textContent='Rebinding cancelled.';}else closeSettings();});
 $('keyboardBindings').onclick=e=>{const b=e.target.closest('[data-action]');if(!b)return;renderBindings();bindingCapture={player:+b.dataset.player,action:b.dataset.action};const current=document.querySelector(`[data-player="${bindingCapture.player}"][data-action="${bindingCapture.action}"]`);current?.classList.add('capturing');if(current)current.textContent='Press a key…';$('bindingStatus').textContent='Press a replacement key, or Escape to cancel.';};

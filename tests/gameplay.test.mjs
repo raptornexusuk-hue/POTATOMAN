@@ -20,6 +20,18 @@ const dt=1/120;
 // Levels are addressed by mode, not by index, so adding maps to the circuit cannot silently
 // re-point a test at a different round.
 const levelOf=mode=>LEVELS.findIndex(l=>l.mode===mode);
+// The menu names how many worlds, rounds and weapons there are before anything has been opened, so
+// those numbers come from the tables rather than from copy typed into the page that goes stale the
+// next time a world is added.
+{const {MAPS}=await import('../dist/map-catalogue.js'),{WEAPONS:ROSTER}=await import('../dist/weapons.js');
+ const intro=document.getElementById('introCounts').textContent;
+ assert.match(intro,/^[\w-]+ worlds\. [\w-]+ rounds\. [\w-]+ weapons\.$/,`the menu counts are filled in at startup: ${intro}`);
+ const spell='Zero One Two Three Four Five Six Seven Eight Nine Ten Eleven Twelve Thirteen Fourteen Fifteen Sixteen Seventeen Eighteen Nineteen Twenty Twenty-one Twenty-two Twenty-three Twenty-four Twenty-five'.split(' ');
+ assert.equal(intro,`${spell[MAPS.length]} worlds. ${spell[LEVELS.length]} rounds. ${spell[Object.keys(ROSTER).length]} weapons.`);
+ assert.equal(document.getElementById('circuitCount').textContent,`${MAPS.length} / ${LEVELS.length}`);
+ const page=await fs.readFile(new URL('../dist/index.html',import.meta.url),'utf8');
+ assert.ok(page.includes(`>${intro}</span>`),'and the copy shipped in the page says the same, for the moment before the script runs');
+ console.log('PASS the menu counts its own worlds, rounds and weapons');}
 const {equipWeapon,WEAPONS}=await import('../dist/weapons.js');
 for(const i of LEVELS.map((_,idx)=>idx).filter(idx=>LEVELS[idx].mode==='race')){a.init(i);let count=0;while(a.snapshot().state==='playing'&&count++<14402)a.tick(dt);const s=a.snapshot();assert.equal(s.state,'results');assert.ok(Math.abs(s.time-120)<dt*1.1);for(const p of s.players.slice(1))assert.ok(Number.isFinite(p.best),`Level ${i+1}, bot ${p.id} failed to escape`);console.log(`PASS level ${i+1}: full 2-minute race, all AI rivals escaped`);}
 for(const i of[levelOf('smash')]){a.init(i);const t=a.snapshot().targets;assert.equal(t.length,14);assert.equal(new Set(t.map(p=>p.x+','+p.z)).size,t.length);console.log(`PASS level ${i+1}: destruction targets do not overlap`);}
