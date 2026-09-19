@@ -155,10 +155,10 @@ dialog::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;back
 .rack-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:8px}
 .rack-row button{background:#22333b;color:#c9d7d9;border:1px solid #6a7f8544;border-radius:10px;padding:7px 5px 6px;display:grid;justify-items:center;gap:3px;transition:background .12s,border-color .12s,transform .12s}
 .rack-row button:hover{background:#2c424c;transform:translateY(-1px)}
-.rack-row button .chip{display:block;width:100%;height:56px;overflow:hidden;display:grid;place-items:center}
-/* The piece drawings are full potatoes; the chip shows the head end of one, scaled up so the hat
-   fills the tile instead of sitting as a speck on a body nobody is choosing. */
-.rack-row button .chip svg{width:132%;height:auto;margin-top:-6%;padding:0;filter:none;max-height:none}
+.rack-row button .chip{display:grid;place-items:center;width:100%;height:60px}
+/* The drawing is already framed on the part being chosen, so the tile shows all of it. Scaling it
+   up and cropping to the head took the top off every tall hat. */
+.rack-row button .chip svg{width:100%;height:100%;padding:0;filter:none;max-height:none}
 .rack-row button small{font-size:9.5px;letter-spacing:.5px;font-weight:700;line-height:1.15;text-align:center;opacity:.78}
 .rack-row button[aria-pressed="true"]{background:#3c5560;border-color:var(--gold);color:#fff;box-shadow:0 0 0 1px var(--gold)}
 .rack-row button[aria-pressed="true"] small{opacity:1;color:var(--gold)}

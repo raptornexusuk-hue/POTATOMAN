@@ -27,7 +27,11 @@ export function saveOutfit(outfit,storage){try{if(!storage)return false;storage.
 // starts and a spinning model is not what the screen is for: it has to answer "what am I picking"
 // instantly, so the preview is an SVG built from the same ids the world builds meshes from.
 const hex=value=>'#'+value.toString(16).padStart(6,'0');
-export function outfitPreview(input){const o=validateOutfit(input),kit=hex(tintColor(o)),skin=hex(skinColor(o)),dark='#2b2016',parts=[];
+// `focus` frames the drawing on the part of the potato a rack is choosing, so a hat can be shown
+// large without the tile having to crop it -- cropping cut the top off the tall ones, which is the
+// one thing a picture of a hat must not do.
+const FOCUS={head:'26 0 148 156',eyes:'26 0 148 156',neck:'26 62 148 156'};
+export function outfitPreview(input,focus){const o=validateOutfit(input),kit=hex(tintColor(o)),skin=hex(skinColor(o)),dark='#2b2016',parts=[];
  parts.push(`<ellipse cx="100" cy="112" rx="58" ry="78" fill="${skin}"/>`);
  for(const side of[-1,1]){parts.push(`<ellipse cx="${100+side*21}" cy="96" rx="13" ry="15" fill="#fff6df"/><circle cx="${100+side*21}" cy="98" r="6" fill="${dark}"/>`);}
  parts.push(`<path d="M78 138 Q100 154 122 138" stroke="${dark}" stroke-width="5" fill="none" stroke-linecap="round"/>`);
@@ -45,5 +49,5 @@ export function outfitPreview(input){const o=validateOutfit(input),kit=hex(tintC
  if(o.head==='tophat')parts.push(`<rect x="72" y="4" width="56" height="58" fill="${kit}"/><rect x="44" y="58" width="112" height="12" rx="6" fill="${kit}"/>`);
  if(o.head==='headscarf')parts.push(`<path d="M50 70 q50 -40 100 0 q-50 16 -100 0 Z" fill="${kit}"/><path d="M148 66 l22 12 l-6 12 l-20 -16 Z" fill="${kit}"/>`);
  if(o.head==='goggles')parts.push(`<path d="M46 64 q54 -14 108 0 v12 q-54 -12 -108 0 Z" fill="${dark}"/><circle cx="76" cy="64" r="15" fill="${kit}"/><circle cx="124" cy="64" r="15" fill="${kit}"/>`);
- return `<svg viewBox="0 0 200 220" role="img" aria-label="Your potato">${parts.join('')}</svg>`;
+ return `<svg viewBox="${FOCUS[focus]??'0 0 200 220'}" role="img" aria-label="Your potato">${parts.join('')}</svg>`;
 }

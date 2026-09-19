@@ -4,17 +4,13 @@ import {weaponConfig,dropFactor,weaponReach,WEAPONS} from './weapons.js';
 // Where a weapon is carried, in the aim frame: `right` outboard of the body's centre line,
 // `lift` measured from the muzzle socket and `forward` out in front of the chest, with `length`
 // the grip-to-muzzle distance the aim solver swings the barrel around.
-// Everything but the launcher is held low and outboard, at the side of the body where a hand
-// actually hangs. Carrying it out at chest height put the hand level with the potato's eyes, and
-// from a camera sat over that same shoulder the whole weapon arm crossed its face -- the one
-// place this view cannot afford to put an arm. The launcher is the exception on purpose: it goes
-// carried the same way, low and outboard, because that is where a launcher's pistol grip is: what
-// makes it shoulder-mounted is the tube above the hand reaching back over the shoulder, which is
-// built into the weapon rather than achieved by lifting the arm into the potato's face.
+// Guns are held at the chest, out in front, which is where they were and where they are wanted. The
+// launcher is the exception: its grip is low and outboard, and what makes it shoulder-mounted is
+// the tube above the hand reaching back over the shoulder rather than the arm being lifted.
 export const CARRIES={
- light:{right:.78,lift:-.30,forward:.54,length:.55},
- heavy:{right:.72,lift:-.30,forward:.70,length:.62},
- rifle:{right:.76,lift:-.28,forward:.62,length:.78},
+ light:{right:.60,lift:.10,forward:.64,length:.55},
+ heavy:{right:.42,lift:0,forward:.90,length:.62},
+ rifle:{right:.60,lift:.10,forward:.64,length:.78},
  shoulder:{right:.70,lift:-.30,forward:.66,length:.69}
 };
 export const carryOf=weapon=>CARRIES[WEAPONS[weapon]?.carry]??(weapon==='peeler'?CARRIES.rifle:['scatter','fryer'].includes(weapon)?CARRIES.heavy:CARRIES.light);

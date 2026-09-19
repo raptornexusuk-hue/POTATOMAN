@@ -90,7 +90,7 @@ function renderLocker(){
 // words. The rest of the outfit rides along so a colour choice shows on every piece at once.
 function piecePreview(slot,id,worn){
  const only=slot==='tint'||slot==='skin'?{...worn,[slot]:id}:{...worn,head:'none',eyes:'none',neck:'none',[slot]:id};
- return outfitPreview(only);
+ return outfitPreview(only,slot);
 }
 function storeOutfit(){outfit=validateOutfit(outfit);lockerSeen=true;saveOutfit(outfit,preferenceStorage);for(const p of players)if(p.id===(online?.slot??0))p.outfit=outfit;}
 // The wardrobe belongs to a player, so it opens once there is one. Anybody who has not registered

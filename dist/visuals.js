@@ -1,6 +1,17 @@
 import * as T from './assets/three.module.js';
 export function roundedBox(radius=.05,segments=3){const g=new T.BoxGeometry(1,1,1,segments,segments,segments),p=g.attributes.position;for(let i=0;i<p.count;i++){const v=new T.Vector3().fromBufferAttribute(p,i),inner=v.clone().clampScalar(-.5+radius,.5-radius),n=v.clone().sub(inner).normalize().multiplyScalar(radius);p.setXYZ(i,inner.x+n.x,inner.y+n.y,inner.z+n.z);}g.computeVertexNormals();return g;}
-export function potatoGeometry(){const g=new T.SphereGeometry(1,64,48),pos=g.attributes.position;for(let i=0;i<pos.count;i++){let x=pos.getX(i),y=pos.getY(i),z=pos.getZ(i);const wave=1+.014*Math.sin(x*8+y*4)*Math.sin(z*7-y*3)+.009*Math.cos(y*11+z*6);pos.setXYZ(i,x*wave*(1-.095*y),y*wave,z*wave*(1+.04*y));}g.computeVertexNormals();return g;}
+// What makes a sphere a potato: it narrows across as it rises and thickens front to back, and the
+// whole surface carries a low swell. Anything worn on the body has to be placed against these
+// numbers rather than against a plain ellipsoid, so they are named here and read back by `potatoAt`.
+export const POTATO={narrow:.095,belly:.04,swell:.023};
+export function potatoGeometry(){const g=new T.SphereGeometry(1,64,48),pos=g.attributes.position;for(let i=0;i<pos.count;i++){let x=pos.getX(i),y=pos.getY(i),z=pos.getZ(i);const wave=1+.014*Math.sin(x*8+y*4)*Math.sin(z*7-y*3)+.009*Math.cos(y*11+z*6);pos.setXYZ(i,x*wave*(1-POTATO.narrow*y),y*wave,z*wave*(1+POTATO.belly*y));}g.computeVertexNormals();return g;}
+// Half-width and half-depth of the body at a height given as a fraction of its own radius, with the
+// swell included so kit sits on the lumpiest part of the surface rather than inside the average of
+// it. A pair of constants used to stand in for the taper here; they happened to be right at the
+// crown, where hats go, and wrong everywhere below it, which is why scarves wrapped inside the
+// potato and only their knots came out.
+export function potatoAt(t){const band=Math.sqrt(Math.max(.05,1-Math.min(1,t*t)))*(1+POTATO.swell);
+ return{x:band*(1-POTATO.narrow*t),z:band*(1+POTATO.belly*t)};}
 export function applyWorldUV(material,scale=.48){material.onBeforeCompile=shader=>{shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vSurfaceWorld;\nvarying vec3 vSurfaceNormal;').replace('#include <begin_vertex>',`#include <begin_vertex>
 vec4 surfacePosition = vec4(transformed, 1.0);
 #ifdef USE_INSTANCING

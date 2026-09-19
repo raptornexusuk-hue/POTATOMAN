@@ -10,7 +10,7 @@ import {WEAPONS} from './weapons.js';
 import * as T from './assets/three.module.js';
 import {PlayerLabel} from './player-label.js';
 import {CELL,rng,POWERUPS,isTrial,boxContact3D,JUMP_SPEED} from './core.js';
-import {roundedBox,potatoGeometry,applyWorldUV,makeSky,curveTube,clogGeometry,clogProfile,ambientDust} from './visuals.js';
+import {roundedBox,potatoGeometry,potatoAt,applyWorldUV,makeSky,curveTube,clogGeometry,clogProfile,ambientDust} from './visuals.js';
 // Sampled once: the shoe's own surface, so painted decoration can be laid on it rather than guessed.
 const CLOG_PROFILE=clogProfile();
 const colors=[0xf1bc40,0x4ccbd3,0xef6b72,0x9b92ed];
@@ -49,7 +49,7 @@ const footReach=(phase,walk)=>{const cycle=((phase%TAU)+TAU)%TAU;return walk*STE
 export class World{
  constructor(canvas,renderer=null){
   if(renderer)this.renderer=renderer;else{try{this.renderer=new T.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});}catch{this.renderer=new T.WebGLRenderer({canvas,antialias:false,powerPreference:'default'});}}this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.autoUpdate=false;this.renderer.shadowMap.type=T.PCFSoftShadowMap;this.renderer.outputColorSpace=T.SRGBColorSpace;this.renderer.toneMapping=T.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.25;
-  this.scene=new T.Scene();this.scene.background=new T.Color(0x8db4c3);this.scene.fog=new T.Fog(0x8db4c3,45,125);this.cameras=[0,1].map(()=>new T.PerspectiveCamera(65,1,.08,180));this.cameraReady=[false,false];this.ray=new T.Raycaster();this.wallMeshes=[];this.materials=new Map();this.movers=[];this.geo={box:new T.BoxGeometry(1,1,1),sphere:new T.SphereGeometry(1,24,16),foliage:new T.SphereGeometry(1,16,10),foliageLow:new T.SphereGeometry(1,8,6),eyelid:new T.SphereGeometry(1,24,10,0,Math.PI*2,0,Math.PI*.55),hipRoof:new T.ConeGeometry(Math.SQRT1_2,1,4).rotateY(Math.PI/4),smallSphere:new T.SphereGeometry(1,10,8),potato:potatoGeometry(),rounded:roundedBox(),clog:clogGeometry(),cylinder:new T.CylinderGeometry(1,1,1,20),cone:new T.ConeGeometry(1,1,4),leaf:new T.PlaneGeometry(1,1),leafPlain:new T.CircleGeometry(.5,12)};
+  this.scene=new T.Scene();this.scene.background=new T.Color(0x8db4c3);this.scene.fog=new T.Fog(0x8db4c3,45,125);this.cameras=[0,1].map(()=>new T.PerspectiveCamera(65,1,.08,180));this.cameraReady=[false,false];this.ray=new T.Raycaster();this.wallMeshes=[];this.materials=new Map();this.movers=[];this.geo={box:new T.BoxGeometry(1,1,1),sphere:new T.SphereGeometry(1,24,16),foliage:new T.SphereGeometry(1,16,10),foliageLow:new T.SphereGeometry(1,8,6),eyelid:new T.SphereGeometry(1,24,10,0,Math.PI*2,0,Math.PI*.55),faceShell:new T.SphereGeometry(1,26,14,Math.PI*.07,Math.PI*.86,Math.PI*.22,Math.PI*.56),hipRoof:new T.ConeGeometry(Math.SQRT1_2,1,4).rotateY(Math.PI/4),smallSphere:new T.SphereGeometry(1,10,8),potato:potatoGeometry(),rounded:roundedBox(),clog:clogGeometry(),cylinder:new T.CylinderGeometry(1,1,1,20),cone:new T.ConeGeometry(1,1,4),leaf:new T.PlaneGeometry(1,1),leafPlain:new T.CircleGeometry(.5,12)};
   this.scratch={hip:new T.Vector3(),ankle:new T.Vector3(),knee:new T.Vector3(),direction:new T.Vector3(),inverse:new T.Quaternion(),up:new T.Vector3(0,1,0),forward:new T.Vector3(0,0,1)};
   this.textures={skin:this.texture('skin'),brick:this.texture('brick'),stone:this.texture('stone'),wood:this.texture('wood'),hedge:this.texture('hedge')};this.effects=[];this.projectileMeshes=new Map();this.characters=[];this.qualityMode='high';this.ready=this.loadMaterials();this.resize();
  }
@@ -364,10 +364,12 @@ export class World{
    this.mesh('rounded',frame,group,0,at+.025,lens,.095,.016,.022);
    for(const side of[-1,1])this.mesh(this.geo.smallSphere,frame,group,side*.045,at+.055,lens*.98,.016,.016,.016);
   }else if(kind==='shades'){
-   // A wraparound: one curved lens shell across both eyes, a brow bar and thick temples.
-   const shell=this.mesh(this.geo.sphere,dark,group,0,at-.005,.02,fit.x*1.06,.115,fit.z*1.06);shell.scale.z=fit.z*1.06;
-   this.mesh('rounded',frame,group,0,at+.10,lens*.97,fit.x*1.5,.030,.035);
-   for(const side of[-1,1]){const temple=this.mesh('rounded',frame,group,side*fit.x*.95,at+.06,lens*.28,.026,.028,fit.z*.88);temple.rotation.y=side*.14;}
+   // A wraparound: one curved lens shell across the face, a brow bar along its top and temples that
+   // run back along the sides of the head. The shell covers the front only -- a flattened full
+   // sphere carried on round the back of the head, which read as a bar driven through the potato.
+   const shell=this.mesh(this.geo.faceShell,dark,group,0,at-.01,0,fit.x*1.05,.155,fit.z*1.05);
+   this.mesh(this.geo.faceShell,frame,group,0,at+.075,0,fit.x*1.06,.040,fit.z*1.06);
+   for(const side of[-1,1]){const temple=this.mesh('rounded',frame,group,side*fit.x*.92,at+.035,lens*.42,.020,.026,fit.z*.42);temple.rotation.y=side*.20;}
   }else if(kind==='minion'){
    // The banana kind: a thick rubber band right round the head, big steel rims with rivets, a
    // domed glass in each and a bar bridging them.
@@ -382,14 +384,18 @@ export class World{
    this.mesh('rounded',steel,group,0,at,lens*.93,.13,.05,.055);
   }else if(kind==='visor'){
    const tinted=this.mat(colour,null,{physical:true,metalness:.65,roughness:.10,opacity:.68,transparent:true,clearcoat:1,clearcoatRoughness:.05});
-   const band=this.mesh(this.geo.sphere,tinted,group,0,at+.01,.02,fit.x*1.08,.13,fit.z*1.08);band.scale.z=fit.z*1.08;
-   this.mesh(this.geo.sphere,this.mat(0x2c2a27,null,{physical:true,roughness:.55,clearcoat:.3}),group,0,at+.15,.02,fit.x*1.05,.045,fit.z*1.05);
-   for(const side of[-1,1])this.mesh('rounded',this.mat(0x9aa2a8,null,{metalness:.8,roughness:.3}),group,side*fit.x*.96,at+.09,lens*.35,.03,.03,fit.z*.5);
+   // A tinted shield across the face with a padded brow above it, and the strap that holds it on
+   // carried right round the head, which is the one part of this that should go round the back.
+   this.mesh(this.geo.faceShell,tinted,group,0,at+.005,0,fit.x*1.07,.175,fit.z*1.07);
+   this.mesh(this.geo.faceShell,this.mat(0x2c2a27,null,{physical:true,roughness:.55,clearcoat:.3}),group,0,at+.135,0,fit.x*1.08,.055,fit.z*1.08);
+   const strap=this.mesh(this.geo.sphere,this.mat(0x2c2a27,null,{roughness:.62}),group,0,at+.10,.01,fit.x*1.03,.032,fit.z*1.03);strap.rotation.z=.05;
+   for(const side of[-1,1])this.mesh(this.geo.smallSphere,this.mat(0x9aa2a8,null,{metalness:.8,roughness:.3}),group,side*fit.x*1.04,at+.10,lens*.30,.035,.035,.035);
   }else if(kind==='patch'){
    const leather=this.mat(0x17130f,null,{physical:true,roughness:.52,clearcoat:.3,clearcoatRoughness:.4});
-   this.mesh(this.geo.sphere,leather,group,-.225,at,lens*.99,.205,.205,.048);
-   own(this.mesh(new T.TorusGeometry(.20,.012,6,20),leather,group,-.225,at,lens*1.01));
-   const strap=this.mesh(this.geo.sphere,leather,group,0,at+.14,.02,fit.x*1.04,.026,fit.z*1.04);strap.rotation.z=.16;
+   // One eye, not a third of the face: the patch is sized to the eye it covers.
+   this.mesh(this.geo.sphere,leather,group,-.225,at,lens*.99,.150,.160,.042);
+   own(this.mesh(new T.TorusGeometry(.148,.011,6,20),leather,group,-.225,at,lens*1.01));
+   const strap=this.mesh(this.geo.sphere,leather,group,0,at+.12,.01,fit.x*1.03,.022,fit.z*1.03);strap.rotation.z=.16;
   }
  }
  neckwear(kind,group,skull,colour){
@@ -402,11 +408,18 @@ export class World{
    for(const side of[-1,1]){const tail=this.mesh('rounded',cloth,group,side*.13,at-.28,fit.z*1.02,.13,.44,.055);tail.rotation.z=side*.12;
     for(let j=0;j<3;j++)this.mesh(this.geo.smallSphere,cloth,group,side*.13,at-.46+j*.03,fit.z*1.05,.055,.022,.035);}
   }else if(kind==='bandana'){
-   this.mesh('cylinder',cloth,group,0,at+.02,0,fit.x*1.06,.055,fit.z*1.11);
-   const front=this.mesh(this.geo.sphere,cloth,group,0,at-.17,fit.z*1.02,.30,.22,.05);front.rotation.x=.12;
+   // A kerchief: a rolled band round the neck, a knot at one side and a triangle of cloth hanging
+   // down the front. It was a band and a flat disc, which read as a bib rather than as cloth.
+   this.mesh('cylinder',cloth,group,0,at+.03,0,fit.x*1.05,.048,fit.z*1.09);
+   for(let j=0;j<7;j++){const a=-.9+j*.30;this.mesh(this.geo.smallSphere,cloth,group,Math.sin(a)*fit.x*1.06,at+.03,Math.cos(a)*fit.z*1.10,.045,.032,.045);}
+   this.mesh(this.geo.sphere,cloth,group,fit.x*.72,at+.02,fit.z*.76,.075,.070,.075);
+   for(let j=0;j<3;j++){const t=j/2,fold=this.mesh(this.geo.sphere,cloth,group,0,at-.07-j*.125,fit.z*(1.02-t*.13),.245-t*.155,.115,.058);fold.rotation.x=.08+t*.22;}
   }else if(kind==='tie'){
-   this.mesh('rounded',cloth,group,0,at+.02,fit.z*1.04,.085,.075,.045);
-   this.mesh('rounded',cloth,group,0,at-.30,fit.z*1.00,.11,.52,.035);
+   // A knot, a short neckband behind it and a blade that tapers and swings, rather than one flat slab.
+   this.mesh('cylinder',cloth,group,0,at+.06,0,fit.x*1.02,.045,fit.z*1.06);
+   const knot=this.mesh('rounded',cloth,group,0,at+.015,fit.z*1.05,.080,.078,.052);knot.rotation.x=-.10;
+   for(let j=0;j<5;j++){const blade=this.mesh('rounded',cloth,group,j*.010,at-.11-j*.112,fit.z*(1.03-j*.012),.104-j*.011,.170,.038);blade.rotation.z=-j*.038;}
+   this.mesh('rounded',cloth,group,.036,at-.575,fit.z*.985,.058,.052,.032).rotation.z=-.16;
   }
  }
  character(id,worn){
@@ -460,8 +473,8 @@ export class World{
   // the potato is an ellipsoid squeezed on x and stretched on z, and the band at a given height
   // follows from that. Anything guessed instead ends up buried in the head on the rounder bodies.
   const hat=new T.Group();bob.add(hat);
-  const skull=height=>{const ry=TORSO.y*breed.build[1],t=(height-TORSO.centre)/ry,band=Math.sqrt(Math.max(.05,1-t*t));
-   return{x:TORSO.x*breed.build[0]*band*.917,z:TORSO.z*breed.build[2]*band*1.035};};
+  const skull=height=>{const ry=TORSO.y*breed.build[1],at=potatoAt((height-TORSO.centre)/ry);
+   return{x:TORSO.x*breed.build[0]*at.x,z:TORSO.z*breed.build[2]*at.z};};
   const kitGroup=new T.Group();bob.add(kitGroup);
   this.headwear(kit.head,hat,skull,tintColor(kit));this.eyewear(kit.eyes,kitGroup,skull,tintColor(kit));this.neckwear(kit.neck,kitGroup,skull,tintColor(kit));
   const arms=[],forearms=[],legs=[];

@@ -95,38 +95,35 @@ for(const opts of cases){pose(opts,false);for(const arm of m.arms){const {upper,
  for(const mesh of[upper,lower]){const {position,normal:n}=mesh.geometry.attributes,ix=mesh.geometry.index;for(let i=0;i<ix.count;i+=3){pa.fromBufferAttribute(position,ix.getX(i));pb.fromBufferAttribute(position,ix.getX(i+1));pc.fromBufferAttribute(position,ix.getX(i+2));surface.copy(pb).sub(pa).cross(pc.sub(pa));if(surface.lengthSq()<1e-10)continue;normal.fromBufferAttribute(n,ix.getX(i));assert.ok(surface.normalize().dot(normal)>.1,'arm triangles must face outward, not expose the inside of a hollow sleeve');}}
 }}
 console.log('PASS potato carried at the side clear of its own face, and continuous outward-facing rounded arm surfaces');
-// The weapon hand belongs at the potato's side, not up by its eye. Carrying a gun out in front at
-// chest height put the hand level with the eyes, and from a camera over that same shoulder the arm
-// read as being across the face. This is the second time that has happened, so it is measured here
-// rather than left to the carry numbers looking sensible: for every weapon, in every stance, the
-// hand sits below both eyes and outboard of the shoulder socket.
+// The hand that carries the spud belongs at the potato's hip, alongside the free one, not up by its
+// chest. Held at chest height it sat a hand's width from the potato's own eye from a camera sat over
+// that same shoulder, and read as an arm across its face. Guns are carried out in front on purpose
+// and are not judged here; this is the carry, between throws, which is the pose the player looks at
+// for most of a round.
 {
  const camera=new T.PerspectiveCamera(70,1.6,.08,180);
  let checked=0,nearest=Infinity,worstCase=null;
- for(const weapon of GUNS)for(const crouching of[false,true])for(const pitch of[MIN_PITCH,DEFAULT_PITCH,0,MAX_PITCH]){
-  pose({weapon,crouching,pitch},false);
+ for(const crouching of[false,true])for(const pitch of[MIN_PITCH,DEFAULT_PITCH,0,MAX_PITCH]){
+  pose({weapon:'throw',crouching,pitch,shotAnim:0},false);
   const view=cameraPose(p,{zoom:REST_ZOOM},[]);
   camera.position.set(view.position.x,view.position.y,view.position.z);camera.lookAt(view.look.x,view.look.y,view.look.z);
   camera.updateMatrixWorld(true);camera.updateProjectionMatrix();
   const screen=o=>{const v=o.getWorldPosition(new T.Vector3()).project(camera);return{x:(v.x*.5+.5)*1280,y:(-v.y*.5+.5)*800};};
-  // Where the hand actually is comes first: it hangs below the eyes in every pose, by a real
-  // distance in metres. Screen position is then checked at a resting sight, which is the view the
-  // player spends the round in. At the pitch limits the camera is looking almost straight down or
-  // up and projection alone can put a lower point above a nearer one, which says nothing about
-  // where the arm is, so the screen check does not run there.
-  const handY=m.arms[0].userData.hand.getWorldPosition(new T.Vector3()).y,eyeY=m.eyes[0].getWorldPosition(new T.Vector3()).y;
-  assert.ok(eyeY-handY>.20,`${weapon} at pitch ${pitch.toFixed(2)}${crouching?' crouched':''}: weapon hand is only ${(eyeY-handY).toFixed(2)}m below the eyes`);
+  // Where the hand is comes first, in metres: it hangs a good way below the eyes, and within a
+  // hand's width of the height the free arm hangs at, which is what "at its side" actually means.
+  const hand=m.arms[0].userData.hand.getWorldPosition(new T.Vector3()),free=m.arms[1].userData.hand.getWorldPosition(new T.Vector3());
+  const eye=m.eyes[0].getWorldPosition(new T.Vector3()).y;
+  assert.ok(eye-hand.y>.35,`carrying a spud${crouching?' crouched':''} at pitch ${pitch.toFixed(2)}: the hand is only ${(eye-hand.y).toFixed(2)}m below the eyes`);
+  // Crouching tips the torso forward, which drops the loaded hand further than the free one; both
+  // are still at the hip, which is the point.
+  assert.ok(Math.abs(hand.y-free.y)<(crouching?.30:.16),`the two hands hang at different heights: ${hand.y.toFixed(2)} against ${free.y.toFixed(2)}`);
   if(Math.abs(pitch-DEFAULT_PITCH)<1e-9){
-   const hand=screen(m.arms[0].userData.hand),eye=Math.min(screen(m.eyes[0]).y,screen(m.eyes[1]).y),below=hand.y-eye;
-   assert.ok(below>(crouching?24:50),`${weapon}${crouching?' crouched':''}: at a resting sight the weapon hand is only ${below.toFixed(0)}px below the eyes`);
-   if(below<nearest){nearest=below;worstCase=`${weapon}${crouching?' crouched':''}`;}}
-  // And outboard: a hand tucked inside the shoulder line is in front of the chest, not at the side.
-  const socket=m.arms[0].userData.shoulder.getWorldPosition(new T.Vector3()),wrist=m.arms[0].userData.hand.getWorldPosition(new T.Vector3());
-  const across=Math.cos(p.yaw),acrossZ=Math.sin(p.yaw);
-  assert.ok((wrist.x*across+wrist.z*acrossZ)-(socket.x*across+socket.z*acrossZ)>-.02,`${weapon}: weapon hand is inboard of its own shoulder`);
+   const below=screen(m.arms[0].userData.hand).y-Math.min(screen(m.eyes[0]).y,screen(m.eyes[1]).y);
+   assert.ok(below>70,`carrying a spud${crouching?' crouched':''}: at a resting sight the hand is only ${below.toFixed(0)}px below the eyes`);
+   if(below<nearest){nearest=below;worstCase=crouching?'crouched':'standing';}}
   checked++;
  }
- console.log(`PASS ${checked} armed poses keep the weapon hand at the potato's side, ${nearest.toFixed(0)}px clear of the eyes on screen at worst (${worstCase})`);
+ console.log(`PASS ${checked} carrying poses hold the spud at the potato's hip, ${nearest.toFixed(0)}px clear of the eyes on screen at worst (${worstCase})`);
 }
 for(const mode of['race','assault']){w.level=LEVELS.find(l=>l.mode===mode);pose({weapon:'throw',walk:1,stride:.7});assert.equal(m.heldSpud.visible,false);for(const arm of m.arms)assert.ok(arm.userData.hand.position.y<arm.userData.shoulder.position.y,'unarmed course runners use a free arm swing, not a raised invisible potato');}
 w.level=LEVELS[0];

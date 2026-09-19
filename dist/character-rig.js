@@ -94,7 +94,12 @@ export function poseArms(m,p,stride,walk,crouch,canThrow=true){
  // throwing action instead of dragging the action round with it.
  const aimLocal=(out,across,height,fwd)=>bodyPoint(out,aimRight.x*across+aimForward.x*fwd,height,aimRight.z*across+aimForward.z*fwd);
  const tossing=canThrow&&p.weapon==='throw'&&!p.runner,duration=p.shotDuration??THROW_DURATION,clock=p.shotAnim>0?Math.max(0,duration-p.shotAnim):0,recovery=Math.max(.01,duration-THROW_WINDUP),u=clamp((clock-THROW_WINDUP)/recovery,0,1),k=recovery/(THROW_DURATION-THROW_WINDUP),mapped=k*u+(1-k)*smooth(u),elapsed=clock<=THROW_WINDUP?clock:THROW_WINDUP+(THROW_DURATION-THROW_WINDUP)*mapped;
- if(tossing){const origin=muzzlePosition(p);aimLocal(ready,1.15,1.15,-.70);aimLocal(windup,.724,2.04,-.350);toLocal(release,origin.x,origin.y,origin.z);aimLocal(follow,.754,1.20,.617);aimLocal(recoverPoint,1.081,1.85,.041);recoverVelocity.copy(ready).sub(follow).multiplyScalar(2);
+ if(tossing){const origin=muzzlePosition(p);
+  // The spud is carried at the hip, alongside the free hand, not up by the chest. Held at chest
+  // height it sat a hand's width from the potato's own eye from a camera over that shoulder, which
+  // read as the arm being across its face -- the same complaint the gun carry had. Everything after
+  // this is the throw itself, which still comes up and over.
+  aimLocal(ready,.88,.84,-.26);aimLocal(windup,.724,2.04,-.350);toLocal(release,origin.x,origin.y,origin.z);aimLocal(follow,.754,1.20,.617);aimLocal(recoverPoint,1.20,1.10,-.34);recoverVelocity.copy(ready).sub(follow).multiplyScalar(2);
   windVelocity.copy(release).sub(ready).multiplyScalar(4);releaseVelocity.copy(follow).sub(windup).multiplyScalar(4);followVelocity.copy(ready).sub(release).multiplyScalar(2);
   if(!p.shotAnim)spud.copy(ready);else if(elapsed<.068)arc(spud,ready,windup,zero,windVelocity,elapsed/.068,.068);else if(elapsed<THROW_WINDUP)arc(spud,windup,release,windVelocity,releaseVelocity,(elapsed-.068)/(THROW_WINDUP-.068),THROW_WINDUP-.068);else if(elapsed<.27)arc(spud,release,follow,releaseVelocity,followVelocity,(elapsed-THROW_WINDUP)/(.27-THROW_WINDUP),.27-THROW_WINDUP);else if(elapsed<.37)arc(spud,follow,recoverPoint,followVelocity,recoverVelocity,(elapsed-.27)/.10,.10);else arc(spud,recoverPoint,ready,recoverVelocity,zero,(elapsed-.37)/(THROW_DURATION-.37),THROW_DURATION-.37);
   // A carried potato follows the gait, then settles into the throwing action and
@@ -123,7 +128,7 @@ export function poseArms(m,p,stride,walk,crouch,canThrow=true){
   // The throw arc lives in the aim frame like every other pole here, not in body coordinates:
    // the spud it reaches for is placed in aim space, so a further-turned torso has to swing under
    // the same arm path rather than drag the upper arm through the chest.
-   if(j===0&&tossing){aimLocal(readyPole,0.96,0.80,-.80);aimLocal(windPole,0.96,1.40,-.80);aimLocal(releasePole,.755,1.85,.006);aimLocal(followPole,.775,.90,-.018);aimLocal(recoverPole,1.018,1.40,-.214);
+   if(j===0&&tossing){aimLocal(readyPole,1.10,.66,-.52);aimLocal(windPole,0.96,1.40,-.80);aimLocal(releasePole,.755,1.85,.006);aimLocal(followPole,.775,.90,-.018);aimLocal(recoverPole,1.34,.84,-.60);
    if(!p.shotAnim)pole.copy(readyPole);else if(elapsed<.068)pole.lerpVectors(readyPole,windPole,smooth(elapsed/.068));else if(elapsed<THROW_WINDUP)pole.lerpVectors(windPole,releasePole,smooth((elapsed-.068)/(THROW_WINDUP-.068)));else if(elapsed<.27)pole.lerpVectors(releasePole,followPole,smooth((elapsed-THROW_WINDUP)/(.27-THROW_WINDUP)));else if(elapsed<.37)pole.lerpVectors(followPole,recoverPole,smooth((elapsed-.27)/.10));else pole.lerpVectors(recoverPole,readyPole,smooth((elapsed-.37)/(THROW_DURATION-.37)));
   }hand.rotation.set(0,0,sign*.08);let curl=.22;
   // Only the weapon arm grips. A potato torso is wider than the arms are long, so a support
@@ -132,11 +137,12 @@ export function poseArms(m,p,stride,walk,crouch,canThrow=true){
   if(m.gun.visible&&j===0){
    // Grip where the shorter arm can actually hold: the wide-bodied weapons are gripped at the
    // receiver rather than out along the fore-end, so the upper arm never gets dragged into the ribs.
-   // The hand goes on the weapon's own grip socket -- the point the aim solver swings the barrel
-   // around -- rather than a guessed distance back down the barrel from the muzzle. Measuring the
-   // hold from the muzzle meant every change to a weapon's length quietly moved the hand, and a
-   // long one dragged it out past where the arm could reach.
-   const socket=gunGrip(p);toLocal(target,socket.x,socket.y,socket.z);hand.quaternion.copy(m.gun.quaternion);curl=1.35;}
+   // Guns are gripped where they were: a fixed distance back down the barrel from the muzzle. The
+   // launcher is the exception, because its tube and its grip were rebuilt together -- its hand goes
+   // on the pistol grip the tube sits above, which is the point the aim solver swings it around.
+   if(p.weapon==='rpg'){const socket=gunGrip(p);toLocal(target,socket.x,socket.y,socket.z);}
+   else target.set(0,-.10,p.weapon==='scatter'?-.50:-.72).applyMatrix4(m.gun.matrix);
+   hand.quaternion.copy(m.gun.quaternion);curl=1.35;}
   else if(tossing&&j===0){
    // Palm faces the throw, fingers cradle the rear skin; a small wrist cock
    // replaces the old upward/backward-facing palm and under-potato grip.
