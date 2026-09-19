@@ -327,31 +327,59 @@ export class World{
  }
  eyewear(kind,group,skull,colour){
   if(kind==='none')return;
-  const at=1.40,fit=skull(at),lens=fit.z*1.02,dark=this.mat(0x241f1c,null,{roughness:.38}),frame=this.mat(colour,null,{metalness:.45,roughness:.36});
+  const at=1.40,fit=skull(at),lens=fit.z*1.02;
+  const dark=this.mat(0x1d1a18,null,{physical:true,roughness:.30,clearcoat:.7,clearcoatRoughness:.15});
+  const frame=this.mat(colour,null,{metalness:.55,roughness:.28});
+  const glass=this.mat(0xd8ecf4,null,{physical:true,metalness:.08,roughness:.05,opacity:.42,transparent:true,clearcoat:1,clearcoatRoughness:.04});
+  const own=mesh=>{mesh.userData.ownGeometry=true;return mesh;};
   if(kind==='glasses'){
-   for(const side of[-1,1]){this.mesh('cylinder',frame,group,side*.225,at,lens,.20,.018,.20).rotation.x=Math.PI/2;
-    this.mesh('cylinder',this.mat(0xcfe6ee,null,{roughness:.1,metalness:.2,opacity:.55,transparent:true}),group,side*.225,at,lens-.004,.172,.012,.172).rotation.x=Math.PI/2;
-    this.mesh('rounded',frame,group,side*fit.x*.92,at+.03,lens*.32,.02,.02,fit.z*.8);}
-   this.mesh('rounded',frame,group,0,at+.02,lens,.10,.018,.02);
+   // Round wire frames: a drawn rim rather than a disc, a bridge over the nose and temples that
+   // run back to the side of the head.
+   for(const side of[-1,1]){
+    own(this.mesh(new T.TorusGeometry(.185,.016,8,24),frame,group,side*.225,at,lens));
+    this.mesh(this.geo.sphere,glass,group,side*.225,at,lens-.004,.175,.175,.028);
+    const temple=this.mesh('rounded',frame,group,side*fit.x*.92,at+.03,lens*.30,.022,.022,fit.z*.86);temple.rotation.y=side*.12;
+   }
+   this.mesh('rounded',frame,group,0,at+.025,lens,.095,.016,.022);
+   for(const side of[-1,1])this.mesh(this.geo.smallSphere,frame,group,side*.045,at+.055,lens*.98,.016,.016,.016);
   }else if(kind==='shades'){
-   for(const side of[-1,1]){const glass=this.mesh(this.geo.sphere,dark,group,side*.235,at-.01,lens*.94,.22,.145,.10);glass.rotation.y=side*.18;
-    this.mesh('rounded',frame,group,side*fit.x*.93,at+.04,lens*.30,.02,.022,fit.z*.82);}
-   this.mesh('rounded',frame,group,0,at+.03,lens*.96,.11,.02,.024);
+   // A wraparound: one curved lens shell across both eyes, a brow bar and thick temples.
+   const shell=this.mesh(this.geo.sphere,dark,group,0,at-.005,.02,fit.x*1.06,.115,fit.z*1.06);shell.scale.z=fit.z*1.06;
+   this.mesh('rounded',frame,group,0,at+.10,lens*.97,fit.x*1.5,.030,.035);
+   for(const side of[-1,1]){const temple=this.mesh('rounded',frame,group,side*fit.x*.95,at+.06,lens*.28,.026,.028,fit.z*.88);temple.rotation.y=side*.14;}
+  }else if(kind==='minion'){
+   // The banana kind: a thick rubber band right round the head, big steel rims with rivets, a
+   // domed glass in each and a bar bridging them.
+   const rubber=this.mat(0x2b2f33,null,{physical:true,roughness:.58,clearcoat:.25,clearcoatRoughness:.5});
+   const steel=this.mat(0xcbd1d8,null,{metalness:.96,roughness:.14});
+   this.mesh(this.geo.sphere,rubber,group,0,at,.02,fit.x*1.11,.085,fit.z*1.11);
+   for(const side of[-1,1]){
+    own(this.mesh(new T.TorusGeometry(.175,.046,10,26),steel,group,side*.235,at,lens*.93));
+    this.mesh(this.geo.sphere,glass,group,side*.235,at,lens*1.02,.152,.152,.062);
+    for(let j=0;j<6;j++){const a=j*Math.PI/3;this.mesh(this.geo.smallSphere,steel,group,side*.235+Math.cos(a)*.176,at+Math.sin(a)*.176,lens*.99,.023,.023,.023);}
+   }
+   this.mesh('rounded',steel,group,0,at,lens*.93,.13,.05,.055);
   }else if(kind==='visor'){
-   const tinted=this.mat(colour,null,{metalness:.6,roughness:.14,opacity:.72,transparent:true});
+   const tinted=this.mat(colour,null,{physical:true,metalness:.65,roughness:.10,opacity:.68,transparent:true,clearcoat:1,clearcoatRoughness:.05});
    const band=this.mesh(this.geo.sphere,tinted,group,0,at+.01,.02,fit.x*1.08,.13,fit.z*1.08);band.scale.z=fit.z*1.08;
-   this.mesh(this.geo.sphere,this.mat(0x2c2a27,null,{roughness:.8}),group,0,at+.15,.02,fit.x*1.05,.045,fit.z*1.05);
+   this.mesh(this.geo.sphere,this.mat(0x2c2a27,null,{physical:true,roughness:.55,clearcoat:.3}),group,0,at+.15,.02,fit.x*1.05,.045,fit.z*1.05);
+   for(const side of[-1,1])this.mesh('rounded',this.mat(0x9aa2a8,null,{metalness:.8,roughness:.3}),group,side*fit.x*.96,at+.09,lens*.35,.03,.03,fit.z*.5);
   }else if(kind==='patch'){
-   this.mesh(this.geo.sphere,dark,group,-.225,at,lens*.99,.20,.20,.045);
-   const strap=this.mesh(this.geo.sphere,dark,group,0,at+.14,.02,fit.x*1.04,.028,fit.z*1.04);strap.rotation.z=.16;
+   const leather=this.mat(0x17130f,null,{physical:true,roughness:.52,clearcoat:.3,clearcoatRoughness:.4});
+   this.mesh(this.geo.sphere,leather,group,-.225,at,lens*.99,.205,.205,.048);
+   own(this.mesh(new T.TorusGeometry(.20,.012,6,20),leather,group,-.225,at,lens*1.01));
+   const strap=this.mesh(this.geo.sphere,leather,group,0,at+.14,.02,fit.x*1.04,.026,fit.z*1.04);strap.rotation.z=.16;
   }
  }
  neckwear(kind,group,skull,colour){
   if(kind==='none')return;
   const at=1.16,fit=skull(at),cloth=this.mat(colour,'wood',{roughness:.95});
   if(kind==='scarf'){
-   this.mesh('cylinder',cloth,group,0,at,0,fit.x*1.08,.105,fit.z*1.13);
-   for(const side of[-1,1]){const tail=this.mesh('rounded',cloth,group,side*.13,at-.28,fit.z*1.02,.13,.44,.055);tail.rotation.z=side*.12;}
+   // Wool: three offset wraps with a ribbed edge, and two tails hanging down the front.
+   for(let j=0;j<3;j++){const wrap=this.mesh('cylinder',cloth,group,0,at+.055-j*.055,0,fit.x*(1.06+j*.015),.062,fit.z*(1.11+j*.015));wrap.rotation.y=j*.22;}
+   for(let j=0;j<9;j++){const a=j*Math.PI*2/9;this.mesh(this.geo.smallSphere,cloth,group,Math.sin(a)*fit.x*1.08,at+.085,Math.cos(a)*fit.z*1.13,.035,.024,.035);}
+   for(const side of[-1,1]){const tail=this.mesh('rounded',cloth,group,side*.13,at-.28,fit.z*1.02,.13,.44,.055);tail.rotation.z=side*.12;
+    for(let j=0;j<3;j++)this.mesh(this.geo.smallSphere,cloth,group,side*.13,at-.46+j*.03,fit.z*1.05,.055,.022,.035);}
   }else if(kind==='bandana'){
    this.mesh('cylinder',cloth,group,0,at+.02,0,fit.x*1.06,.055,fit.z*1.11);
    const front=this.mesh(this.geo.sphere,cloth,group,0,at-.17,fit.z*1.02,.30,.22,.05);front.rotation.x=.12;

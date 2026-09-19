@@ -4,7 +4,7 @@
 // rivals in these terms rather than in their own.
 export const WARDROBE=Object.freeze({
  head:[['none','BARE HEAD'],['cap','FLAT CAP'],['bucket','BUCKET HAT'],['beanie','BOBBLE HAT'],['tophat','TOP HAT'],['headscarf','HEADSCARF'],['goggles','WELDING GOGGLES']],
- eyes:[['none','NO EYEWEAR'],['glasses','ROUND GLASSES'],['shades','SUNGLASSES'],['visor','RACING VISOR'],['patch','EYE PATCH']],
+ eyes:[['none','NO EYEWEAR'],['glasses','ROUND GLASSES'],['shades','SUNGLASSES'],['minion','BANANA GOGGLES'],['visor','RACING VISOR'],['patch','EYE PATCH']],
  neck:[['none','BARE NECK'],['scarf','WOOLLY SCARF'],['bandana','BANDANA'],['tie','CLUB TIE']],
  skin:[['russet','RUSSET'],['maris','MARIS PIPER'],['rooster','ROOSTER'],['golden','GOLDEN WONDER'],['purple','PURPLE MAJESTY']]
 });
@@ -36,6 +36,7 @@ export function outfitPreview(input){const o=validateOutfit(input),kit=hex(tintC
  if(o.neck==='tie')parts.push(`<path d="M92 146 l16 0 l-3 12 l9 42 l-14 12 l-14 -12 l9 -42 Z" fill="${kit}"/>`);
  if(o.eyes==='glasses')parts.push(`<g fill="none" stroke="${kit}" stroke-width="4"><circle cx="79" cy="97" r="17"/><circle cx="121" cy="97" r="17"/><path d="M96 97 h8M62 94 l-14 -6M138 94 l14 -6"/></g>`);
  if(o.eyes==='shades')parts.push(`<path d="M58 84 h36 q6 0 6 6 v10 q0 12 -12 12 h-18 q-12 0 -12 -14 Z M142 84 h-36 q-6 0 -6 6 v10 q0 12 12 12 h18 q12 0 12 -14 Z" fill="${dark}"/><path d="M94 88 h12M58 86 l-12 -6M142 86 l12 -6" stroke="${kit}" stroke-width="4" fill="none"/>`);
+ if(o.eyes==='minion')parts.push(`<path d="M40 90 h120 v18 h-120 Z" fill="#2b2f33"/><g><circle cx="76" cy="99" r="27" fill="#cbd1d8"/><circle cx="124" cy="99" r="27" fill="#cbd1d8"/><circle cx="76" cy="99" r="19" fill="#d8ecf4"/><circle cx="124" cy="99" r="19" fill="#d8ecf4"/><circle cx="76" cy="99" r="8" fill="${dark}"/><circle cx="124" cy="99" r="8" fill="${dark}"/><rect x="96" y="94" width="8" height="10" fill="#cbd1d8"/></g>`);
  if(o.eyes==='visor')parts.push(`<path d="M46 82 q54 -12 108 0 v20 q-54 14 -108 0 Z" fill="${kit}" opacity=".85"/>`);
  if(o.eyes==='patch')parts.push(`<path d="M46 74 q54 -10 108 0" stroke="${dark}" stroke-width="5" fill="none"/><ellipse cx="79" cy="97" rx="18" ry="19" fill="${dark}"/>`);
  if(o.head==='cap')parts.push(`<path d="M52 66 q48 -34 96 0 Z" fill="${kit}"/><path d="M50 64 q50 10 100 0 l4 10 q-54 12 -108 0 Z" fill="${kit}"/>`);

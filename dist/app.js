@@ -72,8 +72,10 @@ function renderLocker(){
  $('lockerBadge').textContent=outfit.head==='none'?pieceName('tint',outfit.tint):pieceName('head',outfit.head);
 }
 function storeOutfit(){outfit=validateOutfit(outfit);lockerSeen=true;saveOutfit(outfit,preferenceStorage);for(const p of players)if(p.id===(online?.slot??0))p.outfit=outfit;}
-function openLocker(){renderLocker();dialog('lockerDialog');}
-$('lockerButton').onclick=openLocker;
+// The wardrobe belongs to a player, so it opens once there is one. Anybody who has not registered
+// gets the sign-up first and lands in the locker as soon as they have.
+async function openLocker(){if(!await playerAccount.requirePlayer(openLocker))return;renderLocker();dialog('lockerDialog');}
+$('lockerButton').onclick=()=>openLocker();
 $('lockerClose').onclick=()=>{storeOutfit();$('lockerDialog').close();};
 $('lockerRandom').onclick=()=>{const pick=list=>list[Math.floor(Math.random()*list.length)][0];
  outfit={head:pick(WARDROBE.head),eyes:pick(WARDROBE.eyes),neck:pick(WARDROBE.neck),skin:pick(WARDROBE.skin),tint:pick(TINTS)};storeOutfit();renderLocker();};
@@ -126,7 +128,7 @@ renderWorlds();
 $('levelGrid').onclick=e=>{const b=e.target.closest('[data-level]');if(b){if(online){$('levelsDialog').close();openOnline();return;}$('levelsDialog').close();start(+b.dataset.level,true);}};
 // First time out, the locker is the screen before the match rather than a menu nobody opens.
 function beginMatch(){online?openOnline():start(0);}
-$('play').onclick=()=>{if(!lockerSeen&&!online){openLocker();return;}beginMatch();};
+$('play').onclick=()=>{if(!lockerSeen&&!online&&playerAccount.player){openLocker();return;}beginMatch();};
 function localPlayer(){return players[online?.slot??0];}
 function isHuman(p){return online?online.roster.some(m=>m.slot===p.id):p.id<(duo?2:1);}
 function newPlayer(id){return {id,outfit:id===(online?.slot??0)?outfit:null,name:id===1&&!duo?'MASH':names[id],knockouts:0,kills:0,points:0,played:0,weaponLevel:0,roundWins:0,x:0,y:0,z:0,vy:0,grounded:true,crouching:false,courseDuckEntry:0,runBoost:0,fireBoost:0,jumpBoost:0,courseStep:0,vx:0,vz:0,yaw:0,pitch:DEFAULT_PITCH,panX:0,panY:0,cameraDistance:4.6,hp:100,score:0,total:0,best:Infinity,attempt:0,respawn:0,invuln:0,throwCD:0,catchCD:0,catchTime:0,dashCD:0,dashTime:0,dashX:0,dashZ:0,shotAnim:0,pendingThrow:0,charge:0,weapon:'throw',gun:false,mag:12,reload:0,runner:false,checks:[false,false],claimTime:0,path:[],navTimer:0,goalKey:null,via:null,viaUntil:0,viaCooldown:0,botDelay:0};}
