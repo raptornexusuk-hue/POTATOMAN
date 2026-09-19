@@ -23,7 +23,7 @@ console.log('PASS delayed mouse capture is retained and stale errors cannot disa
 // Walking into a wall has to crowd the boom in at once, or the camera ends up outside the level.
 // Walking away from it has to give the view back on its own: on a tablet there is no mouse to
 // nudge it loose, and "the camera never came back" was exactly the reported fault.
-const {cameraPose,settleBoom,autoLevel,DEFAULT_PITCH,MIN_PITCH,MAX_PITCH,SIGHT_RANGE,CHEST_HEIGHT,REST_ZOOM}=await (async()=>{
+const {cameraPose,settleBoom,autoLevel,DEFAULT_PITCH,MIN_PITCH,MAX_PITCH,GUN_RANGE,REST_ZOOM,cameraHeight}=await (async()=>{
  const aim=await import('../dist/aiming.js'),ctl=await import('../dist/controls.js');return{...aim,autoLevel:ctl.autoLevel};})();
 const viewer=()=>({id:0,x:0,y:0,z:0,yaw:0,pitch:DEFAULT_PITCH,crouching:false,runner:false,cameraDistance:REST_ZOOM});
 const backWall=[{x:0,z:1.6,w:9,d:.4,h:5}],step=1/60,settings={zoom:REST_ZOOM};
@@ -34,11 +34,11 @@ const compressed=v.boom;settleBoom(v,settings,[],step);
 assert.ok(v.boom>compressed&&v.boom<.75,'the boom eases back out rather than snapping');
 let frames=1;while(v.boom<.995&&frames<600){settleBoom(v,settings,[],step);frames++;}
 assert.ok(v.boom<=1&&frames>12&&frames<90,`boom recovers smoothly in well under a second: ${frames} frames`);
-// The rest pitch must sight a standing rival, not the dirt in front of one.
-const sight=cameraPose(viewer(),settings,[]),at=t=>({y:sight.position.y+sight.direction.y*t});
-const range=SIGHT_RANGE/Math.cos(DEFAULT_PITCH);
-assert.ok(Math.abs(at(range).y-CHEST_HEIGHT)<.02,`resting sight lands on the chest at ${SIGHT_RANGE}m, not ${at(range).y.toFixed(2)}m`);
-assert.ok(at(60).y>0,'the resting sight must not run into the ground inside a rifle shot');
+// The rest pitch must carry the whole length of a shot, not bury itself in the dirt part way.
+const sight=cameraPose(viewer(),settings,[]),at=metres=>sight.position.y+sight.direction.y*(metres/Math.cos(DEFAULT_PITCH));
+assert.ok(at(GUN_RANGE)>-.05&&at(GUN_RANGE)<.05,`a resting sight runs out to the end of the longest shot and lands there, not at ${at(GUN_RANGE).toFixed(2)}m`);
+for(const range of[10,14,20,28])assert.ok(at(range)>.6&&at(range)<cameraHeight({}),`at ${range}m a resting crosshair sits on a standing rival, at ${at(range).toFixed(2)}m`);
+assert.ok(at(1)>1.5,'and close in it is still up at head height rather than at their feet');
 // Auto-level is for thumbs and sticks: it waits, it only works while the player is moving, and
 // any live aim input outranks it.
 const walker=viewer();walker.pitch=MIN_PITCH;
@@ -47,4 +47,4 @@ for(let i=0;i<90;i++)autoLevel(walker,step,false,true);assert.ok(walker.pitch>MI
 for(let i=0;i<600;i++)autoLevel(walker,step,false,true);assert.ok(Math.abs(walker.pitch-DEFAULT_PITCH)<.01,'and it arrives at the resting pitch');
 const stander=viewer();stander.pitch=MAX_PITCH;for(let i=0;i<600;i++)autoLevel(stander,step,false,false);assert.equal(stander.pitch,MAX_PITCH,'standing still, the player keeps the view they chose');
 const aimer=viewer();aimer.pitch=MAX_PITCH;for(let i=0;i<600;i++)autoLevel(aimer,step,true,true);assert.equal(aimer.pitch,MAX_PITCH,'a thumb on the aim pad always outranks the assist');
-console.log('PASS boom compresses instantly and eases back, resting sight holds the chest at range, and auto-level waits for an idle stick and a moving player');
+console.log('PASS boom compresses instantly and eases back, a resting sight runs the length of a shot, and auto-level waits for an idle stick and a moving player');

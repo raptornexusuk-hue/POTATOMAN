@@ -75,14 +75,25 @@ for(const shotDuration of[.46,.62*.53]){
 }
 console.log('PASS boosted recovery keeps release velocity continuous');
 
-// The ready potato stays beside the head before the player presses fire.
-for(const crouching of[false,true]){pose({weapon:'throw',crouching});const potato=m.heldSpud.getWorldPosition(new T.Vector3()),eye=m.eyes[0].getWorldPosition(new T.Vector3());assert.ok(potato.y>eye.y+.18,'ready potato must sit above eye level');}
+// A potato carried ready to throw is carried at the side, not held up in front of its own face.
+// With the torso turned this far towards the sight, the weapon shoulder sits beside the head, so a
+// hand raised to head height put the whole arm across the eyes from the player's own camera.
+for(const crouching of[false,true]){
+ pose({weapon:'throw',crouching});
+ const at=object=>object.getWorldPosition(new T.Vector3());
+ const potato=at(m.heldSpud),eye=at(m.eyes[0]),body=at(m.bob.children[0]),hands=m.arms.map(a=>at(a.userData.hand));
+ const outboard=v=>Math.hypot(v.x-body.x,v.z-body.z);
+ assert.ok(potato.y<eye.y-.12,`a carried potato rests below eye level, not in front of the face (crouch ${crouching})`);
+ assert.ok(potato.distanceTo(eye)>.35,'and clear of the head entirely');
+ assert.ok(Math.abs(hands[0].y-hands[1].y)<.4,`both arms hang at about the same height (crouch ${crouching})`);
+ for(const hand of hands)assert.ok(outboard(hand)>outboard(eye)+.25,'each hand stays outboard of the head rather than across it');
+}
 const pa=new T.Vector3(),pb=new T.Vector3(),pc=new T.Vector3(),surface=new T.Vector3(),normal=new T.Vector3();
 for(const opts of cases){pose(opts,false);for(const arm of m.arms){const {upper,lower}=arm.userData;
  for(const attribute of['position','normal']){const a=upper.geometry.attributes[attribute],b=lower.geometry.attributes[attribute];for(let j=0;j<17;j++){pa.fromBufferAttribute(a,a.count-17+j);pb.fromBufferAttribute(b,j);assert.ok(pa.distanceTo(pb)<1e-6,'rounded elbow surface and lighting must have no seam');}}
  for(const mesh of[upper,lower]){const {position,normal:n}=mesh.geometry.attributes,ix=mesh.geometry.index;for(let i=0;i<ix.count;i+=3){pa.fromBufferAttribute(position,ix.getX(i));pb.fromBufferAttribute(position,ix.getX(i+1));pc.fromBufferAttribute(position,ix.getX(i+2));surface.copy(pb).sub(pa).cross(pc.sub(pa));if(surface.lengthSq()<1e-10)continue;normal.fromBufferAttribute(n,ix.getX(i));assert.ok(surface.normalize().dot(normal)>.1,'arm triangles must face outward, not expose the inside of a hollow sleeve');}}
 }}
-console.log('PASS head-high ready stance and continuous outward-facing rounded arm surfaces');
+console.log('PASS potato carried at the side clear of its own face, and continuous outward-facing rounded arm surfaces');
 for(const mode of['race','assault']){w.level=LEVELS.find(l=>l.mode===mode);pose({weapon:'throw',walk:1,stride:.7});assert.equal(m.heldSpud.visible,false);for(const arm of m.arms)assert.ok(arm.userData.hand.position.y<arm.userData.shoulder.position.y,'unarmed course runners use a free arm swing, not a raised invisible potato');}
 w.level=LEVELS[0];
 console.log('PASS maze and assault runners keep a free unarmed arm swing');

@@ -525,7 +525,10 @@ m.lids.forEach(l=>l.rotation.x=LID_OPEN+shut*1.52);m.eyes.forEach(e=>e.scale.y=1
    this.characters.forEach(m=>m.label.prepare(cam,this.h,this.solids));
    const own=this.characters[p.id],distance=Math.hypot(cam.position.x-p.x,cam.position.z-p.z),end={x:pose.position.x+pose.direction.x*12,y:pose.position.y+pose.direction.y*12,z:pose.position.z+pose.direction.z*12},blockedSight=Number.isFinite(cylinderContact(pose.position,end,p,.12));
    // Clear only actual camera penetration/obstruction; nearby rivals never make the player pop away.
-   const visible=own.g.visible,labelVisible=own.label.sprite.visible;if(distance<1.55||blockedSight)own.g.visible=false;own.label.sprite.visible=false;
+   // Drop the own model when the boom has been crushed against cover, or when the shoulder offset
+   // itself has collapsed and the camera is standing in the player. Measuring the distance to the
+   // player alone only worked while the camera sat directly behind them.
+   const visible=own.g.visible,labelVisible=own.label.sprite.visible;if(pose.distance<1.1||distance<.9||blockedSight)own.g.visible=false;own.label.sprite.visible=false;
    this.renderer.setViewport(left,0,width,this.h);this.renderer.setScissor(left,0,width,this.h);try{this.renderer.render(this.scene,cam);}finally{own.g.visible=visible;own.label.sprite.visible=labelVisible;}
 
   }this.renderer.setScissorTest(false);

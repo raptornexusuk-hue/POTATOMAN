@@ -1,5 +1,5 @@
 import * as T from './assets/three.module.js';
-import {muzzlePosition} from './aiming.js';
+import {muzzlePosition,CAMERA_SHOULDER} from './aiming.js';
 import {THROW_DURATION,THROW_WINDUP} from './weapons.js';
 // A side-on torso puts the shoulder, the throwing hand and the whole receiver in the shoulder view,
 // so the weapon reads as pointing at the crosshair instead of hiding behind the potato.
@@ -67,7 +67,7 @@ function solveArm(arm,shoulder,point,pole,throwing=false){const {upper,lower,joi
  if(throwing){
   // Bound the elbow on its IK circle, so clearing the sight cannot shorten a bone.
   // Keep the same anatomical bend branch throughout wind-up and recovery.
-  const over=Math.max(0,elbow.dot(aimRight)-.80);bendRight.copy(aimRight).addScaledVector(direction,-aimRight.dot(direction));const projection=bendRight.length(),radial=height*projection;
+  const over=Math.max(0,elbow.dot(aimRight)-ELBOW_REACH);bendRight.copy(aimRight).addScaledVector(direction,-aimRight.dot(direction));const projection=bendRight.length(),radial=height*projection;
   if(radial>1e-7){bendRight.divideScalar(projection);bendSide.crossVectors(direction,bendRight).normalize();const wanted=elbow.dot(aimRight)-over*over/(over+.025),centre=shoulder.dot(aimRight)+along*direction.dot(aimRight),k=clamp((wanted-centre)/radial,-.999999,.999999);bend.copy(bendRight).multiplyScalar(k).addScaledVector(bendSide,-Math.sqrt(1-k*k));elbow.copy(shoulder).addScaledVector(direction,along).addScaledVector(bend,height);}
  }
  joint.position.copy(elbow);shapeSleeve(upper,lower,shoulder,elbow,wrist);hand.position.copy(wrist);
@@ -76,6 +76,10 @@ function solveArm(arm,shoulder,point,pole,throwing=false){const {upper,lower,joi
 function limitWrist(arm){const {hand,joint}=arm.userData;direction.copy(hand.position).sub(joint.position).normalize();palmAxis.set(0,-1,0).applyQuaternion(hand.quaternion);const angle=palmAxis.angleTo(direction),limit=1.22;if(angle>limit){align.setFromUnitVectors(palmAxis,direction);align.slerp(identity,limit/angle);hand.quaternion.premultiply(align);}}
 // Cubic Hermite segments share velocities at the overhead release and follow-through.
 function arc(out,a,b,va,vb,t,duration){const t2=t*t,t3=t2*t;return out.copy(a).multiplyScalar(2*t3-3*t2+1).addScaledVector(b,-2*t3+3*t2).addScaledVector(va,(t3-2*t2+t)*duration).addScaledVector(vb,(t3-t2)*duration);}
+// The elbow may travel out towards the sight but never into it. The sight runs through the camera
+// anchor, so the limit is that offset less the width of an arm, rather than a number that happened
+// to suit one body turn.
+const ELBOW_REACH=CAMERA_SHOULDER-.22;
 const zero=new T.Vector3(),releaseVelocity=new T.Vector3(),windVelocity=new T.Vector3(),followVelocity=new T.Vector3();
 const bendRight=new T.Vector3(),bendSide=new T.Vector3();
 const readyPole=new T.Vector3(),windPole=new T.Vector3(),releasePole=new T.Vector3(),followPole=new T.Vector3(),recoverPole=new T.Vector3();
@@ -90,7 +94,7 @@ export function poseArms(m,p,stride,walk,crouch,canThrow=true){
  // throwing action instead of dragging the action round with it.
  const aimLocal=(out,across,height,fwd)=>bodyPoint(out,aimRight.x*across+aimForward.x*fwd,height,aimRight.z*across+aimForward.z*fwd);
  const tossing=canThrow&&p.weapon==='throw'&&!p.runner,duration=p.shotDuration??THROW_DURATION,clock=p.shotAnim>0?Math.max(0,duration-p.shotAnim):0,recovery=Math.max(.01,duration-THROW_WINDUP),u=clamp((clock-THROW_WINDUP)/recovery,0,1),k=recovery/(THROW_DURATION-THROW_WINDUP),mapped=k*u+(1-k)*smooth(u),elapsed=clock<=THROW_WINDUP?clock:THROW_WINDUP+(THROW_DURATION-THROW_WINDUP)*mapped;
- if(tossing){const origin=muzzlePosition(p);aimLocal(ready,.790,1.78,-.203);aimLocal(windup,.724,2.04,-.350);toLocal(release,origin.x,origin.y,origin.z);aimLocal(follow,.754,1.20,.617);aimLocal(recoverPoint,1.081,1.85,.041);recoverVelocity.copy(ready).sub(follow).multiplyScalar(2);
+ if(tossing){const origin=muzzlePosition(p);aimLocal(ready,1.15,1.15,-.70);aimLocal(windup,.724,2.04,-.350);toLocal(release,origin.x,origin.y,origin.z);aimLocal(follow,.754,1.20,.617);aimLocal(recoverPoint,1.081,1.85,.041);recoverVelocity.copy(ready).sub(follow).multiplyScalar(2);
   windVelocity.copy(release).sub(ready).multiplyScalar(4);releaseVelocity.copy(follow).sub(windup).multiplyScalar(4);followVelocity.copy(ready).sub(release).multiplyScalar(2);
   if(!p.shotAnim)spud.copy(ready);else if(elapsed<.068)arc(spud,ready,windup,zero,windVelocity,elapsed/.068,.068);else if(elapsed<THROW_WINDUP)arc(spud,windup,release,windVelocity,releaseVelocity,(elapsed-.068)/(THROW_WINDUP-.068),THROW_WINDUP-.068);else if(elapsed<.27)arc(spud,release,follow,releaseVelocity,followVelocity,(elapsed-THROW_WINDUP)/(.27-THROW_WINDUP),.27-THROW_WINDUP);else if(elapsed<.37)arc(spud,follow,recoverPoint,followVelocity,recoverVelocity,(elapsed-.27)/.10,.10);else arc(spud,recoverPoint,ready,recoverVelocity,zero,(elapsed-.37)/(THROW_DURATION-.37),THROW_DURATION-.37);
   // A carried potato follows the gait, then settles into the throwing action and
@@ -119,7 +123,7 @@ export function poseArms(m,p,stride,walk,crouch,canThrow=true){
   // The throw arc lives in the aim frame like every other pole here, not in body coordinates:
    // the spud it reaches for is placed in aim space, so a further-turned torso has to swing under
    // the same arm path rather than drag the upper arm through the chest.
-   if(j===0&&tossing){aimLocal(readyPole,.90,1.17,-.84);aimLocal(windPole,.90,1.40,-.84);aimLocal(releasePole,.755,1.85,.006);aimLocal(followPole,.775,.90,-.018);aimLocal(recoverPole,1.018,1.40,-.214);
+   if(j===0&&tossing){aimLocal(readyPole,0.96,0.80,-.80);aimLocal(windPole,0.96,1.40,-.80);aimLocal(releasePole,.755,1.85,.006);aimLocal(followPole,.775,.90,-.018);aimLocal(recoverPole,1.018,1.40,-.214);
    if(!p.shotAnim)pole.copy(readyPole);else if(elapsed<.068)pole.lerpVectors(readyPole,windPole,smooth(elapsed/.068));else if(elapsed<THROW_WINDUP)pole.lerpVectors(windPole,releasePole,smooth((elapsed-.068)/(THROW_WINDUP-.068)));else if(elapsed<.27)pole.lerpVectors(releasePole,followPole,smooth((elapsed-THROW_WINDUP)/(.27-THROW_WINDUP)));else if(elapsed<.37)pole.lerpVectors(followPole,recoverPole,smooth((elapsed-.27)/.10));else pole.lerpVectors(recoverPole,readyPole,smooth((elapsed-.37)/(THROW_DURATION-.37)));
   }hand.rotation.set(0,0,sign*.08);let curl=.22;
   // Only the weapon arm grips. A potato torso is wider than the arms are long, so a support

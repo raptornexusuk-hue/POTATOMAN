@@ -2,13 +2,18 @@ import {boxContact3D,THROW_DROP} from './core.js';
 import {bodyHeight,bodyScale,muzzleHeight} from './stance.js';
 import {weaponConfig,dropFactor} from './weapons.js';
 const GUN_TUNING={lightRight:.60,lightLift:.10,heavyRight:.42,heavyForward:.90,heavyLift:0};
-export const MIN_PITCH=-.85,MAX_PITCH=.70,CAMERA_SHOULDER=1.24,REST_ZOOM=4.6;
-export const cameraHeight=p=>(p.crouching?1.17:1.55)*bodyScale(p);
-// A fresh view sights a standing rival's chest at duelling range instead of the dirt underfoot.
-// Tilting the sight up swings the boom down by the same angle, so over the small angle involved
-// the resting pitch solves eye - pitch*REST_ZOOM + pitch*SIGHT_RANGE = CHEST_HEIGHT.
-export const SIGHT_RANGE=14,CHEST_HEIGHT=1.35;
-export const DEFAULT_PITCH=(CHEST_HEIGHT-cameraHeight({}))/(SIGHT_RANGE-REST_ZOOM);
+export const MIN_PITCH=-.85,MAX_PITCH=.70,CAMERA_SHOULDER=1.45,REST_ZOOM=4;
+// The boom pivots above the player's head and out past their shoulder, which is what puts them
+// low and to one side of the sight rather than square behind it. Crouching drops the pivot by the
+// same proportion as the body, so ducking lowers the view instead of leaving it hanging.
+export const VIEW_PIVOT=2,VIEW_PIVOT_CROUCH=VIEW_PIVOT*1.17/1.55;
+export const cameraHeight=p=>(p.crouching?VIEW_PIVOT_CROUCH:VIEW_PIVOT)*bodyScale(p);
+// How far each kind of shot is sighted. A resting view runs the whole length of the longest one and
+// meets the ground exactly at the end of it, so nothing inside any weapon's range sits below the
+// crosshair before the player has aimed at all. Tilting the sight up swings the boom down by the
+// same angle, which is the REST_ZOOM term.
+export const GUN_RANGE=60,THROW_RANGE=28;
+export const DEFAULT_PITCH=-cameraHeight({})/(GUN_RANGE-REST_ZOOM);
 // Socket locations are independent of camera distance and body animation.
 export function muzzlePosition(p,solids=[]){const scale=bodyScale(p),throwing=p.weapon==='throw',right=(throwing?.58:.74)*scale,forward=(throwing?.56:p.weapon==='rpg'?.96:.82)*scale,origin={x:p.x,y:(p.y??0)+(throwing?(p.crouching?1.54:2.04)*scale:muzzleHeight(p)),z:p.z},muzzle={x:p.x+Math.sin(p.yaw)*forward+Math.cos(p.yaw)*right,y:origin.y,z:p.z-Math.cos(p.yaw)*forward+Math.sin(p.yaw)*right};let fraction=1;for(const w of solids)fraction=Math.min(fraction,boxContact3D(origin.x,origin.y,origin.z,muzzle.x,muzzle.y,muzzle.z,w,.18));if(fraction<1)for(const k of ['x','y','z'])muzzle[k]=mix(origin[k],muzzle[k],Math.max(0,fraction-.04));return muzzle;}
 
@@ -51,7 +56,7 @@ export function aimPoint(p,view,players,solids,targets=[],range=28){const camera
 // stops meaning anything.
 export function shotVelocity(p,target,speed,drop=1,muzzle=muzzlePosition(p)){const d=Math.max(.05,Math.hypot(target.x-muzzle.x,target.z-muzzle.z)),t=d/speed;return{...muzzle,vx:(target.x-muzzle.x)/d*speed,vz:(target.z-muzzle.z)/d*speed,vy:(target.y-muzzle.y)/t+drop*THROW_DROP*t};}
 
-export function weaponAim(p,players,solids,targets=[],speed=weaponConfig(p).speed){const w=weaponConfig(p),view=cameraPose(p,{zoom:p.cameraDistance},solids),target=aimPoint(p,view,players,solids,targets,w.gun?60:28),scale=bodyScale(p),origin={x:p.x,y:(p.y??0)+muzzleHeight(p),z:p.z};let muzzle=muzzlePosition(p),velocity,nearTarget=false;
+export function weaponAim(p,players,solids,targets=[],speed=weaponConfig(p).speed){const w=weaponConfig(p),view=cameraPose(p,{zoom:p.cameraDistance},solids),target=aimPoint(p,view,players,solids,targets,w.gun?GUN_RANGE:THROW_RANGE),scale=bodyScale(p),origin={x:p.x,y:(p.y??0)+muzzleHeight(p),z:p.z};let muzzle=muzzlePosition(p),velocity,nearTarget=false;
  if(p.weapon!=='throw'){
   // Aim around a shoulder grip, rather than swinging the stock around a fixed muzzle.
   const twoHanded=['scatter','rpg','mortar','fryer'].includes(p.weapon),gripRight=twoHanded?GUN_TUNING.heavyRight:GUN_TUNING.lightRight,gripForward=twoHanded?GUN_TUNING.heavyForward:.64,grip={x:p.x+Math.cos(p.yaw)*gripRight*scale+Math.sin(p.yaw)*gripForward*scale,y:origin.y+(twoHanded?GUN_TUNING.heavyLift:GUN_TUNING.lightLift),z:p.z+Math.sin(p.yaw)*gripRight*scale-Math.cos(p.yaw)*gripForward*scale},length=(p.weapon==='rpg'?.69:p.weapon==='peeler'?.78:p.weapon==='scatter'?.62:.55)*scale;
