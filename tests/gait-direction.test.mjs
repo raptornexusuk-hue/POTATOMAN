@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import * as T from '../dist/assets/three.module.js';
 import {World} from '../dist/world.js';
-import {LEVELS} from '../dist/core.js';
+import {LEVELS,JUMP_SPEED} from '../dist/core.js';
 const ctx=new Proxy({measureText:t=>({width:t.length*31})},{get:(o,k)=>o[k]??(()=>{}),set:(o,k,v)=>(o[k]=v,true)});
 globalThis.document={createElement:()=>({getContext:()=>ctx})};globalThis.innerWidth=1440;globalThis.innerHeight=900;globalThis.devicePixelRatio=1;
 const renderer={shadowMap:{},capabilities:{getMaxAnisotropy:()=>4},setPixelRatio(){},setSize(){}};
@@ -42,3 +42,24 @@ assert.equal(m.mouth.visible,false);p.shotAnim=.46-.12;w.updatePlayers([p],0,0);
 p.shotAnim=0;w.updatePlayers([p],0,0);assert.equal(m.mouth.visible,false);assert.equal(m.lids[0].rotation.x,openLid);assert.equal(m.brows[0].position.y,idleBrow);
 assert.ok(m.gun.children.filter(o=>o.isMesh).length<=10,'detailed gun is batched into a bounded number of material draws');
 console.log('PASS throw anticipation, effort/exhale and facial recovery; detailed launcher retains bounded draw calls');
+
+// A jump is its own animation, not the walk cycle with the feet held still. Both legs used to hang
+// near-straight with a token lift whatever the leap was doing, which read as dangling. The cycle is
+// driven by the live vertical speed, so it cannot drift from the physics: climbing, the lead knee
+// tucks up and forward and the trailing leg sweeps back; falling, both legs straighten and reach
+// down past where they stand, which is the moment the player is looking at them.
+{
+ const legLength=side=>.78-(m.legs[side].userData.foot.position.y-.09+.315);
+ const airborne=vy=>{Object.assign(p,{grounded:false,vy});m.walk=0;m.stride=0;m.gaitX=0;m.gaitZ=1;m.lastX=p.x;m.lastZ=p.z;w.updatePlayers([p],0,1/60);w.root.updateMatrixWorld(true);
+  return{legs:[legLength(0),legLength(1)],feet:m.legs.map(l=>l.userData.foot.position.z),knee:m.legs[0].userData.knee.position.z};};
+ Object.assign(p,{grounded:true,vy:0});m.walk=0;m.stride=0;m.gaitX=0;m.gaitZ=1;m.lastX=p.x;m.lastZ=p.z;w.updatePlayers([p],0,1/60);w.root.updateMatrixWorld(true);
+ const standing=legLength(0);
+ const launch=airborne(JUMP_SPEED),apex=airborne(0),landing=airborne(-JUMP_SPEED);
+ assert.ok(launch.legs[0]<standing-.10,`climbing, the lead knee tucks: leg is ${launch.legs[0].toFixed(3)} against ${standing.toFixed(3)} standing`);
+ assert.ok(launch.legs[1]>launch.legs[0]+.05,'and the trailing leg stays longer than the tucked one');
+ assert.ok(launch.knee>apex.knee+.15,'the tucked knee comes forward, not just up');
+ assert.ok(landing.legs[0]>standing+.08,`falling, the legs reach down past where they stand: ${landing.legs[0].toFixed(3)} against ${standing.toFixed(3)}`);
+ assert.ok(landing.legs[0]>apex.legs[0]&&apex.legs[0]>launch.legs[0],'and the leg lengthens monotonically from launch through the apex to the landing');
+ for(const stage of[launch,apex,landing])assert.ok(stage.feet[0]-stage.feet[1]>.4,'the legs hold a stride apart throughout the leap rather than hanging together');
+ console.log(`PASS the jump tucks (${launch.legs[0].toFixed(2)}m), passes through rest (${apex.legs[0].toFixed(2)}m) and reaches for the landing (${landing.legs[0].toFixed(2)}m) against ${standing.toFixed(2)}m standing`);
+}

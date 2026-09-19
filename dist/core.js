@@ -331,7 +331,10 @@ export const POWERUPS={run:{label:'BUTTER BOOTS',caption:'RUN FASTER',color:0x60
 // grows from ten rounds to twenty-one stretches its pacing to fit instead of finishing it early.
 export const circuitProgress=index=>LEVELS.length>1?Math.max(0,Math.min(1,index/(LEVELS.length-1))):0;
 export function isTrial(level){return level.mode==='race'||level.mode==='assault'||level.mode==='climb';}
-export function jump(p){if(p.respawn>0||!p.grounded||p.crouching)return false;p.vy=p.jumpBoost>0?10.4:7.8;p.grounded=false;return true;}
+// How hard a jump leaves the ground. The renderer divides the live vertical speed by this to know
+// where in the leap the player is, so the airborne leg cycle cannot drift from the physics.
+export const JUMP_SPEED=7.8,JUMP_BOOST_SPEED=10.4;
+export function jump(p){if(p.respawn>0||!p.grounded||p.crouching)return false;p.vy=p.jumpBoost>0?JUMP_BOOST_SPEED:JUMP_SPEED;p.grounded=false;return true;}
 export function movePlayer(p,input,dt,map,speed=6){
  const solids=map.platforms?.length?[...map.walls,...map.platforms]:map.walls;
  // Whatever the player was standing on last tick takes them with it.

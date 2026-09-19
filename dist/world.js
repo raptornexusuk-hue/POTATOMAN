@@ -9,8 +9,10 @@ import {bodyHeight} from './stance.js';
 import {WEAPONS} from './weapons.js';
 import * as T from './assets/three.module.js';
 import {PlayerLabel} from './player-label.js';
-import {CELL,rng,POWERUPS,isTrial,boxContact3D} from './core.js';
-import {roundedBox,potatoGeometry,applyWorldUV,makeSky,curveTube,clogGeometry,ambientDust} from './visuals.js';
+import {CELL,rng,POWERUPS,isTrial,boxContact3D,JUMP_SPEED} from './core.js';
+import {roundedBox,potatoGeometry,applyWorldUV,makeSky,curveTube,clogGeometry,clogProfile,ambientDust} from './visuals.js';
+// Sampled once: the shoe's own surface, so painted decoration can be laid on it rather than guessed.
+const CLOG_PROFILE=clogProfile();
 const colors=[0xf1bc40,0x4ccbd3,0xef6b72,0x9b92ed];
 export {colors};
 // Feet have to keep up with the ground, which a sine wave alone never does: it only matches
@@ -38,6 +40,10 @@ const indoorGlow=half=>Math.min(3.4,1.6+half*.045);
 const GUN_SHAPES={spud:{bulk:1,length:.72},repeater:{bulk:1,length:.74,kit:'mag'},scatter:{bulk:1.06,length:.82},
  masher:{bulk:.92,length:.70},rpg:{bulk:1.2,length:.91,kit:'warhead'},peeler:{bulk:.88,length:.92,kit:'scope'},
  fryer:{bulk:1.16,length:.60,kit:'funnel'},sticky:{bulk:1.1,length:.56,kit:'drum'}};
+// How far the knee tucks climbing, how far the leg reaches falling, and the stride the legs hold
+// apart throughout a leap. AIR_REACH is negative lift: it puts the ankle below where it stands, so
+// the legs are visibly longer in the air than on the ground.
+const AIR_TUCK=.15,AIR_REACH=.10,AIR_SPLIT=.30;
 const footReach=(phase,walk)=>{const cycle=((phase%TAU)+TAU)%TAU;return walk*STEP_REACH*(cycle<Math.PI?-Math.cos(cycle):1-2*(cycle-Math.PI)/Math.PI);};
 
 export class World{
@@ -284,7 +290,18 @@ export class World{
    if(c.index>0){const prev=map.course[c.index-1],dx=c.x-prev.x,dz=c.z-prev.z,length=Math.hypot(dx,dz);const path=this.mesh('box',this.mat(0xe5c270,null,{roughness:1}),this.root,(c.x+prev.x)/2,.012,(c.z+prev.z)/2,.16,.016,length);path.rotation.y=Math.atan2(dx,dz);path.castShadow=false;}
   }
  }
- clogMaterial(){const key='painted-yellow-klompens';if(!this.materials.has(key)){const m=new T.MeshPhysicalMaterial({color:0xffc522,roughness:.34,clearcoat:.42,clearcoatRoughness:.28,emissive:0x4f3100,emissiveIntensity:.10});if(this.pbr?.oak){m.normalMap=this.pbr.oak[1];m.normalScale.set(.11,.11);m.roughnessMap=this.pbr.oak[2];}this.materials.set(key,m);}return this.materials.get(key);}
+ // A klomp on the cover is varnished yellow wood that has been walked through a market in: the
+ // colour is broken by mud flecks and the grain shows through the paint. A flat colour reads as
+ // plastic next to a photoreal potato, so the yellow carries its own weathering.
+ clogTexture(){const c=document.createElement('canvas');c.width=c.height=256;const ctx=c.getContext('2d'),r=rng(4711);
+  ctx.fillStyle='#ffc93a';ctx.fillRect(0,0,256,256);
+  // Grain running the length of the shoe, then a warmer wash where the varnish has pooled.
+  for(let i=0;i<260;i++){ctx.globalAlpha=.05+r()*.09;ctx.fillStyle=r()>.45?'#d79a1c':'#ffe08a';ctx.fillRect(r()*256,r()*256,r()*90+20,r()*2+.6);}
+  for(let i=0;i<40;i++){ctx.globalAlpha=.05+r()*.06;ctx.fillStyle='#b97d17';ctx.beginPath();ctx.ellipse(r()*256,r()*256,r()*40+12,r()*16+5,r()*3,0,7);ctx.fill();}
+  // Mud. Heavier towards the sole, which is the half of the shoe that meets the street.
+  for(let i=0;i<2600;i++){const y=r();ctx.globalAlpha=(.10+r()*.50)*(y*y);ctx.fillStyle=r()>.35?'#4a3418':'#6d5227';ctx.beginPath();ctx.ellipse(r()*256,y*256,r()*2.0+.25,r()*1.5+.25,r()*3,0,7);ctx.fill();}
+  ctx.globalAlpha=1;const t=new T.CanvasTexture(c);t.colorSpace=T.SRGBColorSpace;t.wrapS=t.wrapT=T.RepeatWrapping;return t;}
+ clogMaterial(){const key='painted-yellow-klompens';if(!this.materials.has(key)){this.textures.clog??=this.clogTexture();const m=new T.MeshPhysicalMaterial({color:0xffc522,map:this.textures.clog,roughness:.30,clearcoat:.62,clearcoatRoughness:.19,emissive:0x4f3100,emissiveIntensity:.10});if(this.pbr?.oak){m.normalMap=this.pbr.oak[1];m.normalScale.set(.11,.11);m.roughnessMap=this.pbr.oak[2];}this.materials.set(key,m);}return this.materials.get(key);}
  // Every piece is cut from the skull band at its own height, so nothing has to be re-guessed for
  // the rounder or narrower bodies. Headgear belongs above the eyes and is the only kit the sight
  // audit measures as such; eyewear and neckwear sit on the face and the shoulders and go in their
@@ -453,40 +470,63 @@ export class World{
    this.mesh('clog',wood,foot,0,0,.04,1.13,1,1.13);
    // The reshaped klomp sits a little taller, so opening and carving ride on one lifted trim group.
    const trim=new T.Group();trim.position.y=.028;foot.add(trim);
-   this.mesh('sphere',this.mat(0x63431e),trim,0,.264,-.065,.14,.014,.155);
-   const rim=this.mesh(new T.TorusGeometry(.14,.023,10,28),wood,trim,0,.281,-.065);rim.rotation.x=Math.PI/2;rim.scale.y=1.13;rim.userData.ownGeometry=true;
    this.mesh('clog',this.mat(0x815c28,'wood'),foot,0,-.02,.04,1.15,.17,1.15);
-   for(let j=0;j<3;j++){const decoration=this.mesh(curveTube([[-.16,.23,.25+j*.047],[0,.278,.27+j*.047],[.16,.23,.25+j*.047]],.012),this.mat(0x735027),trim);decoration.userData.ownGeometry=true;}
-   const carving=this.mat(0x835126,null,{roughness:.6}),inlay=this.mat(breed.paint,null,{roughness:.5}),detail=[];
-   const carve=(points,r=.007,mat=carving)=>{const piece=this.mesh(curveTube(points,r),mat,trim);piece.userData.ownGeometry=true;detail.push(piece);return piece;};
-   // Painted Dutch folk work: tulip spray on the instep, chevroned heel, beaded side borders
-   // and a scalloped collar, in the carved/painted style of a real klomp.
-   for(const side of[-1,1]){
-    for(let j=0;j<2;j++)carve([[side*.06,.295,.25],[side*(.105+j*.025),.302,.32+j*.025],[side*.065,.29,.405]]);
-    carve([[side*.21,.10,-.15],[side*.22,.115,.20],[side*.13,.17,.60],[side*.018,.245,.82]],.006);
-    // Beaded border following the upper edge of each side wall.
-    for(let j=0;j<6;j++){const t=j/5,bead=this.mesh(this.geo.smallSphere,carving,trim,side*(.225-t*.10),.135+t*.075,-.08+t*.62,.018,.018,.018);detail.push(bead);}
-    // Scrolled volute curling back from the toe.
-    carve([[side*.15,.20,.58],[side*.19,.25,.46],[side*.12,.275,.38],[side*.05,.255,.44]],.0055);
-   }
-   // Heel chevrons.
-   for(let j=0;j<3;j++)carve([[-.15,.10+j*.045,-.245+j*.03],[0,.165+j*.045,-.16+j*.03],[.15,.10+j*.045,-.245+j*.03]],.0075);
-   // Scalloped collar around the foot opening.
-   for(let j=0;j<10;j++){const a=j*Math.PI*2/10,scallop=this.mesh(this.geo.smallSphere,carving,trim,Math.sin(a)*.155,.288,-.065+Math.cos(a)*.175,.022,.014,.022);detail.push(scallop);}
-   // Tulip spray on the toe: painted bloom, stem and paired leaves.
-   carve([[-.055,.302,.44],[-.042,.327,.50],[0,.315,.48],[.042,.327,.50],[.055,.302,.44],[0,.296,.41],[-.055,.302,.44]],.009,inlay);
-   carve([[0,.298,.40],[0,.30,.34],[0,.295,.28]],.005);
-   for(const side of[-1,1])carve([[0,.297,.33],[side*.055,.305,.355],[side*.075,.298,.40]],.0045);
-   carve([[-.085,.295,.56],[0,.335,.615],[.085,.295,.56]],.008,inlay);
-   this.mesh(this.geo.smallSphere,inlay,trim,0,.325,.50,.028,.020,.028);
-   // Painted work on the side walls, where a klomp actually carries it: a white band under the
-   // beading, a red heart on the outer wall and brass nail heads along the sole seam.
+   // Painted work belongs ON the klomp. It used to be authored as numbers measured against a
+   // picture of the shoe, so 52 of the 63 pieces were sitting inside the wood and a klomp the code
+   // describes as carrying a tulip spray and beaded borders arrived on screen plain yellow. Every
+   // piece is now placed against the shoe's own profile -- `atop` gives the height of the instep at
+   // a point along the shoe, `beside` the half-width of the side wall there -- so the pattern
+   // survives the next time the toe or the outline is reshaped.
    const paint=this.mat(0xfdf4e2,null,{physical:true,roughness:.42,clearcoat:.5,clearcoatRoughness:.3}),heartPaint=this.mat(0xc22b33,null,{physical:true,roughness:.36,clearcoat:.65,clearcoatRoughness:.2}),brass=this.mat(0xc79a3f,null,{metalness:.8,roughness:.3});
+   const {top:clogTop,wall:clogWall}=CLOG_PROFILE,gz=z=>(z-.04)/1.13;
+   // `atop` asks the shoe how high it is at a point rather than telling it. The cap is triangulated
+   // straight across the outline, so its long triangles carry the toe's upsweep back over the middle
+   // of the instep: a formula put the surface at 0.386 where the wood is actually at 0.469, and the
+   // painted work went under it.
+   const atop=(x,z,lift=.014)=>clogTop(x/1.13,gz(z))-trim.position.y+lift;
+   // Wall work drops down the outside of the shoe from the shoulder where the top bevel ends -- a
+   // fixed line, not the centre of the instep, which the cap's upsweep carries far above it -- and
+   // then asks how far out the wood actually is at that height. Assuming the wall is as wide there
+   // as at its fattest point put every bead, nail and painted band inside it.
+   const WALL_TOP=.215;
+   const onWall=(z,drop,out=.005)=>{const y=WALL_TOP-drop;return{y,x:clogWall(y+trim.position.y,gz(z))*1.13+out};};
+   const carving=this.mat(0x2f1c09,null,{physical:true,roughness:.44,clearcoat:.5,clearcoatRoughness:.25}),inlay=this.mat(breed.paint,null,{roughness:.5});
+   const carve=(points,r=.007,mat=carving)=>{const piece=this.mesh(curveTube(points,r),mat,trim);piece.userData.ownGeometry=true;return piece;};
+   // The one thing every painted klomp has: a bold double outline round the foot opening, carried
+   // forward over the instep and closed off at the nose, with the tulip work sitting inside it.
+   // The foot opening: a dark recess and the lip of wood around it, both sitting on the instep
+   // rather than at a height that has to be retuned whenever the shoe is redrawn.
+   this.mesh('sphere',this.mat(0x4a3116),trim,0,atop(0,-.065,.008),-.065,.145,.016,.160);
+   const rim=this.mesh(new T.TorusGeometry(.145,.024,10,28),wood,trim,0,atop(0,-.065,.022),-.065);rim.rotation.x=Math.PI/2;rim.scale.y=1.13;rim.userData.ownGeometry=true;
+   const collar=(across,fore,width)=>carve(Array.from({length:33},(_,j)=>{const a=j*Math.PI*2/32,z=-.065+Math.cos(a)*fore,x=Math.sin(a)*across;return[x,atop(x,z),z];}),width);
+   collar(.170,.205,.0125);collar(.212,.252,.0078);
+   // Sampled along its length rather than drawn between four corners: the instep sweeps up towards
+   // the nose, and a spline through widely spaced points cuts underneath a curve that steep.
+   for(const side of[-1,1])carve(Array.from({length:9},(_,j)=>{const t=j/8,z=.16+t*.50,x=side*(.150-t*.100);return[x,atop(x,z),z];}),.0125);
+   carve(Array.from({length:9},(_,j)=>{const a=(j/8-.5)*Math.PI,z=.66+Math.cos(a)*.06,x=Math.sin(a)*.050;return[x,atop(x,z),z];}),.0125);
+   // Tulip spray on the instep: bloom, stem, paired leaves and a seed bead, the whole of it inside
+   // the outline above.
+   carve([[-.052,atop(-.052,.50),.50],[-.040,atop(-.040,.565),.565],[0,atop(0,.545),.545],[.040,atop(.040,.565),.565],[.052,atop(.052,.50),.50],[0,atop(0,.475),.475],[-.052,atop(-.052,.50),.50]],.011,inlay);
+   carve([[0,atop(0,.465),.465],[0,atop(0,.40),.40],[0,atop(0,.33),.33]],.0060);
+   for(const side of[-1,1])carve([[0,atop(0,.39),.39],[side*.058,atop(side*.058,.415),.415],[side*.082,atop(side*.082,.46),.46]],.0052);
+   this.mesh(this.geo.smallSphere,inlay,trim,0,atop(0,.565,.030),.565,.026,.018,.026);
+   // There were chevrons across the heel here. They were inside the heel block rather than on the
+   // back of it -- painted work on an end face needs placing against that face, which nothing here
+   // measures -- and the heel is the one part of a klomp the shoulder camera never sees, so they
+   // cost three meshes a foot to draw nothing.
    for(const side of[-1,1]){
-    carve([[side*.215,.075,-.13],[side*.225,.09,.22],[side*.135,.145,.60],[side*.02,.225,.80]],.010,paint);
-    for(const lobe of[-1,1])this.mesh(this.geo.smallSphere,heartPaint,trim,side*.198,.168+lobe*.020,.175+lobe*.032,.020,.030,.030);
-    this.mesh(this.geo.smallSphere,heartPaint,trim,side*.196,.130,.182,.017,.028,.028);
-    for(let j=0;j<3;j++)this.mesh(this.geo.smallSphere,brass,trim,side*(.212-j*.036),.042,-.14+j*.32,.014,.011,.014);
+    // Beaded border along the top of each side wall, and a scrolled volute curling back from the
+    // nose. Both are laid on the wall itself, a hair proud of it.
+    for(let j=0;j<7;j++){const t=j/6,z=-.10+t*.72,w=onWall(z,.052);this.mesh(this.geo.smallSphere,carving,trim,side*w.x,w.y,z,.019,.019,.019);}
+    carve([[.60,.060],[.50,.030],[.42,.012],[.47,.026]].map(([z,drop])=>{const w=onWall(z,drop);return[side*w.x,w.y,z];}),.0062);
+    // Painted work on the side walls, where a klomp actually carries it: a white band under the
+    // beading, a red heart on the outer wall and brass nail heads along the sole seam.
+    carve(Array.from({length:6},(_,j)=>{const z=-.20+j/5*.88,w=onWall(z,.105);return[side*w.x,w.y,z];}),.0125,paint);
+    // A red heart, traced as an outline on the wall rather than stacked out of beads, which read
+    // as three red balls at any distance at which the heart was supposed to be recognisable.
+    carve(Array.from({length:25},(_,j)=>{const t=j/24*Math.PI*2,hx=Math.sin(t)**3,hy=(13*Math.cos(t)-5*Math.cos(2*t)-2*Math.cos(3*t)-Math.cos(4*t))/16,z=.21+hx*.072;
+     const w=onWall(z,.150);return[side*w.x,onWall(.21,.150).y+hy*.062,z];}),.0072,heartPaint);
+    for(let j=0;j<4;j++){const z=-.14+j*.30,w=onWall(z,.195);this.mesh(this.geo.smallSphere,brass,trim,side*w.x,w.y,z,.016,.013,.016);}
    }
    leg.userData={thigh,shin,knee,foot};legs.push(leg);
   }
@@ -531,7 +571,20 @@ export class World{
   // Lean around the torso, rather than sweeping its shoulders forward from the feet.
   direction.set(0,1.09*m.bob.scale.y,0).applyEuler(m.bob.rotation);m.bob.position.x=-direction.x;m.bob.position.z=-direction.z;m.bob.position.y+=1.09*m.bob.scale.y-direction.y;
 
-  m.legs.forEach((leg,j)=>{const phase=stride+j*Math.PI,air=p.grounded===false,up=air?.16+(.06*j):Math.max(0,Math.sin(phase))*.135*walk,step=footReach(phase,walk),x=step*(m.gaitX??0),z=step*(m.gaitZ??1);hip.set(0,.78-crouch*.19,0);ankle.set(x,.315+up,z);knee.set(x*.5,(hip.y+ankle.y)*.5,(hip.z+ankle.z)*.5+.11+crouch*.21);const {thigh,shin,foot}=leg.userData;leg.userData.knee.position.copy(knee);for(let segment=0;segment<2;segment++){const mesh=segment?shin:thigh,a=segment?knee:hip,b=segment?ankle:knee,width=segment?.125:.135;mesh.position.copy(a).add(b).multiplyScalar(.5);direction.copy(b).sub(a);const length=direction.length();mesh.quaternion.setFromUnitVectors(upAxis,direction.normalize());mesh.scale.set(width,length*.58,width*1.06);}foot.position.set(x,.09+up,z);foot.rotation.x=air?-.20:Math.max(0,Math.sin(phase))*.05*walk;});
+  // Airborne legs run their own cycle. Holding both of them in a near-straight hang with a token
+  // lift read as dangling: the knees never came up, the feet never reached, and a leap looked like
+  // being lifted by the scruff. Where the player is in the jump comes from the live vertical speed
+  // rather than from the walk stride, which has stopped by then. Climbing, the lead knee tucks up
+  // and forward while the trailing leg sweeps back -- a stride held in the air. Falling, both legs
+  // straighten and reach down past where they stand, which is what sells the landing and is also
+  // the moment the legs are longest and most visible.
+  m.legs.forEach((leg,j)=>{const phase=stride+j*Math.PI,air=p.grounded===false,lead=j===0?1:-1;
+   const rise=air?Math.max(-1,Math.min(1,(p.vy??0)/JUMP_SPEED)):0,tuck=Math.max(0,rise),fall=Math.max(0,-rise);
+   const up=air?AIR_TUCK*tuck*(lead>0?1:.45)-AIR_REACH*fall:Math.max(0,Math.sin(phase))*.135*walk;
+   const step=air?lead*AIR_SPLIT+lead*(tuck*.16+fall*.10):footReach(phase,walk),x=step*(m.gaitX??0),z=step*(m.gaitZ??1);
+   hip.set(0,.78-crouch*.19,0);ankle.set(x,.315+up,z);knee.set(x*.5,(hip.y+ankle.y)*.5,(hip.z+ankle.z)*.5+.11+crouch*.21+(lead>0?tuck*.22:0));const {thigh,shin,foot}=leg.userData;leg.userData.knee.position.copy(knee);
+   for(let segment=0;segment<2;segment++){const mesh=segment?shin:thigh,a=segment?knee:hip,b=segment?ankle:knee,width=segment?.125:.135;mesh.position.copy(a).add(b).multiplyScalar(.5);direction.copy(b).sub(a);const length=direction.length();mesh.quaternion.setFromUnitVectors(upAxis,direction.normalize());mesh.scale.set(width,length*.58,width*1.06);}
+   foot.position.set(x,.09+up,z);foot.rotation.x=air?-.52*tuck+.34*fall:Math.max(0,Math.sin(phase))*.05*walk;});
   m.gun.visible=p.weapon!=='throw'&&!p.runner&&(!isTrial(this.level)||this.isBonus);
   // Each weapon gets its own bulk, length and attachment, so what a rival is carrying is readable
   // across the arena. Length scales the whole launcher, which keeps the muzzle on the gun's origin.

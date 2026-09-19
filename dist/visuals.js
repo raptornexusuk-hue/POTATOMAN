@@ -35,10 +35,86 @@ export function ambientDust(count=140,radius=26,riseHeight=5.5){
  const points=new T.Points(geo,material);points.frustumCulled=false;points.userData.ownGeometry=true;points.userData.ownMaterial=true;return points;
 }
 export function curveTube(points,r=.025){return new T.TubeGeometry(new T.CatmullRomCurve3(points.map(p=>new T.Vector3(...p))),20,r,8,false);}
+// The klomp's outline and the numbers the extrusion uses, in one place. `clogProfile` reads them
+// back so painted decoration can be laid on the shoe's real surface instead of at heights measured
+// against a picture of it -- which is how a tulip spray and beaded borders ended up inside the wood.
+// A klomp on the cover is a deep chunky block of wood, not a slipper: the body is nearly as tall
+// as the shoe is wide. Everything painted on it is placed from this profile, so deepening the
+// shoe moves the decoration with it.
+const CLOG={depth:.295,bevel:.065,toeStart:.24,toeSpan:.68,toeLift:.30};
+function clogShape(){const shape=new T.Shape();shape.moveTo(-.115,-.33);
+ shape.bezierCurveTo(-.228,-.29,-.252,.10,-.216,.34);
+ shape.bezierCurveTo(-.198,.56,-.158,.78,-.092,.885);
+ shape.quadraticCurveTo(0,.975,.092,.885);
+ shape.bezierCurveTo(.158,.78,.198,.56,.216,.34);
+ shape.bezierCurveTo(.252,.10,.228,-.29,.115,-.33);
+ shape.quadraticCurveTo(0,-.385,-.115,-.33);return shape;}
+// The shoe's own top surface, read off the triangles it is actually built from. Every earlier
+// attempt described it with a formula -- the extrusion depth plus the toe's upsweep -- and every
+// one of them was wrong somewhere, because the bevel rounds the cap away near its edges and the
+// cap itself is a ruled surface between outline vertices. Painted work placed against those
+// formulas came out inside the wood, which is how a klomp the code describes as carrying a tulip
+// spray and a bordered instep arrived on screen plain yellow. This is measured instead: for each
+// triangle, the cells of a grid it covers take its plane height, highest wins. It cannot drift from
+// the geometry, because it is the geometry.
+const GRID={x0:-.36,x1:.36,z0:-.50,z1:1.10,y0:-.12,y1:.80,nx:49,nz:97,ny:61};
+export function clogProfile(g=clogGeometry()){
+ const cell=(i,j)=>i*GRID.nz+j,height=new Float32Array(GRID.nx*GRID.nz).fill(-Infinity);
+ const dx=(GRID.x1-GRID.x0)/(GRID.nx-1),dz=(GRID.z1-GRID.z0)/(GRID.nz-1),pos=g.attributes.position,index=g.index;
+ const count=index?index.count:pos.count,at=k=>index?index.getX(k):k;
+ for(let t=0;t<count;t+=3){
+  const a=at(t),b=at(t+1),c=at(t+2);
+  const ax=pos.getX(a),ay=pos.getY(a),az=pos.getZ(a),bx=pos.getX(b),by=pos.getY(b),bz=pos.getZ(b),cx=pos.getX(c),cy=pos.getY(c),cz=pos.getZ(c);
+  const area=(bx-ax)*(cz-az)-(bz-az)*(cx-ax);if(Math.abs(area)<1e-9)continue;
+  const i0=Math.max(0,Math.floor((Math.min(ax,bx,cx)-GRID.x0)/dx)),i1=Math.min(GRID.nx-1,Math.ceil((Math.max(ax,bx,cx)-GRID.x0)/dx));
+  const j0=Math.max(0,Math.floor((Math.min(az,bz,cz)-GRID.z0)/dz)),j1=Math.min(GRID.nz-1,Math.ceil((Math.max(az,bz,cz)-GRID.z0)/dz));
+  for(let i=i0;i<=i1;i++)for(let j=j0;j<=j1;j++){
+   const x=GRID.x0+i*dx,z=GRID.z0+j*dz;
+   const w0=((bx-x)*(cz-z)-(bz-z)*(cx-x))/area,w1=((cx-x)*(az-z)-(cz-z)*(ax-x))/area,w2=1-w0-w1;
+   if(w0<-.02||w1<-.02||w2<-.02)continue;
+   const y=w0*ay+w1*by+w2*cy,k=cell(i,j);if(y>height[k])height[k]=y;
+  }
+ }
+ // A point between samples takes the highest of the four around it: paint riding a hair high is
+ // paint you can see, and paint a hair low is paint that is not there at all.
+ const top=(x,z)=>{const fi=(x-GRID.x0)/dx,fj=(z-GRID.z0)/dz;let best=-Infinity;
+  for(const i of[Math.floor(fi),Math.ceil(fi)])for(const j of[Math.floor(fj),Math.ceil(fj)]){
+   if(i<0||j<0||i>=GRID.nx||j>=GRID.nz)continue;const y=height[cell(i,j)];if(y>best)best=y;}
+  return Number.isFinite(best)?best:CLOG.depth+CLOG.bevel;};
+ // The side wall, measured the same way: how far out the wood is at a given height and point along
+ // the shoe. The outline's own half-width is only right at the wall's fattest point, so beads, nails
+ // and painted bands set below that line were sitting inside it.
+ const wide=new Float32Array(GRID.ny*GRID.nz).fill(-Infinity),dy=(GRID.y1-GRID.y0)/(GRID.ny-1),wcell=(i,j)=>i*GRID.nz+j;
+ for(let t=0;t<count;t+=3){
+  const a=at(t),b=at(t+1),c=at(t+2);
+  const ay=pos.getY(a),az=pos.getZ(a),by=pos.getY(b),bz=pos.getZ(b),cy=pos.getY(c),cz=pos.getZ(c);
+  const area=(by-ay)*(cz-az)-(bz-az)*(cy-ay);if(Math.abs(area)<1e-9)continue;
+  const ax=Math.abs(pos.getX(a)),bx=Math.abs(pos.getX(b)),cx=Math.abs(pos.getX(c));
+  const i0=Math.max(0,Math.floor((Math.min(ay,by,cy)-GRID.y0)/dy)),i1=Math.min(GRID.ny-1,Math.ceil((Math.max(ay,by,cy)-GRID.y0)/dy));
+  const j0=Math.max(0,Math.floor((Math.min(az,bz,cz)-GRID.z0)/dz)),j1=Math.min(GRID.nz-1,Math.ceil((Math.max(az,bz,cz)-GRID.z0)/dz));
+  for(let i=i0;i<=i1;i++)for(let j=j0;j<=j1;j++){
+   const y=GRID.y0+i*dy,z=GRID.z0+j*dz;
+   const w0=((by-y)*(cz-z)-(bz-z)*(cy-y))/area,w1=((cy-y)*(az-z)-(cz-z)*(ay-y))/area,w2=1-w0-w1;
+   if(w0<-.02||w1<-.02||w2<-.02)continue;
+   const x=w0*ax+w1*bx+w2*cx,k=wcell(i,j);if(x>wide[k])wide[k]=x;
+  }
+ }
+ // Below the wall, where the sole rounds away, there is no wood at that height at all. Returning
+ // zero there quietly moved whatever was being placed onto the shoe's centre line and buried it, so
+ // a miss climbs until it finds wall rather than answering with the middle of the shoe.
+ const wall=(y,z)=>{const fj=(z-GRID.z0)/dz;
+  for(let step=0;step<GRID.ny;step++){const fi=(y-GRID.y0)/dy+step;let best=-Infinity;
+   for(const i of[Math.floor(fi),Math.ceil(fi)])for(const j of[Math.floor(fj),Math.ceil(fj)]){
+    if(i<0||j<0||i>=GRID.ny||j>=GRID.nz)continue;const x=wide[wcell(i,j)];if(x>best)best=x;}
+   if(Number.isFinite(best)&&best>0)return best;}
+  return 0;};
+ return{top,wall};
+}
 export function clogGeometry(){
- // A boat-shaped klomp: narrow heel, widest at the ball of the foot, drawn out to a long
- // pointed toe that sweeps up — rather than the short flat oval it used to be.
- const shape=new T.Shape();shape.moveTo(-.115,-.33);shape.bezierCurveTo(-.225,-.29,-.245,.10,-.205,.32);shape.bezierCurveTo(-.175,.53,-.060,.80,0,.94);shape.bezierCurveTo(.060,.80,.175,.53,.205,.32);shape.bezierCurveTo(.245,.10,.225,-.29,.115,-.33);shape.quadraticCurveTo(0,-.385,-.115,-.33);
- const g=new T.ExtrudeGeometry(shape,{depth:.225,bevelEnabled:true,bevelThickness:.065,bevelSize:.042,bevelSegments:6,steps:1,curveSegments:24});g.rotateX(-Math.PI/2);g.rotateY(Math.PI);
- const p=g.attributes.position;for(let i=0;i<p.count;i++){const toe=Math.max(0,Math.min(1,(p.getZ(i)-.26)/.66));p.setY(i,p.getY(i)+.26*toe*toe);}g.computeVertexNormals();return g;
+ // A klomp the shape of the one on the cover: narrow heel, widest at the ball of the foot, and a
+ // blunt rounded nose that sweeps up hard. It was drawn to a long point before, which is a clog
+ // from a souvenir shop rather than one somebody stands in -- a real klompen's toe is a rounded
+ // scoop, and the upsweep is what carries the painted work into view.
+ const g=new T.ExtrudeGeometry(clogShape(),{depth:CLOG.depth,bevelEnabled:true,bevelThickness:CLOG.bevel,bevelSize:.042,bevelSegments:6,steps:1,curveSegments:24});g.rotateX(-Math.PI/2);g.rotateY(Math.PI);
+ const p=g.attributes.position;for(let i=0;i<p.count;i++){const toe=Math.max(0,Math.min(1,(p.getZ(i)-CLOG.toeStart)/CLOG.toeSpan));p.setY(i,p.getY(i)+CLOG.toeLift*toe);}g.computeVertexNormals();return g;
 }

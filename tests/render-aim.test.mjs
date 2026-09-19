@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import * as T from '../dist/assets/three.module.js';
 import {World} from '../dist/world.js';
+import {clogProfile} from '../dist/visuals.js';
 import {LEVELS,makeMap,boxContact3D} from '../dist/core.js';
 import {cameraPose,weaponAim,cameraHeight,CAMERA_SHOULDER,MIN_PITCH,MAX_PITCH,muzzlePosition} from '../dist/aiming.js';
 const ctx=new Proxy({measureText:t=>({width:t.length*31})},{get:(o,k)=>o[k]??(()=>{}),set:(o,k,v)=>(o[k]=v,true)});
@@ -52,9 +53,53 @@ assert.ok(lift<.18,'foot lift stays restrained');
  const painted=new Set();foot.traverse(o=>{if(o.isMesh&&o!==shoe)painted.add(o.material.color.getHex());});
  assert.ok(painted.size>=5,`decorated in ${painted.size} colours`);
  assert.ok([...painted].some(c=>c===0xfdf4e2)&&[...painted].some(c=>c===0xc22b33),'white banding and a red heart are the klomp motif');
+ // The outline is the thing the eye actually reads at arm's length, and it only reads if it is
+ // near-black on yellow rather than a slightly darker brown.
+ const outline=[...painted].filter(c=>((c>>16)&255)<70&&((c>>8)&255)<50);
+ assert.ok(outline.length,`the painted work is too pale to see against the yellow: ${[...painted].map(c=>'#'+c.toString(16)).join(' ')}`);
+ let pieces=0;foot.traverse(o=>{if(o.isMesh&&o!==shoe&&outline.includes(o.material.color.getHex()))pieces++;});
+ assert.ok(pieces>=18,`a painted klomp carries a full outline and a tulip spray, not a few strokes: ${pieces} pieces`);
+ // And every piece of it is actually on the shoe. This is the whole reason the klompen looked
+ // plain: paint was placed against a formula for where the wood ought to be, the extruded top cap
+ // carries the toe's upsweep back across the middle of the instep, and 52 of the 63 pieces ended up
+ // sitting inside it. The shoe's real surface is read off its own triangles, and every piece of
+ // paint on the instep has to reach above it somewhere.
+ {
+  w.root.updateMatrixWorld(true);
+  const {top,wall}=clogProfile(shoe.geometry),intoShoe=new T.Matrix4().copy(shoe.matrixWorld).invert();
+  let checked=0,worst=Infinity,worstAt=null;
+  for(const part of foot.children.find(c=>c.isGroup).children){
+   // Into the shoe's own space: it is turned and scaled on the foot, so nothing can be compared
+   // against the geometry in world coordinates.
+   const arr=part.geometry.attributes.position,pts=[];
+   for(let v=0;v<arr.count;v+=3)pts.push(new T.Vector3().fromBufferAttribute(arr,v).applyMatrix4(part.matrixWorld).applyMatrix4(intoShoe));
+   if(!pts.length)continue;
+   // A klomp has two painted surfaces and a piece may be on either, so each one is judged against
+   // whichever it is nearest: above the lid, or outboard of the wall. Somewhere along its length it
+   // has to come out of the wood.
+   let proud=-Infinity;
+   for(const q of pts)proud=Math.max(proud,q.y-top(q.x,q.z),Math.abs(q.x)-wall(q.y,q.z));
+   if(!Number.isFinite(proud))continue;
+   checked++;if(proud<worst){worst=proud;worstAt=part.material.color.getHex().toString(16);}
+  }
+  assert.ok(checked>=30,`the painted work has to be measurable against the shoe: ${checked} pieces`);
+  assert.ok(worst>0,`painted work is buried in the wood by ${(-worst).toFixed(3)} (#${worstAt}) -- it is on the klomp in the code and not on it on screen`);
+ }
 }
-const shoe=m.legs[0].userData.foot.children[0];assert.equal(shoe.material.color.getHex(),0xffc522);assert.equal(shoe.material.map,null);const pos=shoe.geometry.attributes.position;let midWidth=0,tipWidth=0,tipTop=0;for(let i=0;i<pos.count;i++){const x=Math.abs(pos.getX(i)),z=pos.getZ(i);if(z>.3&&z<.45)midWidth=Math.max(midWidth,x);if(z>.75){tipWidth=Math.max(tipWidth,x);tipTop=Math.max(tipTop,pos.getY(i));}}assert.ok(tipWidth<midWidth*.65);assert.ok(tipTop>.3);
-console.log('PASS lively gait, restrained foot lift and bright yellow upturned pointed clogs');
+// Shaped and finished like the klompen on the cover: yellow, but weathered yellow -- flat colour
+// reads as plastic beside a photoreal potato -- and a blunt rounded nose that sweeps up hard,
+// rather than the long point of a souvenir clog.
+{
+ const shoe=m.legs[0].userData.foot.children[0];
+ assert.equal(shoe.material.color.getHex(),0xffc522,'the klomp stays klomp yellow');
+ assert.ok(shoe.material.map,'and carries grain and mud rather than one flat colour');
+ assert.ok((shoe.material.clearcoat??0)>.5,'under varnish');
+ const pos=shoe.geometry.attributes.position;let midWidth=0,tipWidth=0,tipTop=0;
+ for(let i=0;i<pos.count;i++){const x=Math.abs(pos.getX(i)),z=pos.getZ(i);if(z>.3&&z<.45)midWidth=Math.max(midWidth,x);if(z>.75){tipWidth=Math.max(tipWidth,x);tipTop=Math.max(tipTop,pos.getY(i));}}
+ assert.ok(tipWidth>midWidth*.55&&tipWidth<midWidth*.85,`the nose is blunt, not drawn to a point: ${(tipWidth/midWidth).toFixed(2)} of the ball width`);
+ assert.ok(tipTop>.45,`and it sweeps up: ${tipTop.toFixed(2)}`);
+}
+console.log('PASS lively gait, restrained foot lift and weathered yellow blunt-nosed upswept clogs');
 
 // Inspect exactly what each viewport renders, including close cover and split-screen.
 Object.assign(renderer,{setScissorTest(){},setViewport(){},setScissor(){}});
