@@ -74,7 +74,7 @@ export function makeMap(level,bonus=false){
  const toCell=(x,z)=>({x:Math.max(0,Math.min(n-1,Math.round(x/CELL+(n-1)/2))),z:Math.max(0,Math.min(n-1,Math.round(z/CELL+(n-1)/2)))});
  // What each prop is standing on, so clearing a cell can take the thing on it away again
  // whichever cells it was laid across.
- const buildings=[],waterCells=[],props=[],propCells=new Map(),family=mapId(level),map0={};
+ const buildings=[],waterCells=[],props=[],hollow=[],propCells=new Map(),family=mapId(level),map0={};
  if(bonus||!isTrial(level)){
   for(let z=1;z<n-1;z++)for(let x=1;x<n-1;x++)grid[z][x]=0;
   const mid=Math.floor(n/2),addProp=(cx,cz,type,h=1.3,size=2.5,depth=size,extra={})=>{grid[cz][cx]=1;const prop={...toWorld(cx,cz),w:size,d:depth,h,prop:type,...extra};propCells.set(prop,[[cx,cz]]);props.push(prop);};
@@ -97,7 +97,15 @@ export function makeMap(level,bonus=false){
    if(spawn(cx,cz)||spawn(cx+dx,cz+dz))return;
    grid[cz][cx]=1;grid[cz+dz][cx+dx]=1;const a=toWorld(cx,cz),b=toWorld(cx+dx,cz+dz);
    const prop={x:(a.x+b.x)/2,z:(a.z+b.z)/2,w:dx?CELL*2-.62:2.42,d:dz?CELL*2-.62:2.42,h,prop:type,...extra};
-   propCells.set(prop,[[cx,cz],[cx+dx,cz+dz]]);props.push(prop);};
+   propCells.set(prop,[[cx,cz],[cx+dx,cz+dz]]);props.push(prop);
+   // A container with its doors chained open is a piece of the map you run through, not round. The
+   // thing you see is still one prop; what stops you is the two side walls and the roof, so the
+   // inside is a corridor and the top is still somewhere to stand. Its cells stay marked, because a
+   // route planner has no way to know it may only be crossed end to end.
+   if(prop.open){const along=dx?'w':'d',across=dx?'d':'w',wall=.30,inner=prop[across]/2-wall/2;
+    for(const side of[-1,1])hollow.push({of:prop,x:prop.x+(dx?0:side*inner),z:prop.z+(dz?0:side*inner),w:dx?prop.w:wall,d:dz?prop.d:wall,h:prop.h,prop:'containerWall'});
+    hollow.push({of:prop,x:prop.x,z:prop.z,w:prop.w,d:prop.d,base:2.28,h:prop.h-2.28,prop:'containerRoof'});
+    void along;void across;}};
   if(family==='shipyard'){
    // Shipment: a yard you can cross in four seconds, packed tight enough that every sightline is
    // short and nowhere is safe for long. Double-stacked rows are the only cover a mortar must arc.
@@ -108,7 +116,7 @@ export function makeMap(level,bonus=false){
    // a four-metre lane runs between them, alternate rows are offset so the cross gaps stagger instead of
    // lining up into one clear run end to end, and every second row is double-stacked so the
    // skyline steps rather than walling the yard in.
-   for(let z=2,row=0;z<=n-3;z+=2,row++)for(let x=row%2?2:3;x+1<=n-2;x+=3)addLong(x,z,1,0,'container',row%2?2.6:5.2,row%2?{}:{stacked:true});
+   for(let z=2,row=0;z<=n-3;z+=2,row++)for(let x=row%2?2:3,chunk=0;x+1<=n-2;x+=3,chunk++)addLong(x,z,1,0,'container',row%2?2.6:5.2,{...(row%2?{}:{stacked:true}),open:(chunk+row)%2===0});
    // Pallets of crates on the cross lanes: low enough to shoot over, solid enough to stop a run.
    spin(mid,2,(x,z)=>{if(grid[z][x]===0)addProp(x,z,'cargo',1.8,2.4);});
   }
@@ -189,10 +197,16 @@ export function makeMap(level,bonus=false){
   // runner had to reach.
   for(const list of[props,buildings])for(let i=list.length-1;i>=0;i--){const piece=list[i];
    if(!spots.some(at=>Math.abs(at.x-piece.x)<piece.w/2+.7&&Math.abs(at.z-piece.z)<piece.d/2+.7))continue;
-   for(const [cx,cz]of propCells.get(piece)??[])grid[cz][cx]=0;list.splice(i,1);}
+   for(const [cx,cz]of propCells.get(piece)??[])grid[cz][cx]=0;list.splice(i,1);
+   for(let k=hollow.length-1;k>=0;k--)if(hollow[k].of===piece)hollow.splice(k,1);}
  }
  const fountain=!bonus&&level.theme==='garden'?{...toWorld(Math.floor(n/2),3),w:2.5,d:2.5,h:1.35,prop:'fountain'}:null;if(fountain)grid[3][Math.floor(n/2)]=1;
- const walls=[...buildings,...props];let cover=0;for(let z=0;z<n;z++)for(let x=0;x<n;x++)if(grid[z][x]===1){const p=toWorld(x,z);if(props.some(w=>w.x===p.x&&w.z===p.z))continue;if(fountain&&p.x===fountain.x&&p.z===fountain.z){walls.push(fountain);continue;}if(buildings.some(b=>Math.abs(p.x-b.x)<b.w/2&&Math.abs(p.z-b.z)<b.d/2))continue;const interior=x>1&&x<n-2&&z>1&&z<n-2,w={...p,w:CELL,d:CELL,h:2.65};
+ // Cells a prop already stands on must not also become a full-cell block. Matching on the prop's
+ // own coordinates only caught the ones placed a single cell at a time, so every container laid
+ // across two cells was quietly wrapped in two three-metre boxes — including the open ones, which
+ // were then not open at all.
+ const claimed=new Set();for(const [piece,cells]of propCells)if(props.includes(piece)||buildings.includes(piece))for(const [cx,cz]of cells)claimed.add(cx+','+cz);
+ const walls=[...buildings,...props.filter(p=>!p.open),...hollow];let cover=0;for(let z=0;z<n;z++)for(let x=0;x<n;x++)if(grid[z][x]===1){const p=toWorld(x,z);if(claimed.has(x+','+z))continue;if(fountain&&p.x===fountain.x&&p.z===fountain.z){walls.push(fountain);continue;}if(buildings.some(b=>Math.abs(p.x-b.x)<b.w/2&&Math.abs(p.z-b.z)<b.d/2))continue;const interior=x>1&&x<n-2&&z>1&&z<n-2,w={...p,w:CELL,d:CELL,h:2.65};
   // The seaward edge of a beach is a low sea wall, not a boundary you cannot see over. It still
   // stops bodies; it just does not wall the bay off from its own sea.
   if(family==='coast'&&z===0)w.h=.42;if(interior&&!isTrial(level)&&!bonus&&!['garden','market','canal','factory','cannery','shipment','gantry','beach'].includes(level.theme)){w.h=1.65;if(cover++%3===0)Object.assign(w,{prop:'bin',w:1.1,d:1.1,h:1.45});}else if(interior&&family==='estate')w.h=1.8;walls.push(w);}

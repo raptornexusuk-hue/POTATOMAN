@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {MAPS,mapId,nextCircuitSeed} from '../dist/map-catalogue.js';
-import {LEVELS,roundLevel,circuitLevels,makeMap,route} from '../dist/core.js';
+import {LEVELS,roundLevel,circuitLevels,makeMap,route,slideMove} from '../dist/core.js';
 import {lastPlaceLine,awardRoundWins} from '../dist/progression.js';
 import {preferredVoice,GameAudio} from '../dist/game-audio.js';
 
@@ -25,6 +25,23 @@ for(let i=1;i<LEVELS.length;i++){
  for(const mode of modes)assert.ok(LEVELS.filter(l=>l.mode===mode).length<=LEVELS.length/3,`too much of the circuit is ${mode}`);
 }
 console.log('PASS the circuit changes world and job every round, the mazes grow, and it ends on the tower');
+// Running through one is the whole point of an open container, so it is measured rather than
+// assumed: a potato that enters at one end comes out of the other, and one that walks at its side
+// is stopped by it.
+{
+ const yard=LEVELS.find(l=>mapId(l)==='shipyard'&&l.mode!=='climb'),map=makeMap(yard);
+ const open=map.props.find(p=>p.open);assert.ok(open,'the container yard has containers you can run through');
+ const along=open.w>open.d?'x':'z',across=along==='x'?'z':'x',length=Math.max(open.w,open.d);
+ const through={x:open.x,z:open.z,y:0};through[along]=open[along]-length/2+.55;
+ for(let i=0;i<260;i++)slideMove(through,along==='x'?.05:0,along==='z'?.05:0,map.walls);
+ assert.ok(through[along]>open[along]+length/2-.05,`a potato runs the length of an open container and out the far side, reaching ${through[along].toFixed(2)} of ${(open[along]+length/2).toFixed(2)}`);
+ assert.ok(Math.abs(through[across]-open[across])<.6,'and is held between its walls on the way');
+ const side={x:open.x,z:open.z,y:0};side[across]=open[across]-1.9;
+ for(let i=0;i<260;i++)slideMove(side,across==='x'?.05:0,across==='z'?.05:0,map.walls);
+ assert.ok(side[across]<open[across]-.7,'and walking at its side is stopped by the side wall, not waved through');
+}
+console.log('PASS the container yard has containers that are a way through rather than round');
+
 // A maze has to be worth running: a long way round and real dead ends to lose time in. Braiding
 // buys the alternative lines that stop racers queuing nose to tail, but it buys them where the maze
 // happens to allow, so the second line is a property of the set rather than a promise per map.
@@ -45,7 +62,17 @@ console.log(`PASS every maze runs long and keeps its dead ends, and ${branching}
 for(const i of LEVELS.map((l,i)=>i).filter(i=>!['race','assault'].includes(LEVELS[i].mode))){
  const map=makeMap(LEVELS[i]),mid=Math.floor(map.n/2),goal=map.toWorld(mid,mid);
  for(const [x,z]of[[2,2],[map.n-3,2],[2,map.n-3],[map.n-3,map.n-3]])assert.ok(route(map,map.toWorld(x,z),goal).length>0);
- for(const prop of map.props){const cell=map.toCell(prop.x,prop.z);assert.equal(map.grid[cell.z][cell.x],1);assert.ok(map.walls.includes(prop));}
+ // Every prop occupies the cells it stands on. A solid one is its own collider; an open container
+ // is a shell, so what stops you is its walls and its roof, and you can run the length of it.
+ for(const prop of map.props){const cell=map.toCell(prop.x,prop.z);assert.equal(map.grid[cell.z][cell.x],1);
+  if(!prop.open){assert.ok(map.walls.includes(prop));continue;}
+  assert.ok(!map.walls.includes(prop),'an open container is not a solid block');
+  const shell=map.walls.filter(w=>Math.abs(w.x-prop.x)<prop.w&&Math.abs(w.z-prop.z)<prop.d&&/^container/.test(w.prop??''));
+  assert.ok(shell.filter(w=>w.prop==='containerWall').length===2&&shell.some(w=>w.prop==='containerRoof'),'an open container has two walls and a roof');
+  const along=prop.w>prop.d?'x':'z',across=along==='x'?'z':'x';
+  assert.ok(shell.filter(w=>w.prop==='containerWall').every(w=>Math.abs(w[across]-prop[across])>.6),'its walls are the sides, leaving the length open');
+  assert.ok(shell.find(w=>w.prop==='containerRoof').base>2.15,'and its roof clears a standing potato');
+ }
  // A block plan that closes on itself leaves courtyards nobody can reach, which reads on the map as
  // cover and plays as a bot standing in a corner for two minutes. Routing corner to centre does not
  // catch it: what does is flooding the arena and finding almost all of it.

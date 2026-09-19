@@ -207,19 +207,40 @@ export function dressWorld(w,map,level,night,r){
   else if(prop.prop==='stoneBlock'){const cut=w.mat(0xd2d5cb,'stone');box(cut,prop.x,.55,prop.z,2.4,1.1,2.4);box(w.mat(0xbcc0b7,'stone'),prop.x,1.24,prop.z,1.9,.3,1.9);for(const side of[-1,1])box(w.mat(0x8d9189),prop.x+side*1.15,.55,prop.z,.08,1.05,2.3);}
   else if(prop.prop==='spoil'){const rubble=w.mat(0xc6c2b0,'stone');for(let i=0;i<5;i++){const a=i*2.399,chunk=w.mesh('rounded',rubble,root,prop.x+Math.cos(a)*.6,.22+(i%2)*.18,prop.z+Math.sin(a)*.6,.7,.5,.65);chunk.rotation.y=a;}box(rubble,prop.x,.12,prop.z,2.2,.24,2.2);}
   else if(prop.prop==='container'){
-   // A corrugated box: ribbed sides, a painted door end and, on the stacked rows, a second one
-   // sitting on top with its ribs offset so the pair does not read as one tall slab.
-   const shade=[0xc4562f,0x2f6f8c,0xd9a33a,0x4f7a4a,0x9a4457][Math.floor(r()*5)],steelBox=w.mat(shade,null,{metalness:.35,roughness:.62}),trim=w.mat(0x2b3237,null,{metalness:.5,roughness:.5});
-   const long=prop.turned?prop.d:prop.w,tall=prop.stacked?2:1;
+   // A corrugated box: ribbed sides, a painted door end and, on the stacked rows, a second one on
+   // top with its ribs offset so the pair does not read as one tall slab. The ones marked open have
+   // their doors chained back and no ends at all, because they are a way through the yard: side
+   // walls, a floor to run on and a roof to stand on.
+   const shade=[0xc4562f,0x2f6f8c,0xd9a33a,0x4f7a4a,0x9a4457][Math.floor(r()*5)];
+   const steelBox=w.mat(shade,null,{metalness:.45,roughness:.52}),trim=w.mat(0x2b3237,null,{metalness:.6,roughness:.42}),floorMat=w.mat(0x4a3d2c,'wood',{roughness:.85});
+   const alongX=prop.w>prop.d,long=alongX?prop.w:prop.d,wide=alongX?prop.d:prop.w,tall=prop.stacked?2:1;
+   const rib=(x,y,z,t)=>alongX?box(trim,x+t,y,z,.08,2.3,.05):box(trim,x,y,z+t,.05,2.3,.08);
    for(let level=0;level<tall;level++){
-    const y=level*2.58+1.28;
-    box(steelBox,prop.x,y,prop.z,prop.w-.06,2.5,prop.d-.06);
-    for(let i=0;i<9;i++){const t=(i/8-.5)*(long-.5);
-     if(prop.turned)box(trim,prop.x-prop.w/2+.02,y,prop.z+t,.05,2.3,.08),box(trim,prop.x+prop.w/2-.02,y,prop.z+t,.05,2.3,.08);
-     else box(trim,prop.x+t,y,prop.z-prop.d/2+.02,.08,2.3,.05),box(trim,prop.x+t,y,prop.z+prop.d/2-.02,.08,2.3,.05);
+    const y=level*2.58+1.28,hollow=prop.open&&level===0;
+    if(hollow){
+     // Two walls, a roof and a plank floor: the shell of a container with the ends taken out.
+     for(const side of[-1,1]){
+      const wx=alongX?prop.x:prop.x+side*(wide/2-.13),wz=alongX?prop.z+side*(wide/2-.13):prop.z;
+      box(steelBox,wx,y,wz,alongX?long-.06:.26,2.5,alongX?.26:long-.06);
+      for(let i=0;i<9;i++)rib(wx,y,wz,(i/8-.5)*(long-.5));
+     }
+     box(steelBox,prop.x,y+1.13,prop.z,prop.w-.06,.24,prop.d-.06);
+     box(floorMat,prop.x,y-1.16,prop.z,alongX?long-.10:wide-.34,.10,alongX?wide-.34:long-.10);
+     // Doors swung right back against the outside of each wall.
+     for(const end of[-1,1])for(const side of[-1,1]){
+      const dx=alongX?end*(long/2-.30):side*(wide/2+.06),dz=alongX?side*(wide/2+.06):end*(long/2-.30);
+      const door=box(steelBox,prop.x+dx,y,prop.z+dz,alongX?.56:.07,2.34,alongX?.07:.56);door.castShadow=true;
+      box(trim,prop.x+dx,y,prop.z+dz+(alongX?0:0),alongX?.05:.09,2.34,alongX?.09:.05);
+     }
+    }else{
+     box(steelBox,prop.x,y,prop.z,prop.w-.06,2.5,prop.d-.06);
+     for(let i=0;i<9;i++){const t=(i/8-.5)*(long-.5);
+      if(alongX){rib(prop.x,y,prop.z-prop.d/2+.02,t);rib(prop.x,y,prop.z+prop.d/2-.02,t);}
+      else{rib(prop.x-prop.w/2+.02,y,prop.z,t);rib(prop.x+prop.w/2-.02,y,prop.z,t);}
+     }
+     box(w.mat(0xe6e0d2),prop.x+(alongX?prop.w*.36:0),y+.35,prop.z+(alongX?0:prop.d*.36),alongX?.05:.9,.34,alongX?.9:.05);
     }
-    for(const corner of[-1,1])for(const end of[-1,1])box(trim,prop.x+(prop.turned?corner*prop.w/2:end*prop.w/2),y,prop.z+(prop.turned?end*prop.d/2:corner*prop.d/2),.14,2.46,.14);
-    box(w.mat(0xe6e0d2),prop.x+(prop.turned?0:prop.w*.36),y+.35,prop.z+(prop.turned?prop.d*.36:0),prop.turned?.9:.05,.34,prop.turned?.05:.9);
+    for(const corner of[-1,1])for(const end of[-1,1])box(trim,prop.x+(alongX?end*prop.w/2:corner*prop.w/2),y,prop.z+(alongX?corner*prop.d/2:end*prop.d/2),.14,2.46,.14);
    }
   }
   else if(prop.prop==='groyne'){
