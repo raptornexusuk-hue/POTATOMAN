@@ -25,6 +25,22 @@ for(let i=1;i<LEVELS.length;i++){
  for(const mode of modes)assert.ok(LEVELS.filter(l=>l.mode===mode).length<=LEVELS.length/3,`too much of the circuit is ${mode}`);
 }
 console.log('PASS the circuit changes world and job every round, the mazes grow, and it ends on the tower');
+// A maze has to be worth running: a long way round and real dead ends to lose time in. Braiding
+// buys the alternative lines that stop racers queuing nose to tail, but it buys them where the maze
+// happens to allow, so the second line is a property of the set rather than a promise per map.
+let branching=0;
+for(const i of LEVELS.map((l,i)=>i).filter(i=>LEVELS[i].mode==='race')){
+ const map=makeMap(LEVELS[i]),line=route(map,map.start,map.exit);
+ let open=0,ends=0;
+ for(let z=1;z<map.n-1;z++)for(let x=1;x<map.n-1;x++){if(map.grid[z][x]===1)continue;open++;
+  if([[1,0],[-1,0],[0,1],[0,-1]].filter(([a,b])=>map.grid[z+b]?.[x+a]===0).length===1)ends++;}
+ assert.ok(line.length>open*.24,`${LEVELS[i].name}: the way through is ${line.length} of ${open} open cells, barely a detour`);
+ assert.ok(ends>=5,`${LEVELS[i].name}: only ${ends} dead ends to lose yourself in`);
+ const lines=[0,1,2,3,4,5].map(v=>route(map,map.start,map.exit,v).map(c=>c.x+','+c.z));
+ if(new Set(lines.flat()).size>lines[0].length)branching++;
+}
+assert.ok(branching>=2,`only ${branching} mazes offer a second line, so racers queue nose to tail`);
+console.log(`PASS every maze runs long and keeps its dead ends, and ${branching} of them offer a second line through`);
 // Every authored combat level must stay navigable corner-to-centre with colliding props.
 for(const i of LEVELS.map((l,i)=>i).filter(i=>!['race','assault'].includes(LEVELS[i].mode))){
  const map=makeMap(LEVELS[i]),mid=Math.floor(map.n/2),goal=map.toWorld(mid,mid);

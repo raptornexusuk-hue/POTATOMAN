@@ -43,9 +43,10 @@ export function makeMap(level,bonus=false){
   // A perfect maze has exactly one route between any two cells, which is why every racer ran the
   // same line nose to tail and no route variant could differ. Braiding a share of the dead ends
   // opens loops, so alternative equal-length routes exist and rivals can be overtaken rather than
-  // queued behind. The share is small enough that the maze still reads as a maze.
+  // queued behind. A fifth is as much as that needs: opening more than that shortened the run
+  // through every maze without buying any more overtaking than this does.
   for(let z=1;z<n-1;z++)for(let x=1;x<n-1;x++){
-   if(grid[z][x]||r()>.38)continue;
+   if(grid[z][x]||r()>.20)continue;
    const open=[[1,0],[-1,0],[0,1],[0,-1]].filter(([a,b])=>grid[z+b]?.[x+a]===0);
    if(open.length!==1)continue;
    const shut=[[1,0],[-1,0],[0,1],[0,-1]].filter(([a,b])=>x+a>0&&z+b>0&&x+a<n-1&&z+b<n-1&&grid[z+b][x+a]===1&&grid[z+b*2]?.[x+a*2]===0);
