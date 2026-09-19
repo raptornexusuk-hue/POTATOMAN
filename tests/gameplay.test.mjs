@@ -29,6 +29,12 @@ const levelOf=mode=>LEVELS.findIndex(l=>l.mode===mode);
  const spell='Zero One Two Three Four Five Six Seven Eight Nine Ten Eleven Twelve Thirteen Fourteen Fifteen Sixteen Seventeen Eighteen Nineteen Twenty Twenty-one Twenty-two Twenty-three Twenty-four Twenty-five'.split(' ');
  assert.equal(intro,`${spell[MAPS.length]} worlds. ${spell[LEVELS.length]} rounds. ${spell[Object.keys(ROSTER).length]} weapons.`);
  assert.equal(document.getElementById('circuitCount').textContent,`${MAPS.length} / ${LEVELS.length}`);
+ const source=await fs.readFile(new URL('../dist/app.js',import.meta.url),'utf8');
+ // Writing innerHTML on a container throws away the ids inside it. This is not hypothetical: the
+ // count used to be written by replacing the whole button, which deleted the span refreshCounts
+ // then looked for, and opening the settings dialog threw in the browser while this stub, whose
+ // getElementById invents any element asked for, saw nothing wrong.
+ for(const id of['levelsButton','lockerButton'])assert.ok(!source.includes(`$('${id}').innerHTML`),`${id} holds a span with an id, so its markup is not replaced wholesale`);
  const page=await fs.readFile(new URL('../dist/index.html',import.meta.url),'utf8');
  assert.ok(page.includes(`>${intro}</span>`),'and the copy shipped in the page says the same, for the moment before the script runs');
  console.log('PASS the menu counts its own worlds, rounds and weapons');}

@@ -134,7 +134,7 @@ $('mapTabs').onclick=e=>{const b=e.target.closest('[data-world]');if(b)renderWor
 $('worldMenu').innerHTML=MAPS.map((m,i)=>`<button data-world="${m.id}" style="--map-color:${m.color}"><small>WORLD ${String(i+1).padStart(2,'0')}</small><strong>${WORLD_ICON[m.id]} ${m.name}</strong><span>${m.mood}</span></button>`).join('');
 // Maze boards follow the level list, so added race levels appear without editing the markup.
 $('leaderboardKind').innerHTML='<option value="circuit">Best session score</option>'+LEVELS.map((l,i)=>({l,i})).filter(({l})=>l.mode==='race').map(({l,i})=>`<option value="${i}">${l.name} · fastest escape</option>`).join('');
-$('levelsButton').innerHTML=`WORLDS & MODES <span>${MAPS.length} / ${LEVELS.length}</span>`;$('worldMenu').onclick=e=>{const b=e.target.closest('[data-world]');if(b){renderWorlds(b.dataset.world);dialog('levelsDialog');}};
+$('worldMenu').onclick=e=>{const b=e.target.closest('[data-world]');if(b){renderWorlds(b.dataset.world);dialog('levelsDialog');}};
 renderWorlds();
 $('levelGrid').onclick=e=>{const b=e.target.closest('[data-level]');if(b){if(online){$('levelsDialog').close();openOnline();return;}$('levelsDialog').close();start(+b.dataset.level,true);}};
 // First time out, the locker is the screen before the match rather than a menu nobody opens.
