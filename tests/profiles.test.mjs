@@ -12,7 +12,13 @@ assert.equal(LEVEL_COUNT,LEVELS.length,'server circuit bounds must match the num
 const MAZE=mazes.at(-2)[0];
 import {openDatabase} from '../server/sqlite-adapter.mjs';
 const DB=await openDatabase(':memory:');
-const api=async(path,body={})=>{const response=await worker.fetch(new Request('https://game.test/api/'+path,{method:'POST',headers:{'content-type':'application/json','origin':'https://game.test'},body:JSON.stringify(body)}),{DB});return{status:response.status,...await response.json()};};
+// The post room: every confirmation the server sends is captured here rather than delivered, so the
+// whole signup can be walked exactly as a player would walk it.
+const posted=[];const realFetch=globalThis.fetch;
+globalThis.fetch=async(url,init)=>{posted.push({url:String(url),...JSON.parse(init.body)});return new Response('{}',{status:200});};
+const MAIL={MAIL_URL:'https://post.test/send',MAIL_TOKEN:'sekrit'};
+const api=async(path,body={},env=MAIL)=>{const response=await worker.fetch(new Request('https://game.test/api/'+path,{method:'POST',headers:{'content-type':'application/json','origin':'https://game.test'},body:JSON.stringify(body)}),{DB,...env});return{status:response.status,...await response.json()};};
+const confirmToken=()=>new URL(posted.at(-1).link).searchParams.get('confirm');
 const saved=await api('player/save',{name:'SPUD CHAMP',motto:'Clogs on, Game on'});assert.equal(saved.status,200);const playerToken=saved.playerToken;
 assert.equal((await api('player/get',{playerToken:'forged'})).status,401);
 const changed=await api('player/save',{playerToken,name:'THE KLOMPEN',motto:'Totally Mash'});assert.equal(changed.player.id,saved.player.id);
@@ -21,11 +27,26 @@ const session=await api('scores/start',{playerToken,level:0,duration:120,mode:'o
 await DB.prepare('UPDATE runs SET started=? WHERE id=?').bind(Date.now()-(LEVELS.length*120+60)*1000,session.run).run();assert.equal((await api('scores/finish',payload)).saved,true);
 assert.equal((await api('scores/finish',{...payload,score:39,times:[{level:1,milliseconds:1000}]})).saved,true);
 let profile=await api('player/get',{playerToken});assert.equal(profile.stats.rounds,LEVELS.length);assert.equal(profile.stats.wins,6);assert.equal(profile.stats.bestCircuit,21);
+// Nothing ranks until the address behind the name has been read. That is the whole anti-abuse
+// story, so it is checked before the board is checked for anything else.
+assert.equal((await api('scores/leaderboard')).rows.length,0,'an unconfirmed player does not appear on the board');
+const signup=await api('player/save',{playerToken,name:'THE KLOMPEN',email:' Chip@Example.COM '});
+assert.equal(signup.status,200);assert.equal(signup.sent,true);assert.equal(signup.player.verified,false);
+assert.equal(posted.at(-1).to,'Chip@Example.COM','the address is written to as the player typed it');
+assert.equal(posted.at(-1).url,MAIL.MAIL_URL);assert.ok(posted.at(-1).text.includes(posted.at(-1).link));
+assert.equal((await api('scores/leaderboard')).rows.length,0,'and still does not while the link is unclicked');
+assert.equal((await api('player/verify',{verifyToken:'made-up'})).status,410);
+const confirmed=await api('player/verify',{verifyToken:confirmToken()});
+assert.equal(confirmed.player.verified,true);assert.equal(confirmed.playerToken,playerToken);
+assert.equal((await api('player/verify',{verifyToken:confirmToken()})).status,410,'a confirmation link works once');
 let board=await api('scores/leaderboard');assert.equal(board.rows[0].score,2100);assert.equal(board.rows[0].name,'THE KLOMPEN');assert.ok(!JSON.stringify(board).includes(playerToken));
 board=await api('scores/leaderboard',{level:1});assert.equal(board.rows[0].milliseconds,35000);assert.equal((await api('scores/leaderboard',{mode:'solo'})).rows.length,0);
 const partial=await api('scores/start',{playerToken,level:MAZE,duration:120,mode:'solo'});await DB.prepare('UPDATE runs SET started=? WHERE id=?').bind(Date.now()-240000,partial.run).run();await api('scores/finish',{playerToken,run:partial.run,score:6,rounds:2,wins:2,knockouts:0,complete:true,durations:[120,120],times:[{level:MAZE,milliseconds:51000}]});profile=await api('player/get',{playerToken});assert.equal(profile.stats.rounds,LEVELS.length+2);assert.equal(profile.stats.bestCircuit,21);assert.equal((await api('scores/leaderboard',{level:MAZE})).rows[0].milliseconds,51000);
 console.log('PASS durable profile update, ownership, circuit qualification, idempotent score save, per-maze ranking and mode filters');// Every playthrough is eligible, including an unfinished first round.
-const second=await api('player/save',{name:"Zoë O’Neil",motto:'Test player'}),token2=second.playerToken,runId=crypto.randomUUID();assert.equal(second.player.name,"Zoë O’Neil");
+const second=await api('player/save',{name:"Zoë O’Neil",motto:'Test player',email:'zoe@example.org'}),token2=second.playerToken,runId=crypto.randomUUID();assert.equal(second.player.name,"Zoë O’Neil");
+await api('player/verify',{verifyToken:confirmToken()});
+// One address, one player. Otherwise the confirmation buys nothing.
+assert.equal((await api('player/save',{name:'IMPOSTOR',email:'ZOE@example.org'})).status,409);
 const start={playerToken:token2,run:runId,level:0,duration:120,mode:'solo'};
 assert.equal((await api('scores/start',start)).run,runId);assert.equal((await api('scores/start',start)).run,runId);
 assert.equal((await api('scores/start',{...start,playerToken})).status,409);
@@ -39,6 +60,34 @@ assert.equal((await api('scores/save',{...progress,revision:4})).status,400);
 const stats2=(await api('player/get',{playerToken:token2})).stats;assert.equal(stats2.bestScore,220);assert.equal(stats2.knockouts,2);assert.equal(stats2.rounds,0);
 console.log('PASS partial first-round scores, Unicode names, idempotent starts, duplicate/reversed saves and ownership');
 
+// The rest of the signup: an address nobody can write to is refused outright, a changed address
+// costs the player their ranking until they read the new one, resends are spaced, and a player can
+// take their address and everything attached to it away again.
+{
+ assert.equal((await api('player/save',{name:'NO POST',email:'someone@example.net'},{})).status,501,'a server with nowhere to send mail does not collect addresses');
+ for(const bad of['plainly-not','two@@at.com','who@','@nowhere.org','a@b','some one@example.org']){
+  assert.equal((await api('player/save',{name:'BAD POST',email:bad})).status,400,`"${bad}" is not an address`);
+ }
+ assert.equal((await api('player/save',{name:'NO ADDRESS',email:'   '})).player.verified,false,'a blank address is no address, not a bad one');
+ const mover=await api('player/save',{name:'MOVER',email:'first@example.org'});
+ await api('player/verify',{verifyToken:confirmToken()});
+ assert.equal((await api('player/get',{playerToken:mover.playerToken})).player.verified,true);
+ const moved=await api('player/save',{playerToken:mover.playerToken,name:'MOVER',email:'second@example.org'});
+ assert.equal(moved.player.verified,false,'a new address has not been read, so it has not been confirmed');
+ assert.equal(posted.at(-1).to,'second@example.org');
+ assert.equal((await api('player/resend',{playerToken:mover.playerToken})).status,429,'a resend straight after the first is refused');
+ await DB.prepare('UPDATE profiles SET verify_sent=? WHERE token=?').bind(Date.now()-600000,mover.playerToken).run();
+ assert.equal((await api('player/resend',{playerToken:mover.playerToken})).sent,true);
+ await api('player/verify',{verifyToken:confirmToken()});
+ assert.equal((await api('player/get',{playerToken:mover.playerToken})).player.verified,true);
+ assert.equal((await api('player/resend',{playerToken:mover.playerToken})).status,400,'there is nothing to resend once it is confirmed');
+ assert.equal((await api('player/forget',{playerToken:mover.playerToken})).forgotten,true);
+ assert.equal((await api('player/get',{playerToken:mover.playerToken})).status,401,'and afterwards that player is gone');
+ assert.equal((await api('player/save',{name:'SOMEBODY ELSE',email:'second@example.org'})).status,200,'which frees the address again');
+ globalThis.fetch=realFetch;
+ console.log('PASS scores rank only for a confirmed address: one player per address, re-confirmation on a change, spaced resends and a way out');
+}
+
 DB.close();
 
 // Plain file hosting has no /api. The game must still get a named player and keep scores, because
@@ -46,7 +95,7 @@ DB.close();
 const store=new Map();
 globalThis.localStorage={getItem:k=>store.has(k)?store.get(k):null,setItem:(k,v)=>store.set(k,String(v)),removeItem:k=>store.delete(k)};
 const nodes=new Map();
-globalThis.document={getElementById:id=>{if(!nodes.has(id))nodes.set(id,{value:'',textContent:'',innerHTML:'',disabled:false,open:false,focus(){},showModal(){this.open=true;},close(){this.open=false;},addEventListener(){},onclick:null});return nodes.get(id);},addEventListener(){}};
+globalThis.document={querySelectorAll:()=>[],getElementById:id=>{if(!nodes.has(id))nodes.set(id,{value:'',textContent:'',innerHTML:'',disabled:false,hidden:false,open:false,dataset:{},style:{},classList:{toggle(){},add(){},remove(){},contains(){return false;}},focus(){},showModal(){this.open=true;},close(){this.open=false;},addEventListener(){},onclick:null});return nodes.get(id);},addEventListener(){}};
 globalThis.addEventListener=()=>{};globalThis.setInterval=()=>({unref(){}});
 globalThis.fetch=async()=>new Response('<!doctype html>',{status:404,headers:{'content-type':'text/html'}});
 const {playerAccount}=await import('../dist/profiles.js');

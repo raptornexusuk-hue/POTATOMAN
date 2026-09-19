@@ -22,7 +22,7 @@ async function rooms(request,env,url,permitted){
   if(!permitted)return json({error:'Origin not allowed.'},403);
   const raw=await request.text();if(raw.length>110000)return json({error:'Request too large.'},413);let body;try{body=JSON.parse(raw);}catch{return json({error:'Invalid request.'},400);}
   const db=env.DB.withSession?env.DB.withSession('first-primary'):env.DB;
-  const sql=(s,...args)=>db.prepare(s).bind(...args);const at=now();const profileResponse=await profileAPI(url.pathname,body,db);if(profileResponse)return profileResponse;
+  const sql=(s,...args)=>db.prepare(s).bind(...args);const at=now();const profileResponse=await profileAPI(url.pathname,body,db,{...env,ORIGIN:env.ORIGIN??url.origin});if(profileResponse)return profileResponse;
   if(url.pathname==='/api/rooms/create'){
    const code=Array.from(crypto.getRandomValues(new Uint8Array(10)),n=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[n%32]).join(''),secret=token();
    await db.batch([sql('DELETE FROM rooms WHERE updated < ?',at-7200000),sql('INSERT INTO rooms(code,created,updated) VALUES(?,?,?)',code,at,at),sql('INSERT INTO members(room,slot,token,name,seen,generation) VALUES(?,0,?,?,?,?)',code,secret,cleanName(body.name),at,crypto.randomUUID())]);

@@ -34,7 +34,27 @@ export const playerAccount={player:null,token:null,session:null,onPlayer:null,re
   store.best=Math.max(store.best,s.score);store.points=Math.max(store.points,s.points);store.rounds=Math.max(store.rounds,s.rounds);store.wins=Math.max(store.wins,s.wins);store.knockouts=Math.max(store.knockouts,s.knockouts);
   for(const t of s.times)store.times[t.level]=Math.min(store.times[t.level]??Infinity,t.milliseconds);
   writeLocal(LOCAL_SCORES,store);},
- showPlayer(){if(!this.player)return;$('playerName').value=this.player.name;$('playerMotto').value=this.player.motto;$('profileButton').textContent=this.player.name.toUpperCase();this.onPlayer?.(this.player);},
+ showPlayer(){if(!this.player)return;$('playerName').value=this.player.name;$('playerMotto').value=this.player.motto;$('playerEmail').value=this.player.email??'';$('profileButton').textContent=this.player.name.toUpperCase();this.showVerification();this.onPlayer?.(this.player);},
+ // Where this player stands with their address, in the one place they will look for it.
+ showVerification(){const row=$('verifyRow'),state=$('verifyState');if(!row)return;
+  const email=this.player?.email??'';row.hidden=this.offline||!this.player||!email;row.classList.toggle('confirmed',!!this.player?.verified);
+  state.textContent=this.player?.verified?`${email} confirmed. Your scores are ranked.`:`We have written to ${email}. Follow the link in it to be ranked.`;
+  $('resendVerify').hidden=!!this.player?.verified;},
+ ranked(){return !!this.player&&!this.offline&&!!this.player.verified;},
+ async resend(){const button=$('resendVerify');button.disabled=true;$('profileStatus').textContent='Sending it again…';
+  try{await this.api('player/resend');$('profileStatus').textContent='Sent. Give it a minute, and check the spam folder.';}
+  catch(e){$('profileStatus').textContent=e.message;}finally{button.disabled=false;}},
+ async confirm(token){try{const data=await this.api('player/verify',{verifyToken:token});this.player=data.player;this.token=data.playerToken;
+   try{localStorage.setItem('potatoman.player.access',this.token);}catch{}this.showPlayer();
+   $('profileStatus').textContent='Address confirmed. Your scores are ranked from now on.';$('profileDialog').showModal();return true;}
+  catch(e){$('profileStatus').textContent=e.message;$('profileDialog').showModal();return false;}},
+ async forget(){if(!this.player)return;
+  $('profileStatus').textContent='Deleting your player…';
+  try{await this.api('player/forget');}catch(e){if(!serverless(e)){$('profileStatus').textContent=e.message;return;}}
+  this.player=null;this.token=null;this.session=null;
+  try{localStorage.removeItem('potatoman.player.access');localStorage.removeItem(LOCAL_PLAYER);localStorage.removeItem(LOCAL_SCORES);}catch{}
+  $('playerName').value='';$('playerMotto').value='';$('playerEmail').value='';$('verifyRow').hidden=true;
+  $('profileButton').textContent='PLAYER DETAILS';$('profileStatus').textContent='Deleted. Nothing of yours is left on the scoreboard.';},
  async requirePlayer(action){await this.ready;if(this.player)return true;this.afterSave=action;$('profileStatus').textContent='Add your real name so friends can find you on the scoreboard.';$('profileDialog').showModal();$('playerName').focus();return false;},
  async refresh(){if(this.offline)return;
   // Probe even without a token. Knowing at load time whether there is a server behind this copy is
@@ -45,7 +65,7 @@ export const playerAccount={player:null,token:null,session:null,onPlayer:null,re
    try{await this.api('scores/leaderboard');}catch(e){if(serverless(e))this.goOffline();}
    return;}
   let data;try{data=await this.api('player/get');}catch(e){if(e.status===401){this.token=null;this.player=null;try{localStorage.removeItem('potatoman.player.access');}catch{}}if(serverless(e))this.goOffline();throw e;}this.player=data.player;this.showPlayer();const s=data.stats;$('profileStats').innerHTML=[['Best score',s.bestScore??'—'],['Rounds played',s.rounds],['Round wins',s.wins],['Knockouts',s.knockouts]].map(([label,value])=>`<div><strong>${value}</strong><span>${label}</span></div>`).join('');},
- async save(){const button=$('saveProfile');button.disabled=true;$('profileStatus').textContent='Saving your player…';try{const data=await this.api('player/save',{name:$('playerName').value,motto:$('playerMotto').value});this.player=data.player;this.token=data.playerToken;try{localStorage.setItem('potatoman.player.access',this.token);}catch{}this.showPlayer();$('profileStatus').textContent='Player saved. Every session counts, even if you leave a round early.';this.refresh().catch(()=>{});const next=this.afterSave;this.afterSave=null;if(next){$('profileDialog').close();next();}return true;}catch(e){
+ async save(){const button=$('saveProfile');button.disabled=true;$('profileStatus').textContent='Saving your player…';try{const data=await this.api('player/save',{name:$('playerName').value,motto:$('playerMotto').value,email:$('playerEmail').value});this.player=data.player;this.token=data.playerToken;try{localStorage.setItem('potatoman.player.access',this.token);}catch{}this.showPlayer();$('profileStatus').textContent=data.sent?'Player saved. Check your email and follow the link to be ranked.':'Player saved. Every session counts, even if you leave a round early.';this.refresh().catch(()=>{});const next=this.afterSave;this.afterSave=null;if(next){$('profileDialog').close();next();}return true;}catch(e){
   // A file host cannot save a player, but it can still let someone name themselves and play.
   if(serverless(e)){this.goOffline();this.saveLocal($('playerName').value,$('playerMotto').value);$('profileStatus').textContent='Saved on this device. This copy has no game server, so scores stay here and online rooms are unavailable.';const next=this.afterSave;this.afterSave=null;if(next){$('profileDialog').close();next();}return true;}
   $('profileStatus').textContent=e.message;return false;}finally{button.disabled=false;}},
@@ -63,10 +83,22 @@ export const playerAccount={player:null,token:null,session:null,onPlayer:null,re
    $('leaderboardStatus').textContent='Scores on this device. Shared high scores need the Potatoman game server.';
    const rows=kind==='circuit'?[{value:store.best+' pts',label:'Best circuit score'},{label:'Rounds played',value:store.rounds},{label:'Round wins',value:store.wins},{label:'Knockouts',value:store.knockouts}]
     :[{label:'Best escape',value:store.times[Number(kind)]?(store.times[Number(kind)]/1000).toFixed(2)+'s':'—'}];
-   $('leaderboardRows').innerHTML=rows.map((r,i)=>`<tr${i===0?' class="your-score"':''}><td>${i+1}</td><td><strong>${escape(name)}</strong><small>${escape(r.label)}</small></td><td>${escape(r.value)}</td></tr>`).join('');return;}$('leaderboardStatus').textContent='Loading scores…';$('leaderboardRows').innerHTML='';try{await this.flush();const {rows}=await this.api('scores/leaderboard',{...(kind==='circuit'?{}:{level:Number(kind)}),...(mode==='all'?{}:{mode})});if(request!==this.boardRequest)return;$('leaderboardStatus').textContent=rows.length?'':kind==='circuit'?'No scores yet. Play any level to put your name here.':'No escape times yet. Complete this maze to put your name here.';let rank=0,last=null;$('leaderboardRows').innerHTML=rows.map((r,i)=>{const value=kind==='circuit'?r.score:r.milliseconds;if(value!==last)rank=i+1;last=value;return`<tr${r.id===this.player?.id?' class="your-score"':''}><td>${rank}</td><td><strong>${escape(r.name)}</strong>${r.motto?`<small>${escape(r.motto)}</small>`:''}</td><td>${kind==='circuit'?r.score+' pts':(r.milliseconds/1000).toFixed(2)+'s'}</td></tr>`;}).join('');}catch(e){if(request===this.boardRequest)$('leaderboardStatus').textContent=e.message;}}
+   $('leaderboardRows').innerHTML=rows.map((r,i)=>`<tr${i===0?' class="your-score"':''}><td>${i+1}</td><td><strong>${escape(name)}</strong><small>${escape(r.label)}</small></td><td>${escape(r.value)}</td></tr>`).join('');return;}$('leaderboardStatus').textContent='Loading scores…';$('leaderboardRows').innerHTML='';try{await this.flush();const {rows}=await this.api('scores/leaderboard',{...(kind==='circuit'?{}:{level:Number(kind)}),...(mode==='all'?{}:{mode})});if(request!==this.boardRequest)return;$('leaderboardStatus').textContent=rows.length?'':kind==='circuit'?'No scores yet. Play any level to put your name here.':'No escape times yet. Complete this maze to put your name here.';// A player who has not confirmed their address is playing, and their scores are being kept; they
+   // simply are not ranked yet. Saying so here is kinder than an empty board they cannot explain.
+   if(this.player&&!this.player.verified)$('leaderboardStatus').textContent=this.player.email?`${$('leaderboardStatus').textContent} Your own scores are saved but unranked until you follow the link we sent to ${this.player.email}.`:`${$('leaderboardStatus').textContent} Add an email to your player to have your own scores ranked here.`;
+   let rank=0,last=null;$('leaderboardRows').innerHTML=rows.map((r,i)=>{const value=kind==='circuit'?r.score:r.milliseconds;if(value!==last)rank=i+1;last=value;return`<tr${r.id===this.player?.id?' class="your-score"':''}><td>${rank}</td><td><strong>${escape(r.name)}</strong>${r.motto?`<small>${escape(r.motto)}</small>`:''}</td><td>${kind==='circuit'?r.score+' pts':(r.milliseconds/1000).toFixed(2)+'s'}</td></tr>`;}).join('');}catch(e){if(request===this.boardRequest)$('leaderboardStatus').textContent=e.message;}}
 };
 export function initializeProfiles(onPlayer){playerAccount.onPlayer=onPlayer;let storage;try{storage=localStorage;playerAccount.token=storage.getItem('potatoman.player.access');}catch{}playerAccount.queue=new ScoreQueue(storage,(...args)=>playerAccount.api(...args));
- $('profileButton').onclick=()=>{playerAccount.afterSave=null;$('profileDialog').showModal();playerAccount.refresh().catch(e=>$('profileStatus').textContent=e.message);};$('saveProfile').onclick=()=>playerAccount.save();$('profileDialog').addEventListener('close',()=>{playerAccount.afterSave=null;});
+ $('profileButton').onclick=()=>{playerAccount.afterSave=null;$('profileDialog').showModal();playerAccount.refresh().catch(e=>$('profileStatus').textContent=e.message);};$('saveProfile').onclick=()=>playerAccount.save();$('resendVerify').onclick=()=>playerAccount.resend();
+ $('privacyLink').onclick=()=>$('privacyDialog').showModal();document.querySelectorAll('.close-privacy').forEach(b=>b.onclick=()=>$('privacyDialog').close());
+ $('forgetPlayer').onclick=()=>{if($('forgetPlayer').dataset.armed){playerAccount.forget();delete $('forgetPlayer').dataset.armed;$('forgetPlayer').textContent='DELETE MY PLAYER';return;}
+  $('forgetPlayer').dataset.armed='1';$('forgetPlayer').textContent='TAP AGAIN TO DELETE FOR GOOD';};
+ // A confirmation link lands back on the game itself, so it is read here and then cleared out of
+ // the address bar: nobody wants a one-shot token sitting in their history.
+ {const from=new URLSearchParams(location.search),token=from.get('confirm');
+  if(token){from.delete('confirm');const rest=from.toString();history.replaceState(null,'',location.pathname+(rest?'?'+rest:'')+location.hash);
+   playerAccount.ready=playerAccount.confirm(token);}}
+ $('profileDialog').addEventListener('close',()=>{playerAccount.afterSave=null;});
  const open=()=>{$('leaderboardDialog').showModal();playerAccount.leaderboard();};$('leaderboardButton').onclick=open;$('resultLeaderboard').onclick=open;$('leaderboardKind').onchange=$('leaderboardMode').onchange=$('refreshLeaderboard').onclick=()=>playerAccount.leaderboard();
  playerAccount.ready=playerAccount.refresh().catch(e=>{if(serverless(e))playerAccount.goOffline();});playerAccount.flush();setInterval(()=>playerAccount.checkpoint(),5000).unref?.();addEventListener('online',()=>playerAccount.checkpoint());addEventListener('pagehide',()=>playerAccount.checkpoint(true));document.addEventListener('visibilitychange',()=>{if(document.hidden)playerAccount.checkpoint(true);});
 }

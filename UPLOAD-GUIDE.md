@@ -34,12 +34,24 @@ Your host needs a Node.js application service supporting **Node 22.13 or newer**
 2. Choose this extracted directory as the application's working directory.
 3. Use `npm start` as the start command. The underlying entry point is `server/node.mjs`; no third-party runtime dependencies or frontend build are needed for this Node deployment.
 4. Set `POTATOMAN_PUBLIC_ORIGIN` to your actual HTTPS origin, such as `https://play.yourdomain.com` (with your own domain, without a trailing path).
-5. To let a copy of the game hosted elsewhere use this server, set `POTATOMAN_ALLOWED_ORIGINS` to
+5. To rank scores, the server has to be able to confirm email addresses, and sending mail is the one
+   thing it does not do itself. Set `POTATOMAN_MAIL_URL` to an endpoint that will send a message for
+   you, and `POTATOMAN_MAIL_TOKEN` if that endpoint wants a bearer token. The server POSTs it JSON:
+
+   ```json
+   {"to":"player@example.com","name":"MACCA","link":"https://…/?confirm=…","subject":"…","text":"…"}
+   ```
+
+   Anything that can turn that into an email will do — a Mailgun or Postmark endpoint, a small
+   script of your own, or an automation service. Without it the server refuses to take email
+   addresses at all and says so, rather than pretending an address was confirmed; players can still
+   name themselves and play, their scores are still saved, and nobody is ranked.
+6. To let a copy of the game hosted elsewhere use this server, set `POTATOMAN_ALLOWED_ORIGINS` to
    that site's address (comma-separated for several). Leave it unset when the server also serves the
    game.
-6. Set `POTATOMAN_DATA_DIR` to a persistent writable directory outside `dist/`, using an absolute path. The server creates `rooms.sqlite` there and applies the included database migrations automatically. Back up this directory; replacing application files must not delete it.
-7. Use the host's assigned `PORT` if required; otherwise the server listens on port 3000. Route your HTTPS domain to this Node application, including `/api/*` requests. Hostnames must be served at the domain or subdomain root for this package.
-8. Keep one application instance running. This SQLite adapter is not configured for multiple independent replicas. Start a room on one device, join from another and verify a saved player score before opening it to others.
+7. Set `POTATOMAN_DATA_DIR` to a persistent writable directory outside `dist/`, using an absolute path. The server creates `rooms.sqlite` there and applies the included database migrations automatically. Back up this directory; replacing application files must not delete it.
+8. Use the host's assigned `PORT` if required; otherwise the server listens on port 3000. Route your HTTPS domain to this Node application, including `/api/*` requests. Hostnames must be served at the domain or subdomain root for this package.
+9. Keep one application instance running. This SQLite adapter is not configured for multiple independent replicas. Start a room on one device, join from another and verify a saved player score before opening it to others.
 
 Where a host asks for an installation command, `npm ci` is compatible with the supplied lockfile, but the Node runtime itself does not require the development dependencies. A host offering only a file manager/FTP upload, with no Node application or persistent storage, needs a different deployment route.
 
