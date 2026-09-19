@@ -135,8 +135,38 @@ dialog::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;back
 .score-row b{display:flex;align-items:baseline;gap:6px}
 .score-row b small{color:#cfe0e6;opacity:.6;font-size:9.5px;letter-spacing:.04em;font-weight:600}
 
-/* The locker: what you are wearing on the left, the racks to pick from on the right. The preview is drawn from the same ids the world builds meshes from, so it cannot show you a hat you will not get. */
-#lockerDialog{width:min(900px,94vw)}#lockerDialog .muted{margin:4px 0 0}.locker-body{display:grid;grid-template-columns:240px 1fr;gap:24px;margin-top:16px;align-items:start}.locker-preview{background:radial-gradient(circle at 50% 35%,#2b4650,#152229);border:1px solid #55707866;border-radius:8px;padding:14px;display:grid;place-items:center}.locker-preview svg{width:100%;height:auto;max-height:250px;filter:drop-shadow(0 10px 18px #0007)}.locker-racks{display:flex;flex-direction:column;gap:13px;max-height:min(64vh,540px);overflow:auto;padding-right:6px;overscroll-behavior:contain}.rack h3{margin:0 0 8px;font-size:11px;letter-spacing:2.4px;color:var(--gold)}.rack-row{display:flex;flex-wrap:wrap;gap:7px}.rack-row button{background:#2b3f47;color:#dfe7e6;border:1px solid #6a7f8566;border-radius:20px;padding:9px 14px;font-size:12px;font-weight:700;letter-spacing:.4px}.rack-row button[aria-pressed="true"]{background:var(--gold);color:#152027;border-color:var(--gold)}.rack-row button.swatch{width:34px;height:34px;padding:0;border-radius:50%;border-width:2px}.rack-row button.swatch[aria-pressed="true"]{box-shadow:0 0 0 3px #152229,0 0 0 5px var(--gold);border-color:#ffffffb3}@media(max-width:700px){.locker-body{grid-template-columns:1fr}.locker-preview svg{max-height:200px}.locker-racks{max-height:none;overflow:visible}}
+/* The locker: what you are wearing on the left, the racks to pick from on the right. Both are drawn
+   from the same ids the world builds meshes from, so it cannot show you a hat you will not get --
+   and once three.js has loaded the left-hand side is the actual potato, wearing the actual kit,
+   turning slowly so a piece reads by its silhouette as well as by its detail. Every piece on a rack
+   is shown as the thing rather than as its name, because a row of hats is quicker to choose from
+   than a row of words. */
+#lockerDialog{width:min(1040px,95vw)}
+#lockerDialog .muted{margin:4px 0 0}
+.locker-body{display:grid;grid-template-columns:300px 1fr;gap:26px;margin-top:16px;align-items:start}
+.locker-preview{position:relative;background:radial-gradient(circle at 50% 30%,#31525e,#111c22 72%);border:1px solid #55707866;border-radius:12px;display:grid;place-items:center;min-height:430px;overflow:hidden;box-shadow:inset 0 2px 20px #0006}
+.locker-preview::after{content:"";position:absolute;left:14%;right:14%;bottom:10%;height:14px;border-radius:50%;background:radial-gradient(ellipse at center,#0009,#0000 72%)}
+.locker-preview svg{width:100%;height:auto;max-height:290px;padding:16px;filter:drop-shadow(0 12px 20px #0008)}
+.locker-preview canvas.locker-stage{position:relative;z-index:1;width:100%;height:430px;display:block}
+.locker-preview.live svg{display:none}
+.locker-racks{display:flex;flex-direction:column;gap:16px;max-height:min(66vh,560px);overflow:auto;padding-right:8px;overscroll-behavior:contain}
+.rack h3{margin:0 0 9px;font-size:11px;letter-spacing:2.4px;color:var(--gold);display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.rack h3 span{color:#cfe0e4;letter-spacing:.6px;font-size:11px;font-weight:600;text-transform:none}
+.rack-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:8px}
+.rack-row button{background:#22333b;color:#c9d7d9;border:1px solid #6a7f8544;border-radius:10px;padding:7px 5px 6px;display:grid;justify-items:center;gap:3px;transition:background .12s,border-color .12s,transform .12s}
+.rack-row button:hover{background:#2c424c;transform:translateY(-1px)}
+.rack-row button .chip{display:block;width:100%;height:56px;overflow:hidden;display:grid;place-items:center}
+/* The piece drawings are full potatoes; the chip shows the head end of one, scaled up so the hat
+   fills the tile instead of sitting as a speck on a body nobody is choosing. */
+.rack-row button .chip svg{width:132%;height:auto;margin-top:-6%;padding:0;filter:none;max-height:none}
+.rack-row button small{font-size:9.5px;letter-spacing:.5px;font-weight:700;line-height:1.15;text-align:center;opacity:.78}
+.rack-row button[aria-pressed="true"]{background:#3c5560;border-color:var(--gold);color:#fff;box-shadow:0 0 0 1px var(--gold)}
+.rack-row button[aria-pressed="true"] small{opacity:1;color:var(--gold)}
+.rack-row.swatches{grid-template-columns:repeat(auto-fill,minmax(42px,42px))}
+.rack-row.swatches button{width:42px;height:42px;padding:0;border-radius:50%;background:var(--swatch);border-width:2px}
+.rack-row.swatches button:hover{transform:scale(1.06)}
+.rack-row.swatches button[aria-pressed="true"]{box-shadow:0 0 0 3px #152229,0 0 0 5px var(--gold);border-color:#ffffffb3}
+@media(max-width:760px){.locker-body{grid-template-columns:1fr}.locker-preview{min-height:300px}.locker-preview svg{max-height:210px}.locker-preview canvas.locker-stage{height:300px}.locker-racks{max-height:none;overflow:visible}.rack-row{grid-template-columns:repeat(auto-fill,minmax(74px,1fr))}}
 
 /* Masthead. The studio mark is drawn rather than set, so it needs no font download and looks the same on a plain file host as it does online. */
 .tagline{display:flex;align-items:center;gap:14px;margin:0 0 6px;font-size:clamp(19px,2.5vw,32px);font-weight:900;letter-spacing:1.5px;line-height:1;color:#fff4d2;text-transform:uppercase;text-shadow:0 3px 0 #0a1b22,0 8px 24px #0009}.tagline em{font-style:normal;color:var(--gold)}.tagline .rule{flex:none;width:34px;height:4px;border-radius:2px;background:linear-gradient(90deg,var(--gold),#ffe9a8)}.byline{display:flex;align-items:center;gap:9px;font-size:15px;letter-spacing:.6px;margin:14px 0;color:#c3ccc9}.klompens{display:inline-flex;align-items:center;gap:9px;padding:6px 13px 6px 9px;border:1px solid #ffce4238;border-radius:999px;background:#0d1d24a8;color:var(--gold);font-weight:900;letter-spacing:2.4px;font-size:13px;text-transform:uppercase}.klomp-mark{width:26px;height:auto;flex:none;filter:drop-shadow(0 1px 1px #0008)}@media(max-width:700px){.tagline{font-size:18px;gap:9px}.tagline .rule{width:22px;height:3px}.byline{font-size:12px;margin:10px 0}.klompens{font-size:11px;letter-spacing:1.6px;padding:5px 10px 5px 7px}.klomp-mark{width:21px}}@media(max-height:500px){.tagline{font-size:15px;margin-bottom:2px}.byline{margin:6px 0}}

@@ -12,6 +12,7 @@ import {playerAccount,initializeProfiles} from './profiles.js';
 import {circuitProgress,moveCourse,THROW_DROP,POWERUPS,isTrial,jump,movePlayer,applyPowerup,roundLevel,playableMap,STEP,CELL,ROUND_TIME,BONUS_TIME,LEVELS,MODES,makeMap,route,rng,movement,slideMove,segmentCircle,segmentBox,circleContact,boxContact,boxContact3D,launchVerticalSpeed,clearShot,deadzone,blocked} from './core.js';
 import {World,colors} from './world.js';
 import {WARDROBE,SLOTS,TINTS,loadOutfit,saveOutfit,validateOutfit,outfitPreview,pieceName} from './locker.js';
+import {showPreview,closePreview} from './locker-preview.js';
 import {ACTIONS,PAD_ACTIONS,PAD_BUTTONS,defaults,loadSettings,saveSettings,bindKey,bindButton,mouseButtonHeld,keyLabel,cameraDrag,resetCamera,autoLevel} from './controls.js';
 import {RoomConnection} from './network.js';
 import {packPlayer,unpackPlayer,validSnapshot,remoteControl} from './net-state.js';
@@ -68,14 +69,28 @@ $('solo').onclick=()=>online?openOnline():setPlayers(false);$('duo').onclick=()=
 // The locker. Racks are generated from the wardrobe, so a piece added there appears here with no
 // second list to keep in step, and the preview redraws from the same ids the world builds from.
 function renderLocker(){
- $('lockerPreview').innerHTML=outfitPreview(outfit);
+ // The flat drawing goes up first and the live potato replaces it once three.js has arrived, so the
+ // screen answers "what am I picking" immediately on a cold open and properly a moment later. On a
+ // device that cannot give us WebGL the drawing simply stays, which is what it was always for.
+ const stage=$('lockerPreview');
+ if(!stage.classList.contains('live'))stage.innerHTML=outfitPreview(outfit);
+ showPreview(stage,outfit,()=>{stage.classList.remove('live');stage.innerHTML=outfitPreview(outfit);});
  $('lockerRacks').innerHTML=SLOTS.map(([slot,title])=>{
   const options=slot==='tint'?TINTS.map(([id,name,colour])=>[id,name,colour]):WARDROBE[slot].map(([id,name])=>[id,name,null]);
-  return `<div class="rack"><h3>${title}</h3><div class="rack-row">${options.map(([id,name,colour])=>
-   `<button data-slot="${slot}" data-piece="${id}" aria-pressed="${outfit[slot]===id}"${colour!=null?` class="swatch" style="background:#${colour.toString(16).padStart(6,'0')}" title="${name}" aria-label="${name}"`:''}>${colour!=null?'':name}</button>`).join('')}</div></div>`;
+  return `<div class="rack"><h3>${title}<span>${escapeHTML(pieceName(slot,outfit[slot]))}</span></h3><div class="rack-row${slot==='tint'?' swatches':''}">${options.map(([id,name,colour])=>
+   // A piece is shown as the thing itself rather than as its name in a pill: the same drawing the
+   // preview uses, cropped to the piece, so picking is done by looking rather than by reading.
+   `<button data-slot="${slot}" data-piece="${id}" aria-pressed="${outfit[slot]===id}" title="${escapeHTML(name)}" aria-label="${escapeHTML(name)}"${colour!=null?` class="swatch" style="--swatch:#${colour.toString(16).padStart(6,'0')}"`:''}>${colour!=null?'':`<span class="chip">${piecePreview(slot,id,outfit)}</span><small>${escapeHTML(name)}</small>`}</button>`).join('')}</div></div>`;
  }).join('');
  for(const button of $('lockerRacks').querySelectorAll('button'))button.onclick=()=>{outfit={...outfit,[button.dataset.slot]:button.dataset.piece};storeOutfit();renderLocker();};
  $('lockerBadge').textContent=outfit.head==='none'?pieceName('tint',outfit.tint):pieceName('head',outfit.head);
+}
+// Each swatch on a rack is the potato wearing that one piece and nothing else that would distract
+// from it, drawn at the same scale so a row of them reads as a row of hats rather than a row of
+// words. The rest of the outfit rides along so a colour choice shows on every piece at once.
+function piecePreview(slot,id,worn){
+ const only=slot==='tint'||slot==='skin'?{...worn,[slot]:id}:{...worn,head:'none',eyes:'none',neck:'none',[slot]:id};
+ return outfitPreview(only);
 }
 function storeOutfit(){outfit=validateOutfit(outfit);lockerSeen=true;saveOutfit(outfit,preferenceStorage);for(const p of players)if(p.id===(online?.slot??0))p.outfit=outfit;}
 // The wardrobe belongs to a player, so it opens once there is one. Anybody who has not registered
@@ -83,9 +98,11 @@ function storeOutfit(){outfit=validateOutfit(outfit);lockerSeen=true;saveOutfit(
 async function openLocker(){if(!await playerAccount.requirePlayer(openLocker))return;renderLocker();dialog('lockerDialog');}
 $('lockerButton').onclick=()=>openLocker();
 $('lockerClose').onclick=()=>{storeOutfit();$('lockerDialog').close();};
+// The preview holds a renderer and a scene, so it is shut down whenever the locker is.
+$('lockerDialog').addEventListener('close',closePreview);
 $('lockerRandom').onclick=()=>{const pick=list=>list[Math.floor(Math.random()*list.length)][0];
  outfit={head:pick(WARDROBE.head),eyes:pick(WARDROBE.eyes),neck:pick(WARDROBE.neck),skin:pick(WARDROBE.skin),tint:pick(TINTS)};storeOutfit();renderLocker();};
-$('lockerPlay').onclick=()=>{storeOutfit();$('lockerDialog').close();beginMatch();};
+$('lockerPlay').onclick=()=>{storeOutfit();closePreview();$('lockerDialog').close();beginMatch();};
 $('levelsButton').onclick=()=>dialog('levelsDialog');$('controlsButton').onclick=openSettings;$('arsenalButton').onclick=()=>{renderArsenal();dialog('arsenalDialog');};$('artButton').onclick=()=>dialog('artDialog');document.querySelectorAll('.close').forEach(b=>b.onclick=()=>{if(b.closest('dialog').id==='settingsDialog')closeSettings();else b.closest('dialog').close();});
 function durationLabel(seconds){return `${seconds/60}-minute`;}
 function refreshDuration(){setPlayers(duo);$('durationSummary').textContent=`${settings.roundSeconds/60} minutes`;$('huntSummary').textContent=`${BONUS_TIME}-second`;$('huntLength').textContent=BONUS_TIME;document.querySelectorAll('[data-level-duration]').forEach(el=>el.textContent=`${settings.roundSeconds/60} MIN`);}

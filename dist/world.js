@@ -553,7 +553,7 @@ export class World{
   crown.visible=false;
   const label=new PlayerLabel(colors[id]);this.root.add(label.sprite);
   const fadeMaterials=[];g.traverse(o=>{if(o.isMesh){o.material=o.material.clone();o.material.transparent=false;o.userData.ownMaterial=true;fadeMaterials.push(o.material);}});
-  return{g,shadow,label,fadeMaterials,crouchBlend:0,bob,hat,kit:kitGroup,arms,forearms,legs,cape,capeBase,clasp,crown,heldSpud,gun,eyes,brows,cheeks,pupils,lids,smile,mouth,lip,hurt:0,joy:0,gaze:0,lastHP:null,stride:0,walk:0,lastX:null,lastZ:null,blinkAt:2.5+id*.7};
+  return{g,shadow,label,badge,fadeMaterials,crouchBlend:0,bob,hat,kit:kitGroup,arms,forearms,legs,cape,capeBase,clasp,crown,heldSpud,gun,eyes,brows,cheeks,pupils,lids,smile,mouth,lip,hurt:0,joy:0,gaze:0,lastHP:null,stride:0,walk:0,lastX:null,lastZ:null,blinkAt:2.5+id*.7};
  }
  updatePlayers(players,time,dt){// Moving platforms are drawn where the collider already is, so what a climber can stand on and
   // what they can see are the same object.
